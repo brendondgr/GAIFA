@@ -107,6 +107,9 @@ class Prompting:
             parts["skills"] = "\n\n".join(x for x in (block, parts["skills"]) if x)
             sizes["instructions"] += ctx.est(parts["task"])
             sizes["skills_memory"] = ctx.est(parts["skills"] + parts["memory"])
+        from .workflows.tool import prompt_part          # agent-workflows 1.3: also offers the `agent` tool (tools.spawn)
+        parts["workflow"] = await prompt_part(self, tid, tools)
+        sizes["instructions"] += ctx.est(parts["workflow"])
         return prompts.build(parts), sizes
 
     async def all_tools(self, model: str) -> bool:

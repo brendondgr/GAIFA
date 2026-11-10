@@ -96,8 +96,16 @@ def _any_site(row: dict[str, Any], arguments: Any) -> bool:
 
 
 def _thread(origin: dict[str, Any] | None) -> str | None:
-    t = (origin or {}).get("thread")
+    """The chat a `thread` grant is written for: a sub-agent's workflow root (`origin.root`, plan agent-workflows
+    1.4), so allowing a call in any chat of a workflow allows it in all of them; else the chat itself."""
+    t = (origin or {}).get("root") or (origin or {}).get("thread")
     return str(t) if t else None
+
+
+def _threads(origin: dict[str, Any] | None) -> tuple[str, str]:
+    """The chats whose `thread` grants cover a call: its own and its workflow's root (the same chat for a plain one)."""
+    t = str((origin or {}).get("thread") or "\0")
+    return t, str((origin or {}).get("root") or t)
 
 
 class Grants:
@@ -109,10 +117,10 @@ class Grants:
         """The newest live grant that covers this call, or None. Counts the use. `key`: the mod's own (27.4).
         In a dry run (the agent eval) a person's `always` grants don't count, only the ones GAIFA ships and
         the chat's own: the eval measures GAIFA's defaults, not this machine's choices."""
-        key, thread = key or key_of(tool.grant_key, arguments), _thread(origin)
+        key = key or key_of(tool.grant_key, arguments)
         rows = await self.db.fetchall(
-            "SELECT * FROM grants WHERE (expires_ts IS NULL OR expires_ts > ?) AND (scope = 'always' OR thread = ?) "
-            "ORDER BY created_ts DESC", (time.time(), thread or "\0"))
+            "SELECT * FROM grants WHERE (expires_ts IS NULL OR expires_ts > ?) AND (scope = 'always' OR thread IN (?, ?)) "
+            "ORDER BY created_ts DESC", (time.time(), *_threads(origin)))
         dry = bool((origin or {}).get("dry_run"))
         for r in rows:
             if dry and r["scope"] == "always" and not r["id"].startswith(SHIPPED_PREFIX):
@@ -164,12 +172,12 @@ class Grants:
         return {"tool": tool.name, "key": key, "kind": tool.grant_key, "risk": tool.risk, "scope": remember,
                 "thread": thread if remember == "thread" else None}
 
-    async def folders(self, tool_name: str, thread: str) -> list[dict[str, Any]]:
-        """The folders the user allowed in this chat for this tool's mod (plan 34), oldest first, as the mod reads
-        them in `origin.folders`: `[{path, level, grant}]`."""
+    async def folders(self, tool_name: str, thread: str, root: str | None = None) -> list[dict[str, Any]]:
+        """The folders the user allowed in this chat (or its workflow's `root`) for this tool's mod (plan 34), oldest
+        first, as the mod reads them in `origin.folders`: `[{path, level, grant}]`."""
         rows = await self.db.fetchall(
-            "SELECT id, tool, key FROM grants WHERE kind = ? AND thread = ? AND (expires_ts IS NULL OR expires_ts > ?) "
-            "ORDER BY created_ts", (FOLDER_KIND, thread, time.time()))
+            "SELECT id, tool, key FROM grants WHERE kind = ? AND thread IN (?, ?) AND (expires_ts IS NULL OR expires_ts > ?) "
+            "ORDER BY created_ts", (FOLDER_KIND, thread, root or thread, time.time()))
         return [{"path": r["key"][len("folder:"):], "level": "read", "grant": r["id"]} for r in rows
                 if fnmatch.fnmatchcase(tool_name, r["tool"]) and str(r["key"] or "").startswith("folder:/")]
 

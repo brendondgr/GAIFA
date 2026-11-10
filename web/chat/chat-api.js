@@ -18,6 +18,8 @@
 //   tasksUnread() runTask(kid) testTask(kid) checkTask(kid) taskNotes(kid) addTaskNote(kid, text) patchTaskNote(kid, nid, text)
 //   removeTaskNote(kid, nid) taskFolders(kid) addTaskFolder(kid, body) patchTaskFolder(kid, fid, p) removeTaskFolder(kid, fid)
 //   runAllows(kid, rid) addAllows(kid, body) runLog(kid, rid) watchTasks(onEvent)   (plan scheduled-tasks)
+//   tree(tid) requests(tid, {waiting}) decideRequest(tid, rid, {approve, reason, remember} | {answers}) seenChild(tid) watchWorkflows(onEvent)
+//                                                                                   (plan agent-workflows 3.1: sub-agents)
 //
 // Errors are ChatError {status, detail, code, data}; status 0 means GAIFA didn't answer.
 
@@ -115,6 +117,7 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
     threadCount: ({ q, archived, environment, project } = {}) => req('GET', '/v1/threads/count' + qs({ q, archived: archivedQ(archived), environment, project })),   // chat-history 1.1
     ...projectCalls(req, url, ES),                                                         // plan projects 1.3
     ...taskCalls(req, url, ES),                                                            // plan scheduled-tasks 4.1
+    ...workflowCalls(req, url, ES),                                                        // plan agent-workflows 3.1
     searchChats: (q, limit = 8) => req('GET', '/v1/chats/search' + qs({ q, limit })).then(r => r.results || []),  // plan 28.5
     create: (body = {}) => req('POST', '/v1/threads', body),
     get: tid => req('GET', T(tid)),
@@ -221,6 +224,19 @@ export function taskCalls(req, url, ES = globalThis.EventSource) {
     addAllows: (kid, body) => req('POST', `${K(kid)}/allow`, body),
     runLog: (kid, rid) => req('GET', `${K(kid)}/runs/${enc(rid)}/log`),
     watchTasks: onEvent => watch(url, ES, 'tasks', ev => (ev.type === 'task' || ev.type === 'task_run') && onEvent?.(ev)),
+  };
+}
+// Sub-agents (plan agent-workflows 3.1): a chat's workflow tree, its sub-agents' requests and deciding one from it.
+// watchWorkflows(onEvent) keeps /v1/streams?watch=workflows open for the `agent_child` events (a sub-agent started,
+// changed state or ended: {id, parent, root, child: <tree row>}).
+export function workflowCalls(req, url, ES = globalThis.EventSource) {
+  const T = tid => `/v1/threads/${enc(tid)}`;
+  return {
+    tree: tid => req('GET', `${T(tid)}/tree`),
+    requests: (tid, { waiting } = {}) => req('GET', `${T(tid)}/requests` + qs({ waiting: waiting ? 'true' : undefined })),
+    decideRequest: (tid, rid, body) => req('POST', `${T(tid)}/requests/${enc(rid)}`, body),
+    seenChild: tid => req('POST', `${T(tid)}/seen`),                                       // 3.2: its unread dot goes
+    watchWorkflows: onEvent => watch(url, ES, 'workflows', ev => ev.type === 'agent_child' && onEvent?.(ev)),
   };
 }
 function watch(url, ES, what, on) {

@@ -24,7 +24,7 @@ export function setPath(o, path, v) {
   return o;
 }
 // The Settings sections that live under [agent] in config.toml (utils/settings.py save()).
-const AGENT_TABLES = new Set(['judge', 'screen', 'permissions', 'web']);
+const AGENT_TABLES = new Set(['judge', 'screen', 'permissions', 'web', 'workflows']);
 /** A Settings path → its dotted config.toml key (`judge.threshold` → `agent.judge.threshold`). */
 export function configKey(path) { const top = String(path).split('.')[0]; return AGENT_TABLES.has(top) ? 'agent.' + path : String(path); }
 
@@ -39,6 +39,20 @@ export function field(id, path, o = {}) {
 export function instant(id, path, o = {}) { return { ...field(id, path, o), instant: true }; }
 /** A block: drawn by the component named `block`, from blocks-hub.js or blocks-agent.js. */
 export function block(id, name, o = {}) { return { id, control: 'block', block: name, key: null, keywords: [], ...o }; }
+/** Settings → Agent → Model's sub-agent rows (`[agent.workflows]`, plan agent-workflows 3.6). `d`: the draft. */
+export function subAgentRows(d) {
+  const on = () => d.workflows?.enabled !== false, kw = ['sub-agents', 'agent tool', 'workflow'];
+  return [
+    field('wfOn', 'workflows.enabled', { label: 'Sub-agents', hint: 'A chat may start sub-agents (the agent tool) for independent parts of its task: each a chat of its own, nested under it in the list.', control: 'toggle', keywords: [...kw, 'parallel'] }),
+    field('wfLocal', 'workflows.parallel_local', { label: 'Sub-agents at once on this machine', hint: 'On one GPU they only queue; more may not be faster.', control: 'number', min: 1, max: 16, width: 80, when: on, keywords: kw }),
+    field('wfRemote', 'workflows.parallel_remote', { label: 'Sub-agents at once on remote and cloud models', control: 'number', min: 1, max: 32, width: 80, when: on, keywords: kw }),
+    field('wfChildren', 'workflows.max_children', { label: 'Sub-agents per turn', hint: 'How many one turn of a chat may start.', control: 'number', min: 0, max: 64, width: 80, when: on, keywords: kw }),
+    field('wfDepth', 'workflows.max_depth', { label: 'Sub-agent depth', hint: '1: a sub-agent can’t start sub-agents of its own.', control: 'number', min: 1, max: 3, width: 80, when: on, keywords: kw }),
+    field('wfSteps', 'workflows.child_max_steps', { label: 'A sub-agent’s steps', control: 'number', min: 1, max: 200, width: 80, when: on, keywords: kw }),
+    field('wfTokens', 'workflows.workflow_tokens', { label: 'Sub-agents’ tokens per turn', hint: 'Every sub-agent of one turn together; past it they are stopped.', control: 'number', min: 1000, max: 100000000, step: 10000, unit: 'tokens', width: 120, when: on, keywords: [...kw, 'budget'] }),
+    field('wfWindow', 'workflows.min_window', { label: 'Sub-agents need a window of', hint: 'Models with a smaller context window don’t get the agent tool.', control: 'number', min: 0, max: 10000000, step: 1024, unit: 'tokens', width: 120, when: on, keywords: kw }),
+  ];
+}
 
 const knownMods = ctx => (ctx.services || []).filter(s => !(s.manifest_errors || []).length);
 const hasMod = (ctx, ...ids) => (ctx.services || []).some(s => ids.includes(s.id));
@@ -146,6 +160,7 @@ export function sections(ctx = {}) {
           control: 'segmented', choices: [{ value: 'fold', label: 'One fold per turn' }, { value: 'split', label: 'Split at each message' }],
           read: () => uiPrefs.get('chat.steps', 'fold'), apply: (c, v) => uiPrefs.set('chat.steps', v), keywords: ['split at each message', 'one fold per turn', 'layout', 'activity fold'] }),   // settings-that-stick 3.3
         block('llms', 'LlmLink', { label: 'Servers and keys', keywords: ['servers', 'API key', 'cloud'] }),   // llm-servers 4.1
+        ...subAgentRows(d),          // agent-workflows 3.6: in this group (a section has at most 7)
       ] },
       { id: 'documents', label: 'Documents', summary: () => 'Whole documents and the reply reserve', rows: [
         block('documents', 'DocumentsCard', { label: 'Documents', card: true, keywords: ['whole documents', 'reply reserve', 'tokens'] }),

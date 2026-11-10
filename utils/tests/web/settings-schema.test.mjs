@@ -93,6 +93,8 @@ test('2.1: nine sections in order, with their groups (LLMs since llm-servers 4.1
     'ModelsCard', 'DocumentsCard', 'InstructionsCard', 'MemoryCard', 'SkillsCard', 'MicsBlock', 'GrantsList', 'JudgedList'])
     assert.ok(rows.some(r => r.block === b), b);
   assert.equal(S.rowFor(secs, 'permissions.deny').key, 'agent.permissions.deny');
+  assert.equal(S.rowFor(secs, 'workflows.parallel_local').key, 'agent.workflows.parallel_local');   // agent-workflows 3.6
+  assert.equal(S.rowFor(secs, 'workflows.enabled').ref, 'agent/model/wfOn');
   assert.equal(S.rowFor(secs, 'judge.allow_commands').control, 'list');
   assert.match(S.rowFor(secs, 'judge.allow_commands').check('rm -rf; x').error, /^No shell/);
 });

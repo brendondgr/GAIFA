@@ -12,6 +12,7 @@ import { approvalButtons } from './chat-risk.js';
 import { decideFolder } from './chat-env.js';
 
 export function originText(o = {}) {
+  if (o.service === 'agent' && o.parent) return 'from a sub-agent';          // agent-workflows 3.4: its parent decides first
   if (o.service === 'agent') return 'from a chat';
   if (o.client) return `from ${o.client}${o.via ? ` (${String(o.via).toUpperCase()})` : ''}`;
   if (o.via) return `from ${String(o.via).toUpperCase()}`;
@@ -39,6 +40,7 @@ export function ApprovalsPanel({ api, approvals, loading, onDecided, toast = () 
     approvals.map(a => h('div', { key: a.id, style: { display: 'flex', flexDirection: 'column', gap: 4 } },
       h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: T.mut } },
         h('span', null, originText(a.origin)), h('span', null, '·'), h('span', null, fmtAgo(a.created_ts) === 'now' ? 'just now' : fmtAgo(a.created_ts) + ' ago'), h('span', { style: { flex: 1 } }),
+        a.origin?.service === 'agent' && a.origin?.parent ? h('a', { href: '#/chat/' + encodeURIComponent(a.origin.parent), style: { fontSize: 11.5 } }, 'Its parent chat →') : null,
         a.origin?.service === 'agent' && a.origin?.thread ? h('a', { href: '#/chat/' + encodeURIComponent(a.origin.thread), style: { fontSize: 11.5 } }, 'Open chat →') : null),
       h(ParamCard, { spec: { tool: a.tool, arguments: a.arguments, ask_fields: a.ask_fields, schema: a.schema, risk: a.risk, description: a.description, grant_key: a.grant_key,
           ...(a.origin?.ask_folder ? { limits: { action: 'read', key: 'folder:' + a.origin.ask_folder.path, ask_folder: a.origin.ask_folder } } : {}) }, compact: true, api, outputs: [], mods: [String(a.tool).split('_')[0]],

@@ -118,6 +118,15 @@ def origin_thread(request: Request) -> str | None:
     return t if isinstance(t, str) else None
 
 
+def no_sub_agent(request: Request) -> None:
+    """A sub-agent never writes memory (plan agent-workflows 2.4): what it learned goes back in its answer."""
+    tid = origin_thread(request)
+    t = request.app.state.agent.store.thread(tid) if tid else None
+    if t is not None and (t.get("settings") or {}).get("spawn"):
+        raise MemoryError(403, "sub_agent", "a sub-agent doesn't write memory",
+                          "say it in your answer: the chat that started you can remember it")
+
+
 def entity_view(m: Any, ref: str) -> dict[str, Any]:
     e = m.need(ref)
     facts = m.facts_of(e["id"], current=False)
@@ -215,6 +224,7 @@ def add_routes(app: FastAPI) -> None:
 
     @app.post("/v1/memory/save", summary="Remember a fact the user told you, about them or a project, person, place, tool or topic")
     def tool_save(body: SaveIn, request: Request) -> dict:
+        no_sub_agent(request)
         m = M(request)
         tid = origin_thread(request)
         f = m.add_fact(body.text, body.about, body.kind, body.valid_from, body.valid_until, "stated",
@@ -232,6 +242,7 @@ def add_routes(app: FastAPI) -> None:
 
     @app.post("/v1/memory/entity", summary="Make, rename, re-parent or describe an entry in memory (a project, person, place, tool, topic)")
     def tool_entity(body: EntityToolIn, request: Request) -> dict:
+        no_sub_agent(request)
         m = M(request)
         e = m.resolve(body.entity)
         if e is None:
@@ -248,6 +259,7 @@ def add_routes(app: FastAPI) -> None:
 
     @app.post("/v1/memory/forget", summary="Forget a fact for good, when the user asks you to (memory_search finds its id)")
     def tool_forget(body: ForgetIn, request: Request) -> dict:
+        no_sub_agent(request)
         return M(request).forget(body.fact, by="agent")
 
     @app.post("/v1/memory/learn", summary="Learn from the chats that went quiet now, instead of at the next pass; ?thread= one chat")

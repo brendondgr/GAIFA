@@ -472,5 +472,5 @@ test('the client asks for archived: all and the count; the mock answers the same
   const days = new Set(both.map(t => Math.floor((Date.now() / 1000 - t.updated) / 86400)));
   for (const d of [0, 2, 3, 5]) assert.ok(days.has(d), `a chat ${d} days old`);
   assert.ok([...days].some(d => d >= 8) && [...days].some(d => d > 365), 'older ones, and one from another year');
-  assert.equal((await cmock.createMockClient({}, { speed: 1000, history: false }).threads({ archived: 'all' })).filter(t => !t.settings?.project && !t.settings?.task).length, 2);   // and the projects' fixture chats (plan projects 1.3), the tasks' runs (scheduled-tasks 4.1)
+  assert.equal((await cmock.createMockClient({}, { speed: 1000, history: false }).threads({ archived: 'all' })).filter(t => !t.settings?.project && !t.settings?.task && !t.children && !t.settings?.external).length, 2);   // and the projects' fixture chats (plan projects 1.3), the tasks' runs (scheduled-tasks 4.1), a workflow and a chat another agent started (agent-workflows 3.1, 4.3)
 });

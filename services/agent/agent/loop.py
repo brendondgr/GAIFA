@@ -109,6 +109,8 @@ class Agent(Compaction, Queueing, Prompting):
         self.tasks: dict[str, asyncio.Task[Any]] = {}
         self.local = Local(self)
         self.on_turn_end: list[Callable[[str], Awaitable[None]]] = []
+        self.on_cancel: list[Callable[[str], Awaitable[None]]] = []   # after the user stops a chat (agent-workflows 1.2)
+        self.workflows: Any = None                # workflows/runner.Workflows, made in the app's lifespan
         self._deciding: set[str] = set()
         self._recalls: dict[str, set[asyncio.Task[Any]]] = {}   # chat-responsive 1.1: recall runs after the user event
         self._read_upto: dict[str, int] = {}     # the last seq the turn's latest model call read
@@ -145,7 +147,7 @@ class Agent(Compaction, Queueing, Prompting):
     def _unanswered(self, tid: str) -> bool:
         """A user message written after the turn's latest model call read the chat (sent while the reply streamed)."""
         mark = self._read_upto.get(tid)
-        return mark is not None and bool(self.store.events(tid, after=mark, types=("user",)))
+        return mark is not None and bool(self.store.events(tid, after=mark, types=("user", "agent_done", "agent_request")))   # agent-workflows 2.1–2.2
 
     # ---- entry points ------------------------------------------------------------------------
 
@@ -345,11 +347,16 @@ class Agent(Compaction, Queueing, Prompting):
             await self._dismiss_pending(tid, "Cancelled by the user.")
             self.set_state(tid, "idle", "cancelled")
             self._queue_after(tid, "idle")      # Stop sends what was held (chat-responsive 2.1)
+        for cb in self.on_cancel:              # its sub-agents stop too, after it (agent-workflows 1.2)
+            try:
+                await cb(tid)
+            except Exception:  # noqa: BLE001
+                log.exception("cancel hook")
 
     async def resume_all(self) -> int:
         """At startup: threads a crash left `running` continue."""
         n = 0
-        for t in self.store.threads(limit=1000):
+        for t in self.store.threads(limit=1000, children=True):     # sub-agents too (agent-workflows 1.1)
             if t["state"] == "running":
                 self.start(t["id"])
                 n += 1
@@ -385,6 +392,7 @@ class Agent(Compaction, Queueing, Prompting):
         await self._cloud_notice(tid, model)
         tools = ToolSet(self.hub, thread.get("settings") or {}, await self.all_tools(model))
         steps = 0
+        max_steps = int((thread.get("settings") or {}).get("max_steps") or self.cfg.max_steps)   # a sub-agent's own (agent-workflows 1.2)
         final, cancelled = "idle", False
         try:
             await tools.refresh()
@@ -395,8 +403,8 @@ class Agent(Compaction, Queueing, Prompting):
                     return
                 if pending == "action":
                     return
-                if steps >= self.cfg.max_steps:
-                    self.emit(tid, "assistant", {"text": f"I stopped at the step limit ({self.cfg.max_steps} steps) before "
+                if steps >= max_steps:
+                    self.emit(tid, "assistant", {"text": f"I stopped at the step limit ({max_steps} steps) before "
                                                           "finishing. Tell me to continue if you want me to go on.", "step": new_id("s_")})
                     self.emit(tid, "note", {"text": "step limit reached", "level": "warn"})
                     return
@@ -630,7 +638,9 @@ class Agent(Compaction, Queueing, Prompting):
             if (thread.get("settings") or {}).get("unattended"):
                 origin["unattended"] = True  # a scheduled run with no one watching: what would ask is refused (scheduled-tasks 2.2)
             from .projects.origin import chat_envs
+            from .workflows.settings import spawn_origin
             origin.update(chat_envs(thread.get("settings"), self.projects))   # the chat's workspace folders (plan 34; a project's: projects 2.2)
+            origin.update(spawn_origin(thread.get("settings")))     # a sub-agent's root, parent, read_only (agent-workflows 1.4)
             if mode == "auto":
                 origin["said"] = self._said(tid)   # the Auto judge reads the user's own words (plan 30.3)…
                 origin["narration"] = ctx.narration(self.store.events(tid))   # …and with context "full", this turn's text

@@ -98,7 +98,7 @@ export const moreOrLess = (row, shown, open = false) => (shown < row.count ? 'mo
 export const showAllOf = (shown, total, page = 20) => (total == null ? (shown >= page ? { n: null } : null) : total > shown ? { n: total } : null);
 /** `more` added after `list`, a chat already there (moved up between two loads) kept once, where it was first. */
 export const mergeById = (list, more) => { const ids = new Set(list.map(t => t.id)); return [...list, ...more.filter(t => !ids.has(t.id))]; };
-const pick = t => Object.fromEntries(['title', 'state', 'running', 'updated', 'archived'].filter(k => k in t).map(k => [k, t[k]]));
+const pick = t => Object.fromEntries(['title', 'state', 'running', 'updated', 'archived', 'children'].filter(k => k in t).map(k => [k, t[k]]));   // children: agent-workflows 3.2
 
 /** What an empty list says, per Show. */
 export const emptyText = (show, q = '') => (q ? `No chats match “${q}”.` : show === 'archived' ? 'No archived chats.' : 'No chats yet. Start one ↑');

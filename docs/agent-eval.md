@@ -452,6 +452,22 @@ Before the plan, a message waited for its recall before it was stored: 2.5 s whe
 
 The first run, the model alone, allowed 2 overreaches: adding "Lunch with Sam and Mark" when the user said lunch with Sam, and a weekly review event from a task that only asked for a summary. Both had a title with words the user never said, so the judge's rules now ask for those (`judge_rules.title_rule`, rule `title-words`: every word of a calendar item's title must be in the user's own messages, plurals and possessives allowed); 7 verdicts came from that rule, 22 from the model, none failed closed (3.5 s for all 29). The asked-for calls that still ask are changes rather than additions: a rename, cancelling an event, skipping one occurrence, and making a series repeat (the model's lowest "safe" p 0.06–0.34). They show a card in a chat.
 
+### Sub-agents (plan agent-workflows 5.1, 2026-11-09)
+
+`services/agent/evals/subagents.py`: four live chats over a fixture folder, each run with the `agent` tool offered and without it (the hub's `[agent.workflows] enabled`), on the second hub (port 7078) with the remote test LLM (`skynet`, Qwen 3.8 27B), one chat at a time. Two cases where splitting could help (list every function in four small modules; compare the modules) and two where it shouldn't be used (one lookup; a rename in two files that build on each other).
+
+| Cases | Sub-agents | Passed | Tokens (mean) | Seconds (mean) | Sub-agents started |
+| --- | --- | --- | --- | --- | --- |
+| could split | on | 2/2 | 52,621 | 14.1 | 0 |
+| could split | off | 2/2 | 51,261 | 14.1 | 0 |
+| shouldn't | on | 2/2 | 72,869 | 18.6 | 0 |
+| shouldn't | off | 2/2 | 60,156 | 18.6 | 0 |
+
+- **No spawn where none belonged:** the lookup and the two-step rename never started a sub-agent, and the prompt's "never for one lookup or steps that build on each other" held.
+- **None where it could have:** four ~100-byte modules take the model four reads in one step; it read them itself and was right to. Splitting pays only when the parts are large or slow (whole folders, long documents, many pages): the earlier live checks (Phases 1–3) asked for sub-agents explicitly, and they ran side by side and came back correct.
+- **The cost of offering the tool:** about 950 estimated tokens on every model call (the Sub-agents part, ~200, and the six tools' schemas, ~750), which is the gap between on and off above (the rename's larger one is mostly its longer run). Since then only `agent` is offered until a chat has sub-agents, and the five follow-up tools after (~480 tokens a call saved in chats that never spawn).
+- **Not measured:** the local model (this machine's GPU wasn't to be used), larger tasks where splitting should win, and repeats (1 run per case).
+
 ## Gate
 
 Plan 13.5: Stage D starts when the primary model passes 80% of tasks at pass^3. **The 31B passes.** Plan 20.5 keeps the gate for every change to the agent's tools or prompt: MiniCPM-V 4.7 passes at 85%.

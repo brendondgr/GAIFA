@@ -128,6 +128,7 @@ class FakeHub:
         self.synonyms: list[tuple[str, str]] = []        # (query word, text word) pairs the fake treats as close in meaning
         self.judge_up = True                             # scheduled-tasks 2.2: GET /api/judge/status
         self.grant_fail: set[str] = set()                # tools POST /api/grants refuses (unknown_tool)
+        self.settings_extra: dict[str, Any] = {}         # more of GET /api/settings (agent-workflows: `workflows`)
 
     def publish(self, ev: dict[str, Any]) -> None:
         for q in list(self.subs):
@@ -316,11 +317,15 @@ class FakeHub:
                 return {"status": "error", "tool": name, "error": {"code": "invalid_arguments", "detail": f"{missing[0]} is required",
                                                                    "fix": f"add {missing[0]}"}}
             risk = t["risk"]
+            if (body.get("origin") or {}).get("read_only") and risk not in ("read", "network"):   # agent-workflows 1.4
+                return {"status": "denied", "tool": name, "error": {"code": "read_only", "detail": f"{name}: this sub-agent only reads",
+                                                                   "fix": "say what should change"}}
             if mode in ("plan", "read_only") and risk != "read":
                 return {"status": "denied", "tool": name, "error": {"code": "denied", "detail": "Plan mode: only tools that read can run"}}
             asks = name in ASK or (risk != "read" and not (mode in ("accept_edits", "auto", "bypass") and risk != "destructive"))
             origin = body.get("origin") or {}
-            grant = next((g for g in self.grants if g.get("thread") == origin.get("thread") and fnmatch.fnmatchcase(name, g["tool"])
+            grant = next((g for g in self.grants if g.get("thread") in (origin.get("thread"), origin.get("root") or origin.get("thread"))
+                          and fnmatch.fnmatchcase(name, g["tool"])
                           and (g.get("key") in (None, "*") or g.get("key") in str(args.get("url") or ""))), None)
             if asks and grant is not None:               # scheduled-tasks 2.1: a chat's grant runs it
                 return {**await self._wait(self._start(name, args, mode), wait), "grant_id": grant["id"]}
@@ -393,6 +398,10 @@ class FakeHub:
             out = await self._wait(st, wait)
             if body.get("remember") in ("thread", "always"):
                 out = {**out, "grant": {"id": "gr_" + aid, "scope": body["remember"]}}
+                if body["remember"] == "thread":                # agent-workflows 1.4: a workflow's grant is its root's
+                    o = a.get("origin") or {}
+                    self.grants.append({"id": "gr_" + aid, "tool": a["tool"], "thread": o.get("root") or o.get("thread"),
+                                        "scope": "thread", "key": None})
             return out
 
         @app.get("/api/grants")
@@ -640,7 +649,8 @@ class FakeHub:
 
         @app.get("/api/settings")
         def settings() -> dict:
-            return {"learning": {"enabled": True, "nightly_at": "03:00", "idle_min": 60, "infer_after": 2, "fade_days": 60}}
+            return {"learning": {"enabled": True, "nightly_at": "03:00", "idle_min": 60, "infer_after": 2, "fade_days": 60},
+                    **self.settings_extra}
 
         @app.get("/api/skills")
         def skills() -> list:

@@ -52,6 +52,7 @@ CANCELLED = {"cancelled", "canceled"}
 FOLLOW_MAX_S = 6 * 3600
 POLL_S = 2.0
 DEFAULT_WAIT_S = 1800.0
+READ_ONLY_RISKS = ("read", "network")   # what a read-only sub-agent may call: reading, here or on the web (agent-workflows 1.4)
 OUTPUT_ID = re.compile(r"^[0-9a-f]{12}$")
 PLACEHOLDER = re.compile(r"\{[^}]+\}")
 
@@ -185,6 +186,12 @@ class Calls:
             if err := await hub_tools.precheck(self.hub, tool.name, arguments):
                 await self._refused(tool.name, arguments, origin, err)
                 return {"status": "error", "tool": tool.name, "error": err}
+        if (origin or {}).get("read_only") and tool.risk not in READ_ONLY_RISKS:   # a read-only sub-agent (agent-workflows 1.4)
+            err = {"code": "read_only", "detail": f"{tool.name} ({tool.risk}): this sub-agent only reads",
+                   "fix": "don't retry it; say in your answer what should change, so the chat that started you can do it "
+                          "or start a sub-agent that may change files"}
+            await self._refused(tool.name, arguments, origin, err)
+            return {"status": "denied", "tool": tool.name, "error": err}
         origin = await self._folders(tool, origin)    # the folders the user allowed in this chat (plan 34)
         limits = await self._limits(tool, arguments, origin) if tool.limits else None
         grant = await self.hub.grants.match(tool, arguments, origin, (limits or {}).get("key")) \
@@ -401,7 +408,7 @@ class Calls:
         (`[{path, level, grant}]`, from the chat's folder grants). Only the hub sets it: a caller's is dropped."""
         o = {k: v for k, v in (origin or {}).items() if k != "folders"}
         if tool.limits and o.get("thread") and self.hub.grants is not None:
-            if rows := await self.hub.grants.folders(tool.name, str(o["thread"])):
+            if rows := await self.hub.grants.folders(tool.name, str(o["thread"]), o.get("root")):   # a workflow's root's too
                 o["folders"] = rows
         return o
 

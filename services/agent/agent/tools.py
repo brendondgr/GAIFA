@@ -82,8 +82,9 @@ LOCAL: list[dict[str, Any]] = [
 ]
 from .projects.tools import NAMES as PROJECT_NAMES, TOOLS as PROJECT_TOOLS  # noqa: E402 - plan projects 3.4
 from .tasks.notes import NAMES as TASK_NAMES, TOOLS as TASK_TOOLS  # noqa: E402 - scheduled-tasks 2.4
+from .workflows.tool import NAMES as WORKFLOW_NAMES, TOOLS as WORKFLOW_TOOLS  # noqa: E402 - agent-workflows 1.3
 
-LOCAL_NAMES = {t["name"] for t in LOCAL} | PROJECT_NAMES | TASK_NAMES   # a project chat's and a scheduled run's tools run locally too
+LOCAL_NAMES = {t["name"] for t in LOCAL} | PROJECT_NAMES | TASK_NAMES | WORKFLOW_NAMES   # a project chat's, a scheduled run's and a workflow's tools run locally too
 READ_ONLY_LOCAL = LOCAL_NAMES - {"remember", "task_note"}
 
 
@@ -126,12 +127,16 @@ class ToolSet:
         self.on: set[str] = set(settings.get("mcp_on") or [])
         self.project: str | None = settings.get("project") or None   # a project chat has the project tools (plan projects 3.4)
         self.task: str | None = settings.get("task") or None         # a scheduled run has task_note (scheduled-tasks 2.4)
+        self.spawn = False                       # the `agent` tool: set with the Sub-agents prompt part (agent-workflows 1.3)
+        self.spawn_more = False                  # agent_wait, …_send, …_stop, …_list, …_review: once the chat has sub-agents (5.2)
+        self.child = bool(settings.get("spawn"))  # a sub-agent: no remember, no agent_memory_* (agent-workflows 2.4)
         self.index: list[dict[str, Any]] = []
         self.full: dict[str, dict[str, Any]] = {}
         self.notes: dict[str, str] = {}              # tool → the harness's note (plan 22.2)
 
     def off(self, t: dict[str, Any]) -> bool:
-        return t["mod"] in self.disabled or group_of(t) in self.disabled
+        return (t["mod"] in self.disabled or group_of(t) in self.disabled or (self.child and t["name"].startswith("agent_memory_"))
+                or t["name"].startswith("agent_chat_"))    # other agents' chat tools (/mcp): a chat here has its agent tool
 
     def hidden(self, t: dict[str, Any]) -> bool:
         g = group_of(t)
@@ -150,7 +155,9 @@ class ToolSet:
         return next((t for t in self.index if t["name"] == name), None)
 
     def local(self) -> list[dict[str, Any]]:
-        return LOCAL + (PROJECT_TOOLS if self.project else []) + (TASK_TOOLS if self.task else [])
+        return ([t for t in LOCAL if not (self.child and t["name"] == "remember")]
+                + (PROJECT_TOOLS if self.project else []) + (TASK_TOOLS if self.task else [])
+                + (WORKFLOW_TOOLS[:1] if self.spawn else []) + (WORKFLOW_TOOLS[1:] if self.spawn and self.spawn_more else []))
 
     def visible(self) -> set[str]:
         return set(self.full) | {t["name"] for t in self.local()}

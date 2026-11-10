@@ -7,6 +7,7 @@
 import { webTurn } from './chat-mock-web.js';
 import { createProjectMocks } from './chat-mock-projects.js';
 import { createTaskMocks } from './chat-mock-tasks.js';
+import { createAgentMocks } from './chat-mock-agents.js';
 import { seedHistory } from './chat-mock-history.js';
 
 const CANCEL = Symbol('cancelled');
@@ -69,9 +70,11 @@ export function createMockClient(api, { speed = 1, history = true } = {}) {
     return t;
   }
   const T = tid => { const t = threads.get(tid); if (!t) throw err(404, `no thread '${tid}'`, 'not_found'); return t; };
-  const pub = t => ({ ...t.thread, running: !!t.run });
+  const pub = t => ({ ...t.thread, running: !!t.run, children: wf.childrenOf(t.thread.id),               // agent-workflows 3.1
+    ...(t.thread.settings?.spawn ? { spawn: t.thread.settings.spawn } : {}) });
   const proj = createProjectMocks({ threads, newThread, emit: (...a) => emit(...a), net: () => net(), err, now, rid, pub });   // plan projects 1.3
   const tsk = createTaskMocks({ threads, newThread, emit: (...a) => emit(...a), net: () => net(), err, now, rid, projects: () => proj.list() });   // scheduled-tasks 4.1
+  const wf = createAgentMocks({ threads, newThread, emit: (...a) => emit(...a), net: () => net(), err, now, rid });   // agent-workflows 3.1
   function emit(t, type, payload) {
     const ev = { thread_id: t.thread.id, seq: t.events.length + 1, ts: now(), type, payload };
     t.events.push(ev); t.thread.updated = ev.ts;
@@ -347,7 +350,7 @@ export function createMockClient(api, { speed = 1, history = true } = {}) {
   async function seed() {
     if (seeded) return seeded;
     seeded = (async () => {
-      proj.seed(); tsk.seed();                 // the projects, then the scheduled tasks and their run chats (scheduled-tasks 4.1)
+      proj.seed(); tsk.seed(); wf.seed();      // the projects, the scheduled tasks and their run chats, a workflow (agent-workflows 3.1)
       const t = newThread({ title: 'Fox in the snow' });
       const q = QUESTIONS.slice(0, 2), qid = rid('tc_'), cid = rid('tc_'), s = rid('s_');
       const tool = await toolSchema('comfy_generate_image'), out = await makeOutput(t, 'image', 'a red fox in fresh snow, photoreal, 16:9');
@@ -385,6 +388,7 @@ export function createMockClient(api, { speed = 1, history = true } = {}) {
     return [...threads.values()].filter(t => inView(t, archived)).filter(t => !envs || envs.includes(t.thread.settings?.environment || 'default'))
       .filter(t => !projs || projs.includes(t.thread.settings?.project || 'none'))   // plan projects 1.3
       .filter(t => !tks || tks.includes(t.thread.settings?.task || 'none'))          // scheduled-tasks 4.1
+      .filter(t => qq || !t.thread.settings?.spawn)                                  // sub-agents only in a search (agent-workflows 1.1)
       .filter(t => !qq || t.thread.title.toLowerCase().includes(qq) || t.events.some(e => ['user', 'assistant'].includes(e.type) && String(e.payload.text).toLowerCase().includes(qq)));
   };
   return {
@@ -560,6 +564,9 @@ export function createMockClient(api, { speed = 1, history = true } = {}) {
     async setSkill(name, enabled) { await net(); const k = settings.skills.find(x => x.id === 'user/' + name); if (k) k.enabled = enabled; return structuredClone(k); },
     ...Object.fromEntries(Object.entries(proj).filter(([k]) => !['newChatBody', 'movePatch', 'seed', 'list'].includes(k))),   // plan projects 1.3
     ...Object.fromEntries(Object.entries(tsk).filter(([k]) => k !== 'seed')),          // scheduled-tasks 4.1
+    tree: tid => seed().then(() => wf.tree(tid)), requests: (tid, o) => seed().then(() => wf.requests(tid, o)),   // agent-workflows 3.1
+    decideRequest: (tid, rqid, body) => wf.decideRequest(tid, rqid, body), watchWorkflows: on => wf.watchWorkflows(on),
+    seenChild: tid => wf.seenChild(tid),
     async deleteSkill(name) { await net(); settings.skills = settings.skills.filter(x => x.id !== 'user/' + name); return { deleted: name }; },
   };
 }

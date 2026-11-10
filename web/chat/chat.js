@@ -35,7 +35,8 @@ import { ProjectChats } from './chat-project-groups.js';
 import { ProjectPage } from './chat-project.js';
 import { TasksPage, TasksEntry } from './chat-tasks.js';
 import { TaskPage } from './chat-task.js';
-import { single, panes, activePane, setTid, setActive, dropTids, loadLayout, saveLayout } from './chat-layout.js';
+import { single, panes, activePane, setTid, setActive, dropTids, loadLayout, saveLayout, splitPane } from './chat-layout.js';
+import './chat-agents.js';
 import { CONTROLS_CSS } from './chat-controls.js';
 import { QUOTE_CSS } from './chat-quote.js';
 import { QREPLY_CSS } from './chat-quote-reply.js';
@@ -98,6 +99,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const React = R(), { useState, useEffect, useRef, useMemo } = React;
   const c = getChatClient(api), sub = subPage(route), allPage = sub?.page === 'all', tid = sub ? null : route?.parts?.[1] || null;   // chat-history 3.1, projects 5.1
   const [rootRef, width] = useWidth(1000), narrow = width < 760;
+  const narrowRef = useRef(narrow); narrowRef.current = narrow;
   const [threads, setThreads] = useState([]), [listLoading, setListLoading] = useState(true), [q, setQ] = useState(''), [total, setTotal] = useState(null);
   const [models, setModels] = useState(null), [settings, setSettings] = useState(null), [tools, setTools] = useState(null);
   const [drawer, setDrawer] = useState(false), [down, setDown] = useState(null);
@@ -167,6 +169,19 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     document.addEventListener('gaifa:open-output', on);
     return () => document.removeEventListener('gaifa:open-output', on);
   }, [openOutput]);
+  useEffect(() => {       // agent-workflows 3.3: a sub-agent's Open puts it in a pane beside the chat that asked (narrow: in its place)
+    const on = e => {
+      const { tid: id, pane } = e.detail || {};
+      if (!id) return;
+      if (narrowRef.current) { go('#/chat/' + id); return; }
+      setLayout(L => { const open = panes(L.root).find(p => p.tid === id);
+        if (open) return setActive(L, open.id);
+        const full = c.live && !c.sharedStream && panes(L.root).length >= MAX_PANES;   // each pane its own stream: as the split's limit
+        return full ? setTid(L, activePane(L).id, id) : splitPane(L, pane || L.active, 'right', id); });
+    };
+    document.addEventListener('gaifa:open-chat-beside', on);
+    return () => document.removeEventListener('gaifa:open-chat-beside', on);
+  }, []);
   const mods = useMemo(() => [...new Set((tools || []).map(t => t.mod))], [tools]);
 
   // ---- the list's actions ----
@@ -174,7 +189,9 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const patched = t => { if (!t?.id) return; listPatch(t.id, t); bus.current.dispatchEvent(new CustomEvent('patched', { detail: t })); };   // every pane showing it
   const rename = (t, title) => c.patch(t.id, { title }).then(patched, fail);
   const archive = t => c.patch(t.id, { archived: !t.archived }).then(() => {   // with Show: Both the row stays, dimmed or not
-    setThreads(l => (archived === 'all' ? l.map(x => (x.id === t.id ? { ...x, archived: !t.archived } : x)) : l.filter(x => x.id !== t.id))); relist(); toast(t.archived ? 'Moved back to chats' : 'Archived', 'success'); }, fail);
+    setThreads(l => (archived === 'all' ? l.map(x => (x.id === t.id ? { ...x, archived: !t.archived } : x)) : l.filter(x => x.id !== t.id))); relist();
+    const kids = t.children > 0 ? ` with its ${t.children === 1 ? 'sub-agent' : `${t.children} sub-agents`}` : '';   // agent-workflows 3.5
+    toast((t.archived ? 'Moved back to chats' : 'Archived') + kids, 'success'); }, fail);
   const move = (t, env) => c.patch(t.id, { settings: { environment: env } }).then(n => {   // plan 41.2: Move to
     patched(n); relist();
     toast(`Moved to ${(envs || []).find(e => e.id === env)?.name || env}`, 'success');
@@ -186,15 +203,27 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const [tasks, setTasks] = useState([]);             // scheduled-tasks 4.2: the Scheduled row
   const loadTasks = () => c.tasks?.().then(setTasks, () => setTasks([]));
   useEffect(() => { loadTasks(); const w = c.watchTasks?.(() => loadTasks()); return () => w?.close(); }, []);
+  useEffect(() => {          // agent-workflows 3.2: sub-agents started, changed or ended; the trees follow, a parent's row counts them
+    const known = new Set();
+    const w = c.watchWorkflows?.(ev => {
+      bus.current.dispatchEvent(new CustomEvent('agent_child', { detail: ev }));
+      if (!ev.child || known.has(ev.child.id) || !ev.parent) return;
+      known.add(ev.child.id);                // the first time the page hears of one: its parent's row, with its count
+      c.get(ev.parent).then(p => patched(p), () => {});
+    });
+    return () => w?.close();
+  }, []);
   const newInProject = p => { setCmd(x => ({ n: (x?.n || 0) + 1, type: 'new', project: p || null, pane: lref.current.active })); setDrawer(false); if (sub) go('#/chat'); };   // 5.4
   const moveProject = (t, pid) => c.patch(t.id, { settings: { project: pid } }).then(n => {
     patched(n); relist();
     toast(pid ? `Moved to the project ${projects.find(p => p.id === pid)?.name || ''}` : 'Removed from the project', 'success');
   }, fail);
   const itemProps = t => ({ moveTo: (envs || []).filter(e => e.id !== ((t.settings || {}).environment || (envs || []).find(x => x.default)?.id)),
-    onMove: envs ? env => move(t, env) : null, projects, onProject: c.projects ? pid => moveProject(t, pid) : null });
+    onMove: envs ? env => move(t, env) : null, projects, onProject: c.projects ? pid => moveProject(t, pid) : null,
+    tree: c.tree ? { c, bus: bus.current, activeId: tid, onOpen: () => setDrawer(false) } : null });   // agent-workflows 3.2
   const remove = async t => {
-    const ok = confirm ? await confirm({ title: `Delete “${t.title || 'this chat'}”?`, body: 'The chat and its history are deleted. Its outputs stay in Outputs.', confirmLabel: 'Delete chat', danger: true }) : window.confirm('Delete this chat?');
+    const kids = t.children > 0 ? ` and its ${t.children === 1 ? 'sub-agent' : `${t.children} sub-agents`}` : '';   // agent-workflows 3.5: they go with it
+    const ok = confirm ? await confirm({ title: `Delete “${t.title || 'this chat'}”?`, body: `The chat${kids} and ${kids ? 'their histories are' : 'its history is'} deleted. Its outputs stay in Outputs.`, confirmLabel: 'Delete chat', danger: true }) : window.confirm('Delete this chat?');
     if (!ok) return;
     try { await c.remove(t.id); setThreads(l => l.filter(x => x.id !== t.id)); relist(); setLayout(L => dropTids(L, [t.id])); toast('Chat deleted', 'success'); } catch (e) { fail(e); }
   };

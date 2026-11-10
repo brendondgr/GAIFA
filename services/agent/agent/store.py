@@ -22,8 +22,13 @@ Event types (payload fields):
     error           {code, detail, fix?}
     state           {state: idle | running | waiting | cancelled | error, reason?}
     project_refresh {for: seq, pages: [{sid, title, ok, error?, slow?}]}   (a project chat's pages fetched again, plan projects 3.5)
+    agent_done      {child, label, state, answer, refused?, error?, chat}   (a background sub-agent ended, agent-workflows 2.1)
+    agent_request   {id, child, label, kind, call, approval_id?, tool?, risk?, arguments?, questions?, in_result}   (2.2)
+    agent_review    {id, child, action: deny | forward, reason, kind, approval_id?, auto?}   (the parent's review, 2.2)
 
 Fork copies the events up to a seq into a new thread (rewind and branch).
+A sub-agent (plan agent-workflows 1.1) is a thread with `parent_id` and `settings.spawn` = {root, parent, label, by,
+tool_call_id, write, depth, seen}; a fork has `parent_id` without `spawn`. Lists leave sub-agents out unless asked.
 """
 
 from __future__ import annotations
@@ -40,6 +45,9 @@ from typing import Any
 ENV_OF = "COALESCE(json_extract(settings, '$.environment'), 'default')"
 PROJ_OF = "COALESCE(json_extract(settings, '$.project'), 'none')"     # a chat's project (plan projects 1.1); `none`: no project
 TASK_OF = "COALESCE(json_extract(settings, '$.task'), 'none')"        # a run chat's task (plan scheduled-tasks 1.2)
+SPAWN_PARENT = "json_extract(settings, '$.spawn.parent')"                # a sub-agent's parent (plan agent-workflows 1.1)
+SPAWN_ROOT = "json_extract(settings, '$.spawn.root')"                    # …and its workflow's root chat
+NOT_SPAWNED = " AND json_extract(settings, '$.spawn') IS NULL"
 GROUP_OF = {"environment": ENV_OF, "project": PROJ_OF}
 SORTS = {"updated": "updated DESC", "created": "created DESC", "title": "lower(title) ASC, updated DESC"}
 
@@ -58,6 +66,8 @@ CREATE TABLE IF NOT EXISTS threads (
     fork_seq  INTEGER
 );
 CREATE INDEX IF NOT EXISTS threads_updated ON threads (archived, updated DESC);
+CREATE INDEX IF NOT EXISTS threads_spawn_parent ON threads (json_extract(settings, '$.spawn.parent'));
+CREATE INDEX IF NOT EXISTS threads_spawn_root ON threads (json_extract(settings, '$.spawn.root'));
 CREATE TABLE IF NOT EXISTS events (
     thread_id TEXT NOT NULL,
     seq       INTEGER NOT NULL,
@@ -128,6 +138,10 @@ class Store:
         t = dict(r)
         t["settings"] = json.loads(t["settings"] or "{}")
         t["archived"] = bool(t["archived"])
+        if "children" not in t:
+            t["children"] = self._one(f"SELECT COUNT(*) FROM threads WHERE {SPAWN_PARENT} = ?", (t["id"],))[0]
+        if t["settings"].get("spawn"):
+            t["spawn"] = t["settings"]["spawn"]
         return t
 
     def create_thread(self, title: str = "", model: str | None = None, mode: str = "manual",
@@ -144,12 +158,53 @@ class Store:
     def thread(self, tid: str) -> dict[str, Any] | None:
         return self._thread(self._one("SELECT * FROM threads WHERE id = ?", (tid,)))
 
+    # ---- sub-agents (plan agent-workflows 1.1) ------------------------------------------------
+
+    def children(self, tid: str) -> list[dict[str, Any]]:
+        """A chat's sub-agents, oldest first (archived ones too: they go with their parent)."""
+        return [self._thread(r) for r in self._all(f"SELECT * FROM threads WHERE {SPAWN_PARENT} = ? ORDER BY created", (tid,))]  # type: ignore[misc]
+
+    def descendants(self, root: str) -> list[dict[str, Any]]:
+        """Every sub-agent of the workflow whose root chat is `root`, oldest first."""
+        return [self._thread(r) for r in self._all(f"SELECT * FROM threads WHERE {SPAWN_ROOT} = ? ORDER BY created", (root,))]  # type: ignore[misc]
+
+    def spawned(self, states: tuple[str, ...]) -> list[dict[str, Any]]:
+        """Sub-agents in these states, in every workflow, oldest first (the runner's queue)."""
+        marks = ", ".join("?" * len(states))
+        return [self._thread(r) for r in self._all(f"SELECT * FROM threads WHERE json_extract(settings, '$.spawn') IS NOT NULL "  # type: ignore[misc]
+                                                    f"AND state IN ({marks}) ORDER BY created", states)]
+
+    def root_of(self, tid: str) -> str:
+        """The workflow's root chat: a sub-agent's `spawn.root`, else the chat itself."""
+        t = self.thread(tid)
+        return str((((t or {}).get("settings") or {}).get("spawn") or {}).get("root") or tid)
+
+    def tree(self, tid: str) -> dict[str, Any] | None:
+        """The workflow `tid` is in: its root chat and every sub-agent (flat, each with its `parent`)."""
+        root = self.thread(self.root_of(tid))
+        if root is None:
+            return None
+        nodes = []
+        for c in self.descendants(root["id"]):
+            sp = c["settings"].get("spawn") or {}
+            nodes.append({"id": c["id"], "title": c["title"], "label": sp.get("label") or c["title"], "parent": sp.get("parent"),
+                          "state": c["state"], "model": c["model"], "mode": c["mode"], "write": bool(sp.get("write")),
+                          "depth": int(sp.get("depth") or 1), "by": sp.get("by") or "agent",
+                          "seen": sp.get("seen", True) is not False, "archived": c["archived"], "created": c["created"],
+                          "updated": c["updated"], "children": c["children"]})
+        return {"root": {k: root[k] for k in ("id", "title", "state", "model", "mode", "archived", "created", "updated", "children")},
+                "children": nodes}
+
     @staticmethod
     def _where(q: str | None, archived: bool | None, environment: list[str] | None,
-               project: list[str] | None = None, task: list[str] | None = None) -> tuple[str, list[Any]]:
+               project: list[str] | None = None, task: list[str] | None = None,
+               children: bool = False) -> tuple[str, list[Any]]:
         """The list's clauses, shared by `threads`, `count` and `groups`: `archived` None means both (plan chat-history
-        1.1); `project` the chats of some projects (plan projects 1.1: `none` matches chats in none)."""
+        1.1); `project` the chats of some projects (plan projects 1.1: `none` matches chats in none). Sub-agents only
+        with `children` or a search (plan agent-workflows 1.1)."""
         sql, args = " WHERE 1", []
+        if not children and not q:
+            sql += NOT_SPAWNED
         if archived is not None:
             sql += " AND archived = ?"
             args.append(int(archived))
@@ -170,20 +225,22 @@ class Store:
 
     def threads(self, q: str | None = None, archived: bool | None = False, limit: int = 200,
                 environment: list[str] | None = None, sort: str = "updated", offset: int = 0,
-                project: list[str] | None = None, task: list[str] | None = None) -> list[dict[str, Any]]:
+                project: list[str] | None = None, task: list[str] | None = None,
+                children: bool = False) -> list[dict[str, Any]]:
         """Newest first (`sort`: updated | created; `title` A to Z), optionally only the chats of some environments
         (plan 41.1: `default` also matches chats without one) or projects (plan projects 1.1); `archived` None lists
         live and archived together."""
-        where, args = self._where(q, archived, environment, project, task)
-        sql = "SELECT * FROM threads" + where
+        where, args = self._where(q, archived, environment, project, task, children)
+        sql = ("SELECT *, (SELECT COUNT(*) FROM threads c WHERE json_extract(c.settings, '$.spawn.parent') = threads.id) "
+               "AS children FROM threads" + where)
         sql += " ORDER BY " + SORTS.get(sort, SORTS["updated"]) + " LIMIT ? OFFSET ?"
         args += [limit, max(0, offset)]
         return [self._thread(r) for r in self._all(sql, args)]  # type: ignore[misc]
 
     def count(self, q: str | None = None, archived: bool | None = False, environment: list[str] | None = None,
-              project: list[str] | None = None, task: list[str] | None = None) -> int:
+              project: list[str] | None = None, task: list[str] | None = None, children: bool = False) -> int:
         """How many chats `threads` would list with these filters and no limit (plan chat-history 1.1)."""
-        where, args = self._where(q, archived, environment, project, task)
+        where, args = self._where(q, archived, environment, project, task, children)
         return int(self._one("SELECT COUNT(*) FROM threads" + where, args)[0])
 
     def groups(self, archived: bool | None = False, by: str = "environment") -> list[dict[str, Any]]:
@@ -215,6 +272,9 @@ class Store:
             args += [time.time(), tid]
             with self._lock:
                 self._c.execute(f"UPDATE threads SET {', '.join(sets)} WHERE id = ?", args)
+                if fields.get("archived") is not None:          # a workflow's sub-agents go with its root (agent-workflows 1.1)
+                    self._c.execute(f"UPDATE threads SET archived = ? WHERE {SPAWN_ROOT} = ?",
+                                    (int(bool(fields["archived"])), tid))
         return self.thread(tid)
 
     def events_by_type(self, types: list[str], since: float = 0) -> list[dict[str, Any]]:
@@ -290,7 +350,8 @@ class Store:
         events = self.events(tid, 0, seq)
         events = trim_unresolved(events)
         title = (src["title"] or "Chat") + " (branch)"
-        new = self.create_thread(title, src["model"], src["mode"], src["settings"], parent_id=tid, fork_seq=seq)
+        settings = {k: v for k, v in src["settings"].items() if k != "spawn"}   # a branch is a chat of its own, not a sub-agent
+        new = self.create_thread(title, src["model"], src["mode"], settings, parent_id=tid, fork_seq=seq)
         with self._lock:
             self._c.execute("BEGIN")
             for i, e in enumerate(events, 1):

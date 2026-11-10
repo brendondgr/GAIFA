@@ -14,6 +14,7 @@ from . import show, skillfmt
 from .knowledge import Knowledge
 from .projects.tools import ProjectTools
 from .tasks.notes import TaskTools
+from .workflows.tool import WorkflowTools
 
 if TYPE_CHECKING:
     from .loop import Agent
@@ -28,7 +29,7 @@ STAND_IN = ("a dry-run stand-in: this chat is an evaluation, so nothing was gene
             "look at. Treat it as a good result of its prompt and carry on as you would with the real output")
 
 
-class Local(ProjectTools, TaskTools):
+class Local(ProjectTools, TaskTools, WorkflowTools):
     def __init__(self, agent: Agent) -> None:
         self.a = agent
 

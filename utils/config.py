@@ -266,11 +266,26 @@ class WebReadCfg(_Strict):
     timeout_s: float = Field(8.0, gt=0)                     # slower → lexical's order
 
 
+class WorkflowsCfg(_Strict):
+    """Sub-agents (plan agent-workflows): a chat's `agent` tool and the limits the agent mod's runner keeps
+    (`services/agent/agent/workflows/settings.py` reads them from `GET /api/settings` → `workflows`)."""
+    enabled: bool = True
+    parallel_local: int = Field(1, ge=1, le=16)       # at once on this machine's models (they only queue on one GPU)
+    parallel_remote: int = Field(3, ge=1, le=32)      # at once on remote and cloud models
+    max_children: int = Field(8, ge=0, le=64)         # per parent turn
+    max_depth: int = Field(1, ge=1, le=3)             # 1: a sub-agent can't start its own
+    child_max_steps: int = Field(25, ge=1, le=200)
+    workflow_tokens: int = Field(400_000, ge=1000)    # per parent turn, every sub-agent's prompt and reply tokens
+    queue_wait_s: int = Field(1800, ge=10)            # a queued sub-agent that waited longer is dropped
+    min_window: int = Field(16384, ge=0)              # the `agent` tool only on models with at least this window
+
+
 class AgentCfg(_Strict):
     permissions: PermissionsCfg = PermissionsCfg()
     judge: JudgeCfg = JudgeCfg()
     screen: ScreenCfg = ScreenCfg()
     web: WebReadCfg = WebReadCfg()
+    workflows: WorkflowsCfg = WorkflowsCfg()          # plan agent-workflows 3.6
     make_room: bool = True          # tool calls unload idle mods when a model needs room
     approval_ttl_h: float = Field(24, gt=0)
 

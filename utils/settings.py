@@ -54,6 +54,7 @@ def _shape(cfg: config_mod.Config, svcs: list[Any], eff: Any) -> dict[str, Any]:
         "screen": cfg.agent.screen.model_dump(),    # [agent.screen] (plan 30.6)
         "permissions": cfg.agent.permissions.model_dump(),   # [agent.permissions]: tool-name globs (plan 13.2)
         "web": cfg.agent.web.model_dump(),          # [agent.web]: a long page's relevant passages first (webread.py)
+        "workflows": cfg.agent.workflows.model_dump(),   # [agent.workflows]: sub-agents (plan agent-workflows 3.6)
         "outputs": cfg.outputs.model_dump(),        # [outputs]: saved web pages' clean-up (plan 30.9)
         "repos": cfg.repos.model_dump(),            # [repos]: the mods that are their own repositories (plan mod-repos 3.5)
     }
@@ -196,6 +197,7 @@ async def _save(hub: Hub, patch: dict[str, Any], base: dict[str, Any] | None) ->
         "screen": d.agent.screen.model_dump(),
         "permissions": d.agent.permissions.model_dump(),
         "web": d.agent.web.model_dump(),
+        "workflows": d.agent.workflows.model_dump(),
         "outputs": d.outputs.model_dump(),
         "repos": d.repos.model_dump(),
     }
@@ -204,7 +206,7 @@ async def _save(hub: Hub, patch: dict[str, Any], base: dict[str, Any] | None) ->
         for key, default in keys.items():
             if new[section][key] != before[section][key]:
                 changes.setdefault(section, {})[key] = _or_default(new[section][key], default)
-    for section in ("judge", "screen", "permissions", "web"):   # they live under [agent] in config.toml
+    for section in ("judge", "screen", "permissions", "web", "workflows"):   # they live under [agent] in config.toml
         if section in changes:
             changes.setdefault("agent", {})[section] = changes.pop(section)
     if new["ui"]["dashboard"] != before["ui"]["dashboard"]:

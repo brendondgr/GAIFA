@@ -28,12 +28,15 @@ import { QuoteReplyBox, addQuote, draftQuotes, quotesPayload, messageText } from
 import { speak, speakable } from './chat-speak.js';
 import { MemoryNote } from './chat-memory-note.js';
 import { QueueStrip, queueRows } from './chat-queue.js';
+import { AgentStrip } from './chat-agents.js';
+import { useRequests } from './chat-agent-requests.js';
 
 const R = () => globalThis.React;
 /** A scheduled run's chat was opened: its run is seen (the Scheduled row's dot goes; scheduled-tasks 4.4). */
 export function seenRun(c, t) {
   const s = t?.settings || {};
   if (s.task && s.task_run && c.seeRun) c.seeRun(s.task, s.task_run).catch(() => {});
+  if (s.spawn && s.spawn.seen === false && c.seenChild) c.seenChild(t.id).catch(() => {});   // a sub-agent's end, seen (agent-workflows 3.2)
 }
 const EMPTY_LIVE = { deltas: {}, progress: {}, meter: null };
 const SUGGEST = ['Make me an image of a fox in the snow', 'Turn my last image into a 3D model', 'Say “Welcome to GAIFA” in Hope’s voice', 'What can you do?'];
@@ -287,8 +290,13 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
     setToolForms(f => [...f.filter(x => x.tool.name !== name), { key: 'tf' + name + Date.now(), kind: 'toolform', tool, args, label: a?.label && a.on === 'composer' ? a.label : a?.label ? `${a.label}` : null }]);
   };
   const attach = o => { setAttachments(l => (l.some(x => x.id === o.output_id) ? l : [...l, { id: o.output_id, kind: o.kind, title: o.title, preview: o.preview, n: o.n }])); inputRef.current?.focus(); };
+  const requests = useRequests(c, tid, events, shared.bus);          // agent-workflows 3.4: its sub-agents' cards, docked
+  const parentId = thread?.settings?.spawn?.parent || null, [parentRow, setParentRow] = useState(null);   // 3.5: a sub-agent's way back
+  useEffect(() => { setParentRow(null); if (parentId) c.get(parentId).then(p => setParentRow({ id: p.id, title: p.title }), () => {}); }, [parentId]);
   const ctx = {
     api, live: c.live, tid, thread, outputs: view.outputs, made, tools, mods, running, dock: true, confirm, toast, speechOutput: speechOut,
+    workflow: c.tree ? { c, bus: shared.bus, paneId } : null,       // agent-workflows 3.3: its sub-agents' cards
+    decideRequest: (rid, body) => c.decideRequest(tid, rid, body),   // 3.4: a sub-agent's request, decided here
     act: (tool, args) => ensureThread().then(id => c.action(id, tool, args)),   // plan 46.5: a fix runs as your own step
     answer: (qid, answers) => c.answer(tid, qid, answers),
     // o: {remember, confirm} when allowing (plan 25.3), {reason} when denying
@@ -330,12 +338,14 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
   const empty = !mine.length && (!tid || (ready && !events.length && !running));
   const compacts = events.filter(e => e.type === 'compact').length;
   const composer = h(Composer, { draft, setDraft, attachments, setAttachments, onOpen: openOutput, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
-      dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })), placeholder,
+      dock: [...toolForms, ...view.pending, ...requests].reverse().map(it => h(Card, { key: it.key, item: it, ctx })), placeholder,
       voice: h(VoiceButton, { api, onSend: t => send(t), running, waiting: view.pending.length > 0, answer: lastAnswer(events), speechOutput: speechOut, onMode: m => { voiceOn.current = m !== 'off'; } }),
       queued: qRows.length,
-      queue: h(QueueStrip, { rows: qRows, paused: held.paused, waiting: !running && (thread?.state === 'waiting' || view.pending.length > 0),
+      queue: h(React.Fragment, null,
+        tid && thread?.children ? h(AgentStrip, { w: ctx.workflow, tid, count: thread.children }) : null,   // agent-workflows 3.3
+        h(QueueStrip, { rows: qRows, paused: held.paused, waiting: !running && (thread?.state === 'waiting' || view.pending.length > 0),
         onEdit: qAct((t, id, text) => c.queueEdit(t, id, { text })), onMove: qAct((t, id, index) => c.queueEdit(t, id, { index })),
-        onRemove: qAct(c.queueRemove), onSendNow: qAct(c.queueSend), onResume: qAct(c.queueResume), onClear: qAct(c.queueClear) }),
+        onRemove: qAct(c.queueRemove), onSendNow: qAct(c.queueSend), onResume: qAct(c.queueResume), onClear: qAct(c.queueClear) })),
       settings: thread?.settings || fresh.settings, onSettings: setGroups, skills, models, outputs: view.outputs, api, inputRef, quotes, setQuotes, folders,
       onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }),
       controls: h(ControlsRow, {   // plan 42.3: the chat's environment, mode and model, under the box
@@ -352,7 +362,8 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
     style: { outline: 'none', flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative', background: T.bg, ...style } },
     h(ThreadHeader, { thread,
       onRename: title => shared.rename(thread, title), meter: live.meter, meterOpen, setMeterOpen, onCompact: () => c.compact(tid).then(() => toast('Compacted', 'success'), fail), compacts,
-      learn: thread ? !(thread.settings || {}).no_learn : null, onLearn: thread ? on => setGroups({ ...(thread.settings || {}), no_learn: !on }) : null,
+      learn: thread ? !(thread.settings || {}).no_learn : null, onLearn: thread && !thread.settings?.spawn ? on => setGroups({ ...(thread.settings || {}), no_learn: !on }) : null,   // a sub-agent never learns
+      parent: parentRow,                                                                    // agent-workflows 3.5
       running, state: thread?.state, onBranch: events.length ? () => forkAt(view.lastSeq, null) : null, onMenu: shared.onMenu, narrow: width < 700, grip, tools: paneTools }),
     shared.banner || null,
     conn === 'reconnecting' ? h('div', { role: 'status', style: { padding: '4px 14px', fontSize: 12, color: T.acct, background: T.tacc } }, 'Reconnecting to the chat…') : null,

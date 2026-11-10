@@ -68,14 +68,14 @@ export function setAllHidden(nav, services, hide) {
 export const MEMORY_TABS = ['memory', 'review', 'learning'];
 
 /** The fixed items: Overview, Chat and Outputs on top, each followed by the mods whose page is a main view there
- *  (`main.after`, calendar 3.1: the Calendar after Chat, with the mod's logo and badge); Memory (with the agent mod),
+ *  (`main.after`, calendar 3.1: the Calendar after Chat, with its manifest icon in the items' muted colour, and its badge); Memory (with the agent mod),
  *  Models and Settings at the bottom. */
 export function groups(route, services) {
   const r = route || { page: 'overview', parts: [] }, has = id => (services || []).some(s => s.id === id);
   const memory = r.page === 'service' && r.parts[1] === 'agent' && MEMORY_TABS.includes(r.parts[2]);
   const item = (key, label, href, icon, on) => ({ key, label, href, icon, on: !!on, hint: HINTS[key] });
   const mains = after => (services || []).filter(s => s.main && s.main.after === after)
-    .map(s => ({ key: 'main:' + s.id, label: s.main.label, href: '#/' + s.id, icon: s.icon || 'puzzle', logo: s, on: r.page === s.id, hint: s.description || '', badge: s.badge || 0 }));
+    .map(s => ({ key: 'main:' + s.id, label: s.main.label, href: '#/' + s.id, icon: s.icon || 'puzzle', on: r.page === s.id, hint: s.description || '', badge: s.badge || 0 }));   // the manifest's icon, drawn like the hub's own items
   return {
     top: [item('overview', 'Overview', '#/overview', 'grid', r.page === 'overview'), ...mains('overview'), item('chat', 'Chat', '#/chat', 'chat', r.page === 'chat'),
       ...mains('chat'), item('outputs', 'Outputs', '#/outputs', 'folder', r.page === 'outputs'), ...mains('outputs')],

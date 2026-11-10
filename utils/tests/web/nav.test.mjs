@@ -110,13 +110,14 @@ test('calendar 2.2: a badge reads the count up to 9, then 9+', () => {
 });
 
 test('calendar 3.1: a mod with a main view is an item after its `after`, with its logo, badge and on state', () => {
-  const cal = sv('calendar', 'ready', { main: { label: 'Calendar', after: 'chat' }, badge: 2, description: 'Events' });
+  const cal = sv('calendar', 'ready', { main: { label: 'Calendar', after: 'chat' }, badge: 2, description: 'Events', icon: 'calendar' });
   const g = n.groups({ page: 'calendar', parts: ['calendar'] }, [...SVCS, cal]);
   assert.deepEqual(g.top.map(x => x.label), ['Overview', 'Chat', 'Calendar', 'Outputs']);
   const it = g.top[2];
   assert.equal(it.href, '#/calendar');
   assert.equal(it.badge, 2);
   assert.equal(it.on, true);
-  assert.equal(it.logo.id, 'calendar');
+  assert.equal(it.icon, 'calendar');
+  assert.equal(it.logo, undefined);                       // drawn as an icon in the items' colour, not the logo image
   assert.deepEqual(n.groups({ page: 'calendar', parts: [] }, SVCS).top.map(x => x.label), ['Overview', 'Chat', 'Outputs']);
 });

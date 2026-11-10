@@ -56,10 +56,10 @@ const ymdOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0
 
 function eventBox(box, v) {
   const o = box.occ, short = box.height < 34;
-  const node = el('div.cal-ev', { class: [o.busy === 'focus' ? 'focus' : '', o.busy === 'free' ? 'free' : ''].join(' '),
+  const node = el('div.cal-ev', { class: [o.busy === 'focus' ? 'focus' : '', o.busy === 'free' ? 'free' : '', o.layer ? 'layer' : ''].join(' '),
     style: { '--c': o.color || '#4F7CFF', top: `${box.top}px`, height: `${box.height - 2}px`, left: `calc(${box.col} * 100% / ${box.cols} + 2px)`, width: `calc(100% / ${box.cols} - 4px)` },
     title: `${o.title} · ${timeText(o)}${o.location ? ' · ' + o.location : ''}`, tabIndex: 0, role: 'button', 'aria-label': `${o.title}, ${timeText(o)}` },
-  el('div.t', null, o.title, o.recurring ? el('span.cal-rep', null, '↻') : null), short ? null : el('div.s', null, timeText(o) + (o.location ? ' · ' + o.location : '')), el('div.rs'));
+  el('div.t', null, o.title, o.recurring ? el('span.cal-rep', null, '↻') : null, o.prep ? el('span.cal-rep', { title: 'Has a prep task' }, '◷') : null), short ? null : el('div.s', null, timeText(o) + (o.location ? ' · ' + o.location : '')), el('div.rs'));
   node.dataset.occ = o.id;
   node.addEventListener('keydown', e => { if (e.key === 'Enter') v.on.open(o, node); });
   return node;
@@ -77,6 +77,7 @@ function dragging(scroll, grid, cols, v) {
     if (evn) {
       const o = v.occs.find(x => x.id === evn.dataset.occ);
       if (!o) return;
+      if (o.layer) { v.on.open(o, evn); return; }                     // a task's mark or run: opened, never dragged
       drag = { kind: e.target.classList.contains('rs') ? 'resize' : 'move', o, node: evn, x0: e.clientX, y0: e.clientY, moved: false,
         start: new Date(o.ts * 1000), end: new Date(o.end_ts * 1000), ci0: colAt(e.clientX) };
     } else {

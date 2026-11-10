@@ -55,6 +55,7 @@ class ItemIn(BaseModel):
     priority: int | None = Field(None, description="To-dos: 0 none, 1 low, 2 medium, 3 high")
     estimate_min: int | None = Field(None, description="To-dos: how long it takes, in minutes (for planning a day)")
     busy: Literal["busy", "free", "focus"] | None = Field(None, description="Events: free doesn't block free time; focus is a focus block")
+    prep: dict | None = Field(None, description="The page's own: {task_id, before_min} of the event's prep task (calendar 6.3)")
 
 
 def _body(m: BaseModel) -> dict[str, Any]:

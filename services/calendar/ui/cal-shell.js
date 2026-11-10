@@ -62,16 +62,18 @@ export function mountCalendar(root, ctx, client, store) {
 
   // ---- writes, each with Undo ----------------------------------------------------------------------------------
   const undoable = (r, text) => { refresh(); if (r?.undo) snack(text, async () => { try { await client.undo(r.undo); refresh(); } catch (e) { fail(e); } }); };
-  async function add(body, text = 'Added') { try { undoable(await client.add(body), text); } catch (e) { fail(e); } }
+  async function add(body, text = 'Added') { try { const r = await client.add(body); undoable(r, text); return r; } catch (e) { fail(e); return null; } }
   async function change(o, body, verb = 'Change') {
     let scope = 'all', occurrence;
     if (o.recurring) { scope = await askScope(verb); if (!scope) return refresh(); occurrence = o.occurrence; }
-    try { undoable(await client.patch(o.item_id, body, { occurrence, scope }), 'Changed'); } catch (e) { fail(e); refresh(); }
+    try { const r = await client.patch(o.item_id, body, { occurrence, scope }); undoable(r, 'Changed'); return r; } catch (e) { fail(e); refresh(); return null; }
   }
   async function remove(o) {
     let scope = 'all', occurrence;
     if (o.recurring) { scope = await askScope('Delete'); if (!scope) return; occurrence = o.occurrence; }
-    try { const r = await client.remove(o.item_id || o.id, { occurrence, scope }); undoable(r, r?.note ? 'Moved to the trash, kept 30 days' : 'Deleted'); } catch (e) { fail(e); }
+    try { const r = await client.remove(o.item_id || o.id, { occurrence, scope }); undoable(r, r?.note ? 'Moved to the trash, kept 30 days' : 'Deleted'); } catch (e) { return fail(e); }
+    if (o.prep?.task_id && scope === 'all' && ctx.removePrep && await ctx.confirm?.({ title: 'Delete its prep task too?', body: 'The scheduled task that prepares before this event. Its past runs stay as chats.', confirmLabel: 'Delete the task' }))
+      try { await ctx.removePrep(o.prep.task_id); } catch (e) { fail(e); }
   }
   async function toggleDone(o) {
     try { undoable(await client.done(o.item_id, o.recurring ? o.occurrence : undefined, o.done), o.done ? 'Marked not done' : 'Done'); } catch (e) { fail(e); }
@@ -92,7 +94,11 @@ export function mountCalendar(root, ctx, client, store) {
     if (!f.calendar) f.calendar = (st.calendars.find(c => c.is_default) || st.calendars[0])?.id;
     if (!item && !f.alerts.length && st.settings) f.alerts = [...(f.kind === 'todo' ? st.settings.todo_alerts : st.settings.event_alerts)];
     overlay = sheet(f, { calendars: st.calendars, projects: st.projects, settings: st.settings, close: closeOverlay, parse: client.parse, extra: ctx.sheetExtra ? x => ctx.sheetExtra(x, item) : null,
-      save: async body => { closeOverlay(); if (item) await change(o, body, 'Change'); else await add(body, body.kind === 'todo' ? 'To-do added' : 'Event added'); },
+      save: async (body, x) => {
+        closeOverlay();
+        const r = item ? await change(o, body, 'Change') : await add(body, body.kind === 'todo' ? 'To-do added' : 'Event added');
+        if (r?.item && ctx.afterSave) { try { await ctx.afterSave(r.item, x); refresh(); } catch (e) { fail(e); } }
+      },
       remove: async () => { closeOverlay(); await remove(o); } });
     page.append(overlay);
   }

@@ -65,6 +65,7 @@ export const CSS = `
 .cal-ev .s{color:var(--mut,#8A94A6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cal-ev.focus{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c) 14%,var(--card,#11151D)) 0 6px,color-mix(in srgb,var(--c) 22%,var(--card,#11151D)) 6px 12px)}
 .cal-ev.free{opacity:.75;border-left-style:dashed}
+.cal-ev.layer{border-left-style:dotted;background:color-mix(in srgb,var(--c) 10%,var(--card,#11151D));font-size:11px}
 .cal-ev.ghost{opacity:.55;outline:1px dashed var(--c);pointer-events:none}
 .cal-ev .rs{position:absolute;left:0;right:0;bottom:0;height:6px;cursor:ns-resize}
 .cal-bar{position:absolute;height:20px;border-radius:5px;padding:0 6px;font-size:11.5px;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;background:color-mix(in srgb,var(--c) 22%,var(--card,#11151D));border-left:3px solid var(--c)}

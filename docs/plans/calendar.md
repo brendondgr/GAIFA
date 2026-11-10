@@ -424,18 +424,20 @@ Assumed:
   - **The calendar side:** `GET /v1/items/{id}/next` is a new route there.
   *Done when:* `services/agent/tests/test_task_event.py` (a fake calendar) covers next from a repeating event, a moved occurrence, one run per occurrence, missed before and after the event's end, the item gone, and the mod down.
   *As built (6.1–6.2):* `when.next_due` answers None for a once that ran and for event schedules; the scheduler (`TaskSchedule.refresh_events`) asks the calendar each check for event tasks (`EventDue`, 60 s cache) and keeps the next occurrence in memory; an item that answers 404 turns the task off. Tests: `services/agent/tests/test_task_event.py` (the fake hub has a calendar's items), `chat-tasks.test.mjs`.
-- [ ] **6.3 Prep from the event: `services/calendar/ui/cal-edit.js`, `ui/cal-prep.js` (new), the agent's `api_tasks.py`.**
+- [x] **6.3 Prep from the event: `services/calendar/ui/cal-edit.js`, `ui/cal-prep.js` (new), the agent's `api_tasks.py`.**
   - **The sheet:** the event editor gets **Prep task**: instructions ("Gather my notes on… and write a brief"), minutes before, model and mode (defaults from Settings → Agent), and pre-allows.
   - **Saving:** creates the task through `POST /api/s/agent/v1/tasks` with the event kind and a name "Prep: <title>", and stores `prep` on the item. The item shows a small prep mark and opens its task page.
   - **Deleting the event** asks whether to delete its prep task too.
   *Done when:* `services/calendar/tests/ui/prep.test.mjs` covers the task body and the item's mark; `test_tasks_api.py` covers the event kind's checks.
-- [ ] **6.4 The task layer: the agent's `api_tasks.py` (`GET /v1/tasks/calendar`), `services/calendar/ui/cal-layers.js` (new).**
+- [x] **6.4 The task layer: the agent's `api_tasks.py` (`GET /v1/tasks/calendar`), `services/calendar/ui/cal-layers.js` (new).**
   - **`GET /v1/tasks/calendar?from=&to=`:** each enabled task's due times in the range (from `next_after`, or the events for event kinds) and its runs there (`state`, `seen`, `thread_id`). At most 200 per task.
   - **The page:** a **Scheduled tasks** layer, on by default, draws due times as thin marks with the clock icon and runs as small chips coloured by state. A click opens `#/chat/tasks/<id>` or the run's chat.
   - **An empty slot's menu** has **Schedule a task here**, which opens the task editor with Once at that time (`#/chat/tasks?new=once&at=`).
   *Done when:* `services/agent/tests/test_tasks_calendar.py` covers the range for each kind and the runs; `tests/ui/layers.test.mjs` covers the marks and the new-task link.
 
   Update architecture §14.1 and the scheduled-tasks section of the brief §11.13.
+
+  *As built (6.3–6.4):* the prep section is the page's (`cal-prep.js`, through `ctx.sheetExtra` and `ctx.afterSave` from `page.js`), so the calendar mod's API only gained the item's `prep` field. *Schedule a task here* is a link in a new event's sheet rather than a menu on an empty slot. The layer's marks and runs can't be dragged. Tests: `services/agent/tests/test_tasks_calendar.py`, the page's `prep.test.mjs` and `layers.test.mjs`.
 
 **Checks & deliverables — Phase 6**
 - [ ] On the second hub: a prep task 2 minutes before a test event runs once, its chat opens from the calendar, and the next occurrence shows its mark. A once task runs and turns off.

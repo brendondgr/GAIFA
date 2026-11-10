@@ -117,3 +117,10 @@ def test_search_next_parse_settings(client):
     assert p["repeat"] == "Every weekday" and p["title"] == "standup"
     assert client.patch("/v1/settings", json={"date_order": "dmy"}).json()["date_order"] == "dmy"
     assert client.patch("/v1/settings", json={"week_start": 3}).json()["code"] == "invalid_setting"
+
+
+def test_prep_on_an_item(client):
+    it = add(client, title="Review", when="2026-11-13 1pm")["item"]
+    r = client.patch(f"/v1/items/{it['id']}", json={"prep": {"task_id": "k_0123456789", "before_min": 30}}).json()
+    assert r["item"]["prep"] == {"task_id": "k_0123456789", "before_min": 30}
+    assert client.patch(f"/v1/items/{it['id']}", json={"prep": {"task_id": "x"}}).json()["code"] == "bad_prep"

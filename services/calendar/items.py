@@ -110,6 +110,13 @@ def normalise(store: Store, settings: dict[str, Any], body: dict[str, Any], base
             f["all_day"] = bool(merged.get("due")) and T.is_date(merged["due"])
         if base is None or "kind" in body:
             f["start"] = f["end"] = None
+    if "prep" in f:
+        p = f["prep"]
+        if not (isinstance(p, dict) and str(p.get("task_id") or "").startswith("k_") and isinstance(p.get("before_min"), int)):
+            raise Invalid("prep is {task_id: k_…, before_min}", "bad_prep")
+        f["prep"] = {"task_id": p["task_id"], "before_min": p["before_min"]}
+    elif "prep" in body and body["prep"] is None:
+        f["prep"] = None
     if "priority" in f and f["priority"] not in (0, 1, 2, 3):
         raise Invalid("priority is 0 (none) to 3 (high)")
     if "busy" in f and f["busy"] not in ("busy", "free", "focus"):

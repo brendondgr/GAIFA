@@ -21,6 +21,7 @@ install = "install.sh"
 [ui]
 page = "ui/page.js"
 chat = "ui/chat.js"            # calendar 4.4: its cards in Chat (an item, a day, a proposal to tick and add)
+chat_panel = { module = "ui/panel.js", label = "Calendar" }   # calendar 7.2: the day or the week beside your chats
 main = { label = "Calendar", after = "chat" }      # calendar 3.1: #/calendar, after Chat in the sidebar
 
 [agent]

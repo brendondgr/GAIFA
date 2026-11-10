@@ -20,3 +20,15 @@ test('schedule a task here', () => {
   assert.equal(L.scheduleHere({ date: '2026-11-14', time: '15:00' }), '#/chat/tasks?new=once&at=2026-11-14T15%3A00');
   assert.equal(L.scheduleHere({ date: '2026-11-14', time: '15:00', project_id: 'p_1' }), '#/chat/tasks?new=once&at=2026-11-14T15%3A00&project=p_1');
 });
+
+test('history: chats as blocks of at least 15 minutes, outputs as marks', () => {
+  const went = [];
+  const occ = L.historyOccs([{ thread_id: 't_1', title: 'Plan the trip', day: '2026-11-10', first: 1000, last: 1100, turns: 3 },
+    { thread_id: 't_2', title: 'Digest · Mon', day: '2026-11-10', first: 5000, last: 9000, turns: 1, task: 'k_1' }],
+  [{ id: 'o_1', title: 'chart.png', created_ts: 2000, service: 'agent' }], h => went.push(h));
+  assert.deepEqual(occ.map(o => [o.title, o.ts, o.end_ts, o.location]), [['Plan the trip', 1000, 1900, '3 messages'], ['◷ Digest · Mon', 5000, 9000, '1 message'],
+    ['▣ chart.png', 2000, 2600, 'agent']]);
+  assert.ok(occ.every(o => o.layer === 'history'));
+  occ[0].open(); occ[2].open();
+  assert.deepEqual(went, ['#/chat/t_1', '#/outputs/o_1']);
+});

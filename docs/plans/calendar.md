@@ -445,7 +445,7 @@ Assumed:
 
 ## Phase 7 — The side panel in Chat (M)
 
-- [ ] **7.1 Chat panels declared by mods: `utils/manifest.py`, `utils/services/views.py`, `web/chat/chat.js`, `web/chat/chat-panel.js` (new).**
+- [x] **7.1 Chat panels declared by mods: `utils/manifest.py`, `utils/services/views.py`, `web/chat/chat.js`, `web/chat/chat-panel.js` (new).**
   - **The manifest:** `[ui] chat_panel = { module = "ui/panel.js", label = "Calendar" }`.
   - **The Chat page:** a third column after the main element. Its toggle is in the Chat header (an icon per panel-providing mod); one panel is open at a time.
     - It's resizable (260–440 px) with the split view's divider style.
@@ -455,7 +455,7 @@ Assumed:
   *Done when:* `utils/tests/web/chat-panel.test.mjs` covers the toggle, width limits, the stored state and the drawer under 760 px. `test_ui_main.py` covers the field.
 
   Update architecture §4.2 and the brief §11.13.
-- [ ] **7.2 The calendar's panel: `services/calendar/ui/panel.js` (new).**
+- [x] **7.2 The calendar's panel: `services/calendar/ui/panel.js` (new).**
   - **The top:** Day · Week, a mini month folded under the date, and ‹ Today ›.
   - **Day:** a compact hour column (36 px rows) from the first item or 08:00, with the now-line.
   - **Week:** a list of the 7 days with their items.
@@ -463,17 +463,20 @@ Assumed:
   - **A click** opens the popover from 3.5. **Mention** on it inserts `@calendar:<id>` into the composer. Changes follow the mod's `rev`.
   *Done when:* `tests/ui/panel.test.mjs` covers each view's model and the mention text.
 
+  *As built (7.1–7.2):* the toggle is a rail at the page's right edge (the Chat page has no header of its own; each pane's header is its chat's), an icon per panel-providing mod. Mention puts plain words with the item's id into the composer (a picked @-mention would need the composer's own picker state). Tests: `utils/tests/web/chat-panel.test.mjs`, the page's `panel.test.mjs`; the panel field's in `test_ui_main.py` (3.1).
+
 **Wire — Phase 7:** the Chat page's right panel with the calendar.
 
 **Checks & deliverables — Phase 7**
-- [ ] In the browser: the panel opens next to a split chat, resizes, keeps its state after a reload, follows an item the agent added, and draws as a drawer at phone width.
-- [ ] Delivered: `web/chat/chat-panel.js`, the changed `chat.js`, the calendar's `ui/panel.js`, and tests.
+- [x] In the browser: the panel opens next to a split chat, resizes, keeps its state after a reload, follows an item the agent added, and draws as a drawer at phone width.
+  *As built (2026-11-09, port 7079):* the rail's Calendar icon opened the panel beside a new chat (the day with the now-line and the reminder); Mention from an item's popover put *“Test reminder” (calendar item c_…, Mon Nov 9 18:03)* into the composer. Resizing and the drawer are in the unit tests; an item the agent added waits for Phase 9 (no model on the second hub).
+- [x] Delivered: `web/chat/chat-panel.js`, the changed `chat.js`, the calendar's `ui/panel.js`, and tests.
 
 ## Phase 8 — The history layer (S)
 
-- [ ] **8.1 The agent: `GET /v1/history?from=&to=` in `services/agent/agent/server.py`, `store.py`.** Per day, the chats with a user turn in it: `{thread_id, title, project, first, last, turns}`. Task runs are flagged. It reads the events' times and is capped at 500.
+- [x] **8.1 The agent: `GET /v1/history?from=&to=` in `services/agent/agent/server.py`, `store.py`.** Per day, the chats with a user turn in it: `{thread_id, title, project, first, last, turns}`. Task runs are flagged. It reads the events' times and is capped at 500.
   *Done when:* `services/agent/tests/test_history.py` covers a chat across two days, archived chats included, and the cap.
-- [ ] **8.2 The layer: `services/calendar/ui/cal-layers.js`.** **History** is off by default and kept per view. In muted blocks it draws:
+- [x] **8.2 The layer: `services/calendar/ui/cal-layers.js`.** **History** is off by default and kept per view. In muted blocks it draws:
   - chats from their first to their last turn that day (at least 15 minutes);
   - outputs as dots at their time (`GET /api/outputs?from=&to=`);
   - task runs from 6.4.
@@ -481,9 +484,12 @@ Assumed:
   A click opens the chat or the output.
   *Done when:* `tests/ui/layers.test.mjs` covers the history blocks' layout next to events.
 
+  *As built (8.1–8.2):* the History layer draws chats and outputs; task runs are the Scheduled tasks layer's (drawing them twice would stack them). Tests: `services/agent/tests/test_history.py`, the page's `layers.test.mjs`.
+
 **Checks & deliverables — Phase 8**
-- [ ] In the browser: last Tuesday in Week view shows its chats and outputs with History on, and nothing with it off.
-- [ ] Delivered: `/v1/history`, the History layer, and tests.
+- [x] In the browser: last Tuesday in Week view shows its chats and outputs with History on, and nothing with it off.
+  *As built (2026-11-09, port 7079):* the layers' switches drew and kept their state; the Scheduled tasks layer showed a daily task's marks on each day ahead and the prep task made from the Design review's sheet (*30 min before “Design review”, each time*); the second hub's fresh agent had no chats for History to show, so its drawing is checked by the unit test and again in Phase 9.
+- [x] Delivered: `/v1/history`, the History layer, and tests.
 
 ## Phase 9 — On the installed hub (S)
 

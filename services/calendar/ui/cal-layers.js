@@ -38,3 +38,37 @@ export function tasksLayer(ctx) {
 
 /** "Schedule a task here": a new once task at the sheet's time (#/chat/tasks?new=once&at=…). */
 export const scheduleHere = x => `#/chat/tasks?new=once&at=${encodeURIComponent(`${x.date}T${x.time}`)}${x.project_id ? `&project=${encodeURIComponent(x.project_id)}` : ''}`;
+
+const MIN_BLOCK_S = 15 * 60, OUT_S = 10 * 60, MUTED = '#5D6778';
+
+/** The History layer (calendar 8.2): your chats each day as muted blocks from their first to their last message (at
+ *  least 15 minutes) and outputs as small marks at their time; a click opens the chat or the output. Task runs are
+ *  the Scheduled tasks layer's. */
+export function historyOccs(chats, outputs, go) {
+  const out = [];
+  for (const c of chats || []) {
+    const end = Math.max(c.last, c.first + MIN_BLOCK_S);
+    out.push({ id: `chat:${c.thread_id}@${c.day}`, item_id: null, layer: 'history', kind: 'event', all_day: false, ts: c.first, end_ts: end, start: '', end: '',
+      title: `${c.task ? '◷ ' : ''}${c.title}`, location: `${c.turns} message${c.turns === 1 ? '' : 's'}`, color: MUTED, busy: 'free', recurring: false,
+      open: () => go(`#/chat/${encodeURIComponent(c.thread_id)}`) });
+  }
+  for (const o of outputs || []) {
+    out.push({ id: `out:${o.id}`, item_id: null, layer: 'history', kind: 'event', all_day: false, ts: o.created_ts, end_ts: o.created_ts + OUT_S, start: '', end: '',
+      title: `▣ ${o.title}`, location: o.service || '', color: MUTED, busy: 'free', recurring: false, open: () => go(`#/outputs/${encodeURIComponent(o.id)}`) });
+  }
+  return out;
+}
+
+/** The History layer: the agent's /v1/history and the hub's outputs in the range. */
+export function historyLayer(ctx) {
+  return {
+    id: 'history',
+    async load(from, to) {
+      const f = from.getTime() / 1000, t = to.getTime() / 1000;
+      const [h, o] = await Promise.all([
+        ctx.api.callService('agent', 'GET', `/v1/history?from=${f}&to=${t}`).then(r => r?.json?.chats || []).catch(() => []),
+        Promise.resolve(ctx.api.listOutputs?.({ from: f, to: t, limit: 200 })).then(p => p?.items || []).catch(() => [])]);
+      return historyOccs(h, o, x => ctx.navigate(x));
+    },
+  };
+}

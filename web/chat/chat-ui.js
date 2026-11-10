@@ -21,6 +21,7 @@ export const COL = 760;            // the thread column's max width
 
 export const ICONS = {
   clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2',    // scheduled-tasks 4.2
+  calendar: 'M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v12a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5zM4 10h16M8.5 3v4M15.5 3v4',   // calendar 7.1
   undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',   // plan 27.7: Undo this turn
   chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',        // plan 47.2: show
   speaker: 'M4 10v4h4l5 4V6L8 10zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11',   // plan 49.1: read aloud

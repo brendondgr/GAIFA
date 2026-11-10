@@ -45,6 +45,7 @@ import { registerAction } from './chat-actions.js';
 import { registerPreview, ActionBar, Model3DPreview } from './chat-results.js';
 import { registerStep, nameOf } from './chat-steps.js';
 import { loadChatModules } from './chat-mods.js';
+import { ChatPanels } from './chat-panel.js';
 import * as liveKit from '../live-kit.js';
 
 export { registerCard } from './chat-cards.js';
@@ -154,9 +155,10 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const [speechOut, setSpeechOut] = useState(null);   // plan 49.1: the voice that reads replies (hub settings' speech_output)
   useEffect(() => { api.getSettings?.().then(s => setSpeechOut(s.speech_output || null)).catch(() => {}); }, []);
   const [, setModTick] = useState(0);    // mods' chat modules (plan 44.1): draw again once they've registered
+  const [svcList, setSvcList] = useState(null);   // calendar 7.1: the mods' side panels
   useEffect(() => {
     let alive = true;
-    Promise.resolve(api.listServices?.()).then(s => loadChatModules(s || [], chatModuleApi(api)))
+    Promise.resolve(api.listServices?.()).then(s => { if (alive) setSvcList(s || []); return loadChatModules(s || [], chatModuleApi(api)); })
       .then(r => { if (alive && r.some(x => x.ok)) setModTick(t => t + 1); }).catch(() => {});
     return () => { alive = false; };
   }, []);
@@ -240,5 +242,6 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     h(SplitView, { layout, setLayout, narrow, maxPanes: c.live && !c.sharedStream ? MAX_PANES : Infinity, onRefuse: m => toast(m, 'error'),
       titleOf: id => threads.find(t => t.id === id)?.title || null,
       renderPane: (p, { active, tools, grip }) => h(ChatPane, { shared: sh, tid: p.tid, paneId: p.id, cmd, grip, paneTools: tools,
-        onOpen: id => openIn(p.id, id), onFocus: active ? null : () => setLayout(L => setActive(L, p.id)) }) }));
+        onOpen: id => openIn(p.id, id), onFocus: active ? null : () => setLayout(L => setActive(L, p.id)) }) }),
+    h(ChatPanels, { services: svcList, narrow, api, go, toast }));   // calendar 7.1: mods' side panels (the Calendar's)
 }

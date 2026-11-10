@@ -7,7 +7,7 @@ import { createMockClient } from './cal-mock.js';
 import { mountCalendar } from './cal-shell.js';
 import { settingsForm } from './cal-settings.js';
 import { prepFields, savePrep } from './cal-prep.js';
-import { scheduleHere, tasksLayer } from './cal-layers.js';
+import { historyLayer, scheduleHere, tasksLayer } from './cal-layers.js';
 import { el } from './cal-style.js';
 
 const clientFor = ctx => (useMock(ctx) ? createMockClient() : createClient((m, p, o) => ctx.call(m, p, o)));
@@ -30,7 +30,7 @@ export default {
       const agent = async (m, p, json) => (await ctx.api.callService('agent', m, p, { json })).json;
       return mountCalendar(el, { ...ctx, projects: () => projects(ctx),
         // calendar 6.3: an event's prep task, made in the agent's scheduled tasks
-        layers: agentUp() ? [tasksLayer(ctx)] : [],                                    // calendar 6.4
+        layers: agentUp() ? [tasksLayer(ctx), historyLayer(ctx)] : [],               // calendar 6.4, 8.2
         sheetExtra: (x, item) => (x.kind !== 'event' || !agentUp() ? null : item ? prepFields(x, item)
           : el('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px' } }, prepFields(x, item),
             el('a.cal-btn.ghost', { href: scheduleHere(x), style: { textDecoration: 'none', alignSelf: 'flex-start' } }, 'Or schedule a task at this time'))),

@@ -46,7 +46,7 @@ class ItemIn(BaseModel):
     due: str | None = Field(None, description="A to-do's due date (YYYY-MM-DD) or time (YYYY-MM-DDTHH:MM)")
     repeat: str | None = Field(None, description="How it repeats, in words: 'every Tuesday', 'every weekday', 'monthly on the 1st'")
     rrule: str | None = Field(None, description="Or an RFC 5545 rule: FREQ=WEEKLY;BYDAY=TU")
-    alerts: list[int] | None = Field(None, description="Alerts, in minutes before (to-dos: before the due time)")
+    alerts: list[int] | None = Field(None, description="Alerts, in minutes before (to-dos: before the due time; an all-day item's are whole days before, at the all-day alert time, 0 on the day), up to 8, each 0–40320 (4 weeks): 1 day before is 1440, 2 days 2880")
     calendar: str | None = Field(None, description="The calendar's name or id (default: the default calendar)")
     project_id: str | None = Field(None, description="The agent's project (p_…) it belongs to")
     notes: str | None = None

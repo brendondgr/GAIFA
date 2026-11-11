@@ -3,17 +3,21 @@ and posted to the hub's `POST /api/notify` (a toast with Snooze and, for a to-do
 count (the Calendar item's badge).
 
 - An alert is `before_min` minutes before a timed occurrence (a to-do's due time). An all-day item's alert is at
-  `allday_alert` (09:00) on its day for `before_min = 0`, else that time on the day before.
+  `allday_alert` (09:00) on its day for `before_min = 0`, else that time `before_min` days before, rounded up (10 and
+  1440 are the day before, 2880 two days before).
 - The last check is kept in the store (`meta.alerts_checked`): alerts missed while the mod was down fire once,
   marked late; ones more than 24 hours old are only listed (no toast).
 - A hub that's down is retried on the next tick (`fired.posted`): a fired alert is never lost.
-- Snoozed alerts come back as unread at `snooze_until`.
+- Snoozed alerts come back as unread at `snooze_until`: any number of minutes (up to 30 days) or `tomorrow`
+  (`allday_alert` the next day). The toast offers 10 min, 1 hour and Tomorrow (Done instead for a to-do); the page and
+  the Chat panel any amount.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import time
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
@@ -32,23 +36,39 @@ Poster = Callable[[dict[str, Any]], Awaitable[bool]]
 
 def alert_time(occ: dict[str, Any], before_min: int, allday_at: str) -> float:
     if occ["all_day"]:
-        day = datetime.fromisoformat(occ["start"][:10]).date() - timedelta(days=1 if before_min > 0 else 0)
+        day = datetime.fromisoformat(occ["start"][:10]).date() - timedelta(days=math.ceil(before_min / 1440))
         hh, mm = (int(x) for x in allday_at.split(":"))
         return datetime(day.year, day.month, day.day, hh, mm, tzinfo=T.local_tz()).timestamp()
     return occ["ts"] - before_min * 60
 
 
 def body_of(occ: dict[str, Any], now: float) -> str:
+    """The toast's line: when, from `now` (an alert two days ahead names the day)."""
     tz = T.local_tz()
     fmt = lambda ts: datetime.fromtimestamp(ts, tz).strftime("%H:%M")  # noqa: E731
+    today = datetime.fromtimestamp(now, tz).date()
+    d = datetime.fromisoformat(occ["start"][:10]).date() if occ["all_day"] else datetime.fromtimestamp(occ["ts"], tz).date()
+    gap = (d - today).days
+    day = "today" if gap == 0 else "tomorrow" if gap == 1 else f"{d.strftime('%a %b')} {d.day}"
+    ahead = f" (in {gap} days)" if gap > 1 else ""
     if occ["kind"] == "todo":
-        return "due today" if occ["all_day"] else f"due {fmt(occ['ts'])}"
+        return f"due {day}{ahead}" if occ["all_day"] else f"due {'' if gap == 0 else day + ' '}{fmt(occ['ts'])}{ahead}"
     if occ["all_day"]:
-        d = datetime.fromisoformat(occ["start"][:10]).date()
-        return "today, all day" if d == datetime.now(tz).date() else f"{d.strftime('%a %b')} {d.day}, all day"
+        return f"{day}, all day{ahead}"
+    if gap != 0:
+        return f"{day} · {fmt(occ['ts'])}–{fmt(occ['end_ts'])}{ahead}"
     mins = round((occ["ts"] - now) / 60)
-    when = "now" if abs(mins) < 1 else f"in {mins} min" if 0 < mins < 60 else f"in {mins // 60} h {mins % 60:02d} min" if mins > 0 else f"started {-mins} min ago"
+    when = "now" if abs(mins) < 1 else f"in {mins} min" if 0 < mins < 60 else f"in {mins // 60} h" + (f" {mins % 60:02d} min" if mins % 60 else "") if mins > 0 else f"started {-mins} min ago"
     return f"{when} · {fmt(occ['ts'])}–{fmt(occ['end_ts'])}"
+
+
+def snooze_until(now: float, allday_at: str, minutes: int | None = None, at: str | None = None) -> float:
+    """When a snoozed reminder comes back: `minutes` from now, or `tomorrow` at the all-day alert time."""
+    if at == "tomorrow":
+        d = datetime.fromtimestamp(now, T.local_tz()).date() + timedelta(days=1)
+        hh, mm = (int(x) for x in allday_at.split(":"))
+        return datetime(d.year, d.month, d.day, hh, mm, tzinfo=T.local_tz()).timestamp()
+    return now + int(minutes or 10) * 60
 
 
 class Alerts:
@@ -161,7 +181,9 @@ class Alerts:
         rows = self.store.db.execute("SELECT * FROM fired WHERE posted = 0 AND state = 'unread' ORDER BY alert_at LIMIT 20").fetchall()
         changed = False
         for r in rows:
-            acts = [{"label": "Snooze 10 min", "op": f"POST /v1/alerts/{r['id']}/snooze?minutes=10"}]
+            snz = f"POST /v1/alerts/{r['id']}/snooze"
+            acts = [{"label": "Snooze 10 min", "op": f"{snz}?minutes=10"}, {"label": "1 hour", "op": f"{snz}?minutes=60"},
+                    {"label": "Tomorrow", "op": f"{snz}?at=tomorrow"}]
             if r["kind"] == "todo":
                 acts.append({"label": "Done", "op": f"POST /v1/alerts/{r['id']}/done"})
             body = r["body"] + (" (missed while GAIFA was off)" if r["late"] else "")

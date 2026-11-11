@@ -32,7 +32,7 @@ class NotifyIn(BaseModel):
     level: Literal["info", "warn"] = "info"
     route: str | None = Field(None, max_length=500, pattern=r"^#/", description="Where Open goes (a #/ route)")
     key: str | None = Field(None, max_length=100, description="The mod's own id for it (a later toast with the same key replaces it)")
-    actions: list[NotifyAction] = Field([], max_length=3)
+    actions: list[NotifyAction] = Field([], max_length=4)
     unread: int | None = Field(None, ge=0, le=100000, description="The mod's unread count, shown as its badge")
 
 

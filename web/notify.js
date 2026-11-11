@@ -1,5 +1,5 @@
 // In-app notifications (calendar plan 2.2): a mod's `notification` event as a toast with its title, body, an
-// Open link and up to three actions (each a route of that mod, called through the hub's proxy). Pure, so
+// Open link and up to four actions (each a route of that mod, called through the hub's proxy). Pure, so
 // utils/tests/web/notify.test.mjs tests it; Hub.dc.html draws the toasts.
 
 export const MAX_TOASTS = 5;
@@ -10,7 +10,7 @@ export function toastOf(ev) {
     id: 'n' + (ev.id || Math.random().toString(36).slice(2)), key: ev.key ? `${ev.service}:${ev.key}` : null,
     level: ev.level === 'warn' ? 'warn' : 'info', sticky: true, service: ev.service,
     title: String(ev.title || ''), body: String(ev.body || ''), route: ev.route || null,
-    actions: (ev.actions || []).slice(0, 3).map(a => ({ label: a.label, ...actionCall(ev.service, a.op) })).filter(a => a.url),
+    actions: (ev.actions || []).slice(0, 4).map(a => ({ label: a.label, ...actionCall(ev.service, a.op) })).filter(a => a.url),
   };
 }
 

@@ -56,7 +56,7 @@ def test_event_alert_once_with_snooze(client, cal, hub):
     run(a.tick(T(2026, 11, 13, 12, 50, 10)))
     t = hub.toasts()
     assert len(t) == 1 and t[0]["title"] == "Lunch" and t[0]["body"] == "in 10 min · 13:00–14:00"
-    assert [x["label"] for x in t[0]["actions"]] == ["Snooze 10 min"] and t[0]["route"].startswith("#/calendar?item=c_")
+    assert [x["label"] for x in t[0]["actions"]] == ["Snooze 10 min", "1 hour", "Tomorrow"] and t[0]["route"].startswith("#/calendar?item=c_")
     assert hub.unread() == 1
     run(a.tick(T(2026, 11, 13, 12, 51)))
     assert len(hub.toasts()) == 1                                                       # once
@@ -72,7 +72,7 @@ def test_todo_alert_and_done_completes_it(client, cal, hub):
     run(cal.alerts.tick(T(2026, 11, 10, 9, 59, 50)))
     run(cal.alerts.tick(T(2026, 11, 10, 10, 0, 5)))
     toast = hub.toasts()[0]
-    assert toast["body"] == "due 10:00" and [x["label"] for x in toast["actions"]] == ["Snooze 10 min", "Done"]
+    assert toast["body"] == "due 10:00" and [x["label"] for x in toast["actions"]] == ["Snooze 10 min", "1 hour", "Tomorrow", "Done"]
     fid = cal.alerts.list("unread")[0]["id"]
     client.post(f"/v1/alerts/{fid}/done")
     assert cal.store.get(t["id"])["done_at"] and hub.unread() == 0
@@ -132,3 +132,42 @@ def test_routes_and_seen_all(client, cal, hub):
     assert client.post("/v1/alerts/seen-all").json() == {"seen": 2}
     assert hub.unread() == 0 and client.get("/v1/status").json()["stats"][2]["value"] == 0
     assert client.post("/v1/alerts/f_nope/seen").status_code == 404
+
+
+def test_alerts_days_ahead_name_the_day(client, cal, hub):
+    """1 day, 2 days and 60 / 30 minutes before one event: four toasts, the early ones naming the day; an all-day
+    item two days before fires at the all-day time two days ahead."""
+    add(client, title="Exam", start="2026-11-20T14:00", end="2026-11-20T16:00", alerts=[2880, 1440, 60, 30])
+    add(client, title="Trip", start="2026-11-27", all_day=True, alerts=[2880, 0])
+    for day, hh, mm in ((18, 13, 59), (18, 14, 0), (19, 14, 0), (20, 13, 0), (20, 13, 30)):
+        run(cal.alerts.tick(T(2026, 11, day, hh, mm, 10)))
+    assert [t["body"] for t in hub.toasts()] == ["Fri Nov 20 · 14:00–16:00 (in 2 days)", "tomorrow · 14:00–16:00",
+                                                "in 1 h · 14:00–16:00", "in 30 min · 14:00–16:00"]
+    run(cal.alerts.tick(T(2026, 11, 25, 8, 59)))
+    run(cal.alerts.tick(T(2026, 11, 25, 9, 0, 5)))
+    assert hub.toasts()[-1]["title"] == "Trip" and hub.toasts()[-1]["body"] == "Fri Nov 27, all day (in 2 days)"
+
+
+def test_snooze_any_amount_or_tomorrow(client, cal, hub, monkeypatch):
+    import api_alerts
+    add(client, title="Call", start="2026-11-13T13:00", end="2026-11-13T13:30")
+    run(cal.alerts.tick(T(2026, 11, 13, 12, 49)))
+    run(cal.alerts.tick(T(2026, 11, 13, 12, 50, 10)))
+    fid = cal.alerts.list("unread")[0]["id"]
+    now = T(2026, 11, 13, 12, 51)
+    monkeypatch.setattr(api_alerts.time, "time", lambda: now)
+    assert client.post(f"/v1/alerts/{fid}/snooze", params={"minutes": 3 * 1440}).json()["snooze_until"] == now + 3 * 86400
+    assert client.post(f"/v1/alerts/{fid}/snooze", params={"at": "tomorrow"}).json()["snooze_until"] == T(2026, 11, 14, 9, 0)
+    assert client.post(f"/v1/alerts/{fid}/snooze", json={"minutes": 45}).json()["snooze_until"] == now + 45 * 60
+    assert client.post(f"/v1/alerts/{fid}/snooze", params={"minutes": 43201}).status_code == 422
+    assert client.post(f"/v1/alerts/{fid}/snooze", json={"until": now - 5}).json().get("code") == "bad_until"
+    run(cal.alerts.tick(T(2026, 11, 13, 13, 30)))                    # not back yet (45 min from 12:51)
+    assert len(hub.toasts()) == 1
+    run(cal.alerts.tick(T(2026, 11, 13, 13, 36, 30)))
+    assert len(hub.toasts()) == 2 and cal.alerts.get(fid)["state"] == "unread"
+
+
+def test_up_to_eight_alerts(client):
+    assert client.post("/v1/items", json={"title": "x", "start": "2026-11-20T10:00", "alerts": list(range(8))}).status_code == 200
+    r = client.post("/v1/items", json={"title": "x", "start": "2026-11-20T10:00", "alerts": list(range(9))})
+    assert r.status_code >= 400 and "eight" in r.text

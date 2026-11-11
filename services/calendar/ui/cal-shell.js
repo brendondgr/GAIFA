@@ -8,6 +8,7 @@ import { askScope, fieldsOf, popover, sheet, snack } from './cal-edit.js';
 import { importSheet, proposalList, trashSheet } from './cal-files.js';
 import { renderGrid } from './cal-grid.js';
 import { renderAgenda, renderMonth } from './cal-month.js';
+import { reminderActs, untilWords } from './cal-remind.js';
 import { I, el, ensureCss, icon } from './cal-style.js';
 
 export const VIEWS = [['day', 'Day', 'd'], ['week', 'Week', 'w'], ['month', 'Month', 'm'], ['agenda', 'Agenda', 'a']];
@@ -197,9 +198,8 @@ export function mountCalendar(root, ctx, client, store) {
     col.append(el('div.cal-sec', null, el('h3', null, icon(I.bell, 12), el('span', null, `Reminders${st.unread ? ` · ${st.unread}` : ''}`),
       st.unread ? el('button.cal-btn.ghost', { style: { height: '22px', padding: '0 6px', fontSize: '11px' }, onclick: async () => { await client.seenAll(); refresh(); } }, 'Seen all') : null),
       ...(rem.length ? rem.map(a => el('div', { style: { padding: '4px 6px', borderRadius: '6px', background: a.state === 'unread' ? 'var(--cal-soft)' : 'transparent', display: 'flex', flexDirection: 'column', gap: '3px' } },
-        el('div', { style: { fontWeight: a.state === 'unread' ? 600 : 400, fontSize: '12.5px' } }, a.title), el('div.cal-muted.cal-small', null, a.state === 'snoozed' ? 'snoozed' : a.body),
-        el('div', { style: { display: 'flex', gap: '4px' } }, ...[['seen', 'Seen'], ['snooze', '10 min'], ...(a.kind === 'todo' ? [['done', 'Done']] : [])].map(([act, l]) =>
-          el('button.cal-btn', { style: { height: '22px', padding: '0 7px', fontSize: '11px' }, onclick: async () => { try { await client.alert(a.id, act, act === 'snooze' ? 10 : undefined); refresh(); } catch (e) { fail(e); } } }, l))))) : [el('div.cal-muted', { style: { padding: '0 6px' } }, 'None waiting.')])));
+        el('div', { style: { fontWeight: a.state === 'unread' ? 600 : 400, fontSize: '12.5px' } }, a.title), el('div.cal-muted.cal-small', null, a.state === 'snoozed' && a.snooze_until ? `Snoozed ${untilWords(a.snooze_until)} · ${a.body}` : a.body),
+        reminderActs(a, client, refresh, fail, st.settings?.allday_alert))) : [el('div.cal-muted', { style: { padding: '0 6px' } }, 'None waiting.')])));
     return col;
   }
   const open1 = (t, anchor) => open({ ...t, id: t.id || t.item_id }, anchor);

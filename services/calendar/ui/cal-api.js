@@ -31,7 +31,7 @@ export function createClient(call) {
     restore: id => j('POST', `/v1/trash/${encodeURIComponent(id)}/restore`, { json: {} }),
     undo: path => j('POST', String(path).replace(/^\/api\/s\/calendar/, ''), { json: {} }),
     alerts: (state = 'all') => j('GET', `/v1/alerts${qs({ state })}`),
-    alert: (fid, act, minutes) => j('POST', `/v1/alerts/${encodeURIComponent(fid)}/${act}${qs({ minutes })}`, { json: {} }),
+    alert: (fid, act, minutes, at) => j('POST', `/v1/alerts/${encodeURIComponent(fid)}/${act}${qs({ minutes, at })}`, { json: {} }),
     seenAll: () => j('POST', '/v1/alerts/seen-all', { json: {} }),
     importIcs: file => typeof file === 'string' ? j('POST', '/v1/import', { json: { ics: file } }) : j('POST', '/v1/import', { form: { file } }),
     proposal: id => j('GET', `/v1/proposals/${encodeURIComponent(id)}`),

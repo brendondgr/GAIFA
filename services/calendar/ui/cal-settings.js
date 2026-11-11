@@ -2,14 +2,14 @@
 // alert defaults, the week's first day, how 11/12 reads, today's agenda in chats, the default view.
 
 import { WEEKDAYS } from './cal-dates.js';
+import { alertsField } from './cal-remind.js';
 import { el, ensureCss } from './cal-style.js';
-
-const ALERTS = [[0, 'At the time'], [5, '5 min'], [10, '10 min'], [15, '15 min'], [30, '30 min'], [60, '1 hour'], [1440, '1 day']];
 
 export function settingsForm(root, ctx, client) {
   ensureCss();
   const box = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '18px', maxWidth: '720px' } });
   root.replaceChildren(box);
+  const custom = {};                          // which alert list has its typed amount open
   const draw = s => {
     const x = JSON.parse(JSON.stringify(s));
     const row = (label, ...kids) => el('div', { style: { display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', minHeight: '32px' } },
@@ -21,15 +21,20 @@ export function settingsForm(root, ctx, client) {
       d ? el('input.cal-input', { type: 'time', value: d[0], oninput: e => { x.work_hours[i][0] = e.target.value; } }) : el('span.cal-muted', null, 'day off'),
       d ? el('span.cal-muted', null, '–') : null,
       d ? el('input.cal-input', { type: 'time', value: d[1], oninput: e => { x.work_hours[i][1] = e.target.value; } }) : null));
-    const multi = k => el('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap' } }, ...ALERTS.map(([m, l]) =>
-      el('label.cal-btn', { style: { cursor: 'pointer' } }, el('input', { type: 'checkbox', checked: x[k].includes(m), onchange: e => { x[k] = e.target.checked ? [...x[k], m] : x[k].filter(y => y !== m); } }), l)));
+    const multi = (k, kind) => {            // the editor's chips, presets and Custom… (cal-remind.js)
+      const y = { alerts: x[k], kind, all_day: false, _customAlert: custom[k] };
+      const wrap = el('div');
+      const redraw = () => { x[k] = y.alerts; custom[k] = y._customAlert; wrap.replaceChildren(alertsField(y, redraw)); };
+      wrap.append(alertsField(y, redraw));
+      return wrap;
+    };
     box.replaceChildren(
       el('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } }, el('strong', { style: { flex: 1, fontSize: '15px' } }, 'Calendar settings'),
         el('a.cal-btn', { href: '#/calendar', style: { textDecoration: 'none' } }, 'Open the Calendar')),
       row('Working hours (free time and day plans use them)', el('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } }, ...hours)),
-      row('Alerts on new events', multi('event_alerts')),
-      row('Alerts on new to-dos', multi('todo_alerts')),
-      row('An all-day item’s alert', el('input.cal-input', { type: 'time', value: x.allday_alert, oninput: e => { x.allday_alert = e.target.value; } }), el('span.cal-muted', null, 'the day before (or on the day for “at the time”)')),
+      row('Alerts on new events', multi('event_alerts', 'event')),
+      row('Alerts on new to-dos', multi('todo_alerts', 'todo')),
+      row('An all-day item’s alert', el('input.cal-input', { type: 'time', value: x.allday_alert, oninput: e => { x.allday_alert = e.target.value; } }), el('span.cal-muted', null, 'on the day, or the days before that an all-day item’s alerts name')),
       row('Weeks start on', sel('week_start', [[0, 'Monday'], [6, 'Sunday']], Number)),
       row('11/12 means', sel('date_order', [['mdy', 'November 12 (month first)'], ['dmy', '11 December (day first)']])),
       row('Opens in', sel('default_view', [['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['agenda', 'Agenda']])),

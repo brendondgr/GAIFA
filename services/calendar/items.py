@@ -146,8 +146,8 @@ def _alerts(v: Any) -> list[dict[str, int]]:
         if not isinstance(m, int) or not 0 <= m <= 40320:
             raise Invalid("alerts: minutes before, 0–40320")
         out.append({"before_min": m})
-    if len(out) > 5:
-        raise Invalid("up to five alerts")
+    if len(out) > 8:
+        raise Invalid("up to eight alerts")
     return sorted({a["before_min"]: a for a in out}.values(), key=lambda a: a["before_min"])
 
 

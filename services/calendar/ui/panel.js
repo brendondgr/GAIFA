@@ -8,6 +8,7 @@ import { createClient, useMock } from './cal-api.js';
 import { createMockClient } from './cal-mock.js';
 import { layoutDay } from './cal-layout.js';
 import { popover } from './cal-edit.js';
+import { reminderActs } from './cal-remind.js';
 import { I, el, ensureCss, icon } from './cal-style.js';
 
 export const ROW_PX = 36;
@@ -110,8 +111,9 @@ export default {
           el('button.cal-check', { role: 'checkbox', 'aria-checked': 'false', 'aria-label': `Done: ${t.title}`, onclick: async () => { try { await client.done(t.item_id, t.recurring ? t.occurrence : undefined); refresh(); } catch (e) { fail(e); } } }),
           el('span', { style: { flex: '1', minWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, t.title),
           el('span.cal-small', { style: { color: t.overdue ? 'var(--rd,#F85149)' : 'var(--mut,#8A94A6)' } }, t.overdue ? 'overdue' : t.all_day ? 'today' : hhmm(new Date(t.ts * 1000)))))),
-        sec('Reminders', st.alerts.slice(0, 5).map(a => el('div.cal-row', null, icon(I.bell, 12), el('span', { style: { flex: '1', minWidth: '0' } }, a.title, el('div.cal-muted.cal-small', null, a.body)),
-          el('button.cal-btn', { style: { height: '22px', padding: '0 7px', fontSize: '11px' }, onclick: async () => { await client.alert(a.id, 'seen'); refresh(); } }, 'Seen')))),
+        sec('Reminders', st.alerts.slice(0, 5).map(a => el('div', { style: { display: 'flex', gap: '8px', padding: '5px 6px', alignItems: 'flex-start' } }, el('span', { style: { paddingTop: '2px' } }, icon(I.bell, 12)),
+          el('div', { style: { flex: '1', minWidth: '0', display: 'flex', flexDirection: 'column', gap: '3px' } }, el('span', { style: { fontSize: '12.5px' } }, a.title), el('div.cal-muted.cal-small', null, a.body),
+            reminderActs(a, client, refresh, fail, st.settings?.allday_alert))))),
       ];
     }
     function draw() {

@@ -4,6 +4,7 @@
 
 import { addDays, parse, timeText, wall, ymd } from './cal-dates.js';
 import { DAYS, KINDS, choiceOf, ruleOf, words } from './cal-repeat.js';
+import { alertsField } from './cal-remind.js';
 import { I, el, icon } from './cal-style.js';
 
 /** The body a save sends, from the sheet's fields (pure: tests/ui/edit.test.mjs). */
@@ -80,7 +81,7 @@ export function sheet(f, a) {
         field('Title', inp(x, 'title', { placeholder: x.kind === 'todo' ? 'What to do' : 'What it is', autofocus: true })),
         whenFields(x, a, draw),
         repeatFields(x, draw),
-        alertFields(x, draw),
+        alertsField(x, draw, a.settings?.allday_alert),
         el('div.cal-two', null,
           field('Calendar', sel(x, 'calendar', (a.calendars || []).map(c => [c.id, c.name]))),
           x.kind === 'event' ? field('Shows as', sel(x, 'busy', [['busy', 'Busy'], ['free', 'Free'], ['focus', 'Focus block']]))
@@ -156,15 +157,6 @@ function repeatFields(x, draw) {
     parts.push(el('div.cal-muted.cal-small', null, '↻ ', words(ruleOf(c, x.date))));
   }
   return el('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } }, ...parts);
-}
-
-function alertFields(x, draw) {
-  const label = m => m === 0 ? (x.kind === 'todo' ? 'At the time' : 'When it starts') : m % 1440 === 0 ? `${m / 1440} day${m > 1440 ? 's' : ''} before` : m % 60 === 0 ? `${m / 60} h before` : `${m} min before`;
-  const add = el('select.cal-input', { style: { width: 'auto' }, onchange: e => { const m = +e.target.value; if (!x.alerts.includes(m) && x.alerts.length < 5) x.alerts.push(m); draw(); } },
-    el('option', { value: '' }, '+ Alert'), ...[0, 5, 10, 15, 30, 60, 120, 1440, 2880, 10080].map(m => el('option', { value: m }, label(m))));
-  return field('Alerts (in the app)', el('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' } },
-    ...x.alerts.sort((p, q) => p - q).map(m => el('span.cal-btn', { style: { cursor: 'default' } }, icon(I.bell, 12), label(m),
-      el('button.cal-btn.icon.ghost', { style: { width: '20px', height: '20px' }, onclick: () => { x.alerts = x.alerts.filter(y => y !== m); draw(); }, 'aria-label': 'Remove alert' }, icon(I.x, 11)))), add));
 }
 
 /** Which occurrences: resolves 'this' | 'following' | 'all', or null (cancelled). */

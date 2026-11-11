@@ -99,7 +99,7 @@ Assumed:
 - **A project's items:** an item may name one project (`project_id`). In that project's chats the agenda adds a "Project dates" list: the project's items in the next 14 days.
 - **Alerts:**
   - Defaults: events 10 minutes before, to-dos at their time. An all-day event's alert is at 09:00 the day before. You set the defaults in the mod's settings.
-  - A fired alert stays unread until you open it, mark it done or snooze it (5, 10 or 60 minutes, or tomorrow 09:00).
+  - A fired alert stays unread until you open it, mark it done or snooze it (5, 10, 30 minutes, 1 or 3 hours, tomorrow at the all-day time, or an amount you type, up to 30 days).
   - Alerts missed while the mod was down fire once, marked late, when it comes back. Ones over 24 hours old are only listed.
 - **Prep tasks:**
   - A task with `{kind: "event", item, before_min}` runs once per occurrence.
@@ -221,10 +221,10 @@ Assumed:
     - title: the item's title;
     - body: its time, e.g. "in 10 min · 14:00–15:00", or "due 17:00";
     - route: `#/calendar?item=<occ>`;
-    - actions: Snooze 10 min, and **Done** for a to-do.
+    - actions: Snooze 10 min, 1 hour, Tomorrow, and **Done** for a to-do (four at most).
     - It then posts `unread`.
   - **Start-up:** missed alerts are handled per §2, and the count is posted again.
-  - **Routes:** `GET /v1/alerts?state=` (fired, newest first), `POST /v1/alerts/{fid}/seen|done|snooze` (`{minutes | until}`), `POST /v1/alerts/seen-all`.
+  - **Routes:** `GET /v1/alerts?state=` (fired, newest first), `POST /v1/alerts/{fid}/seen|done|snooze` (`{minutes | at: tomorrow | until}`), `POST /v1/alerts/seen-all`.
   - **Errors:** a hub that's down is retried on the next tick. A fired alert is never lost.
   *Done when:* `services/calendar/tests/test_alerts.py` (a fake clock and a fake hub) covers an event alert, a to-do at its time, an all-day alert, snooze and re-fire, done on a repeating to-do, missed alerts late and the 24 h limit, the count, and the hub being down.
 
@@ -232,7 +232,7 @@ Assumed:
 
 **Checks & deliverables — Phase 2**
 - [x] On the second hub: an item set two minutes ahead with a 1-minute alert shows a toast with Snooze. Snoozed, it fires again. With the page closed, the badge counts it when the page opens.
-  *As built (2026-11-09, a second hub on port 7079 from the worktree, `--dev`):* the item's alert fired 16 s after its time (`in 1 min · 18:03–19:03`), the Calendar item showed the badge 1 on load, a toast with Open and Snooze 10 min drew, and Snooze went through the proxy (the alert `snoozed`, the badge gone at once by its `badge` event). Found: `api.js` drops event types without an area, so `EVENT_AREA` maps `notification` and `badge` to `notify`; and an `sc-if` inside the toasts' `sc-for` stopped every toast from drawing, so the body and actions are spans shown by style.
+  *As built (2026-11-09, a second hub on port 7079 from the worktree, `--dev`):* the item's alert fired 16 s after its time (`in 1 min · 18:03–19:03`), the Calendar item showed the badge 1 on load, a toast with Open and Snooze 10 min drew, and Snooze went through the proxy (the alert `snoozed`, the badge gone at once by its `badge` event). Found: `api.js` drops event types without an area, so `EVENT_AREA` maps `notification` and `badge` to `notify`; and an `sc-if` inside the toasts' `sc-for` stopped every toast from drawing, so the body and actions are spans shown by style. *Later (2026-11-11, the user's ask):* an item takes up to eight alerts, each a preset or a typed amount (minutes, hours, days or weeks, up to 4 weeks; `cal-remind.js`, also in the settings' defaults); an all-day item's are whole days before at the all-day time (2880: two days before); an alert a day or more ahead names the day (`Fri Nov 20 · 14:00–16:00 (in 2 days)`); the toast offers Snooze 10 min, 1 hour, Tomorrow and Done (the hub's `/api/notify` takes four actions), and the page's and the Chat panel's reminders a Snooze menu with a typed amount (`test_alerts.py`, `tests/ui/remind.test.mjs`). Checked on the installed hub: a typed 3-hour alert saved, the toast's 1 hour snoozed to the minute, a typed 2 days from the page's menu.
 - [x] Delivered: `utils/routes/notify.py`, the changed `events.py`, `views.py`, `Hub.dc.html`, `nav-model.js`, `sidebar.js`, the calendar's `alerts.py` and `api_alerts.py`, and tests.
 
 ## Phase 3 — The Calendar in the main view (L)
@@ -256,7 +256,7 @@ Assumed:
     - Calendars (colour dot, on/off, New calendar, edit);
     - Layers (Scheduled tasks, History; each a switch, filled in later phases);
     - **To-dos** (open, overdue first, a tick to complete);
-    - **Reminders** (fired alerts, unread first, with Seen / Done / Snooze).
+    - **Reminders** (fired alerts, unread first, with Seen / Done / Snooze ▾: the presets, Tomorrow, or a typed amount; a snoozed one says until when).
     - The column folds away under 1000 px.
   - **Keys:** `t` today, `d`/`w`/`m`/`a` views, `j`/`k` previous/next, `n` new, `/` search, `Esc` close.
   - **Kept on the hub:** the view, the date and calendars on/off (`calendar.view`, `calendar.date`, `calendar.on`; `ctx` store). `?item=<occ>` opens that item.

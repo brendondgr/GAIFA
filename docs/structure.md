@@ -67,6 +67,7 @@ The existing apps came in with `git subtree add` (their history is kept), so mos
 | `agent-rebuild-guide.md` | How the chat agent turns a message into tool calls and an answer, written for another agent to rebuild it: the loop, the event log, tools, one model call, skills, context, guards, the tool host and permissions, a compact reference implementation, a build order with tests, and the base system prompt |
 | `agents-over-mcp.md` | GAIFA's chats from another agent: connecting Claude Code or Codex to `/mcp`, the `agent_chat_*` tools, who decides what, headless clients (plan agent-workflows Phase 4) |
 | `agent-eval.md` | Plan 13.5 and 14.12: the eval's and the live runs' results in short (the full account is the overnight report) |
+| `voice-spike.md` | Plan voice-speech-model Phase 1: LFM3-Omni-2B on this machine (speed, memory, llama.cpp's realtime protocol as found) |
 | `report/` | The overnight report (Phases 13–16): `report.tex` and its parts, `build.py` (turns `data/*.json` from the eval, live and test runs into `gen/` tables and thumbnails), `gen/` (tracked). Local only, gitignored: `data/` (the runs' records), `img/` (UI screenshots, live outputs) and the built `report.pdf` |
 | `test-plan.md` | The checks and edge cases for Phases 13–16, written before building them; results go in the overnight report |
 | `backend-plan.md` | The original build plan: Phases 0–51 with steps, checks and deliverables; closed on 2026-10-25 (open steps may still be ticked), new work goes in `plans/` |

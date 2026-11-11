@@ -1,0 +1,51 @@
+# Voice: a speech-to-speech model (LFM3-Omni-2B) that hears and answers aloud, for Chat's voice mode
+# (plan voice-speech-model). The mod runs llama.cpp's server as a child process and bridges the page to
+# its realtime WebSocket. Fields: architecture §4.3. Setup: setup/llama-cpp.md.
+id = "voice"
+name = "Voice"
+description = "A speech-to-speech model for voice mode: it hears you and answers aloud, on this machine (LFM3-Omni-2B in llama.cpp)"
+icon = "wave"
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "server.py"]
+port = 5110
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+start_timeout_s = 30
+stop_timeout_s = 20
+restart = "on-failure"
+install = "install.sh"
+
+[run.env]
+VOICE_MODELS_DIR = "{models}/s2s"
+VOICE_LLAMA_BIN = "{service_dir}/runtime/llama.cpp/bin/current/llama-server"
+VOICE_QUANT = "q4_k_m"             # q4_k_m | q8_0 (docs/voice-eval.md compares them)
+VOICE_GPU_LAYERS = "99"            # 0 keeps the language model on the CPU
+
+[run.variants.vulkan]              # Mesa RADV on AMD (as lcpp)
+env = { AMD_VULKAN_ICD = "RADV" }
+
+[run.variants.cpu]
+env = { VOICE_GPU_LAYERS = "0" }
+
+[memory]
+estimate_gb = 5                    # measured 4.3 GB (Q4_K_M) and 5.1 GB (Q8_0): docs/voice-spike.md
+load = "POST /v1/load"
+unload = "POST /v1/unload"
+triggers = ["POST /v1/load", "POST /v1/speech"]
+idle_unload_s = 300
+idle_unload_env = "VOICE_IDLE_UNLOAD_S"
+
+[gpu]                              # a conversation holds the GPU slot while it is open
+class = "interactive"
+
+[models]
+dirs = ["s2s"]
+
+[ui]
+page = "ui/page.js"
+
+[api.responses]
+"POST /v1/speech" = "audio"

@@ -136,6 +136,20 @@ Run on 2026-11-11 with `services/voice/evals/compare.py` (plan voice-speech-mode
 - Q4_K_M (176 ms) ✓: A capital de Portugal é Lisboa.
 - Q8_0 (229 ms) ✓: A capital de Portugal é Lisboa.
 
+## Tools (plan Phase 5)
+
+Run on 2026-11-11 on the installed hub, with `[voice_mode] tools = ["calendar_agenda", "calendar_free", "web_search", "time_now"]` set for the run only (`compare.py --tools --only t1 t2 t3 t4 t5`). A turn counts when the reply called the tool the prompt is about.
+
+| Prompt | Tool | Q4_K_M | Q8_0 |
+| --- | --- | --- | --- |
+| What is on my calendar tomorrow? | `calendar_agenda` | called · 401 ms | called · 529 ms |
+| What time is it right now? | `time_now` | called · 323 ms | called · 436 ms |
+| Do I have anything planned for today? | `calendar_agenda` | called, read both events out · 447 ms | called · 592 ms |
+| When am I free tomorrow afternoon? | `calendar_free` | called, answered "no free time" on an empty day · 540 ms | the same · 787 ms |
+| Search the web for the weather in Tallahassee. | `web_search` | called, gave a forecast · 10.9 s (the search) | called, "couldn't find any weather information" · 1.2 s |
+
+Both sizes called the right tool on all five, and the first audio comes 0.3 to 0.6 s after you stop (the call, then a second response that speaks). What they *say* about the result is less sure: both read an empty afternoon as "no free time". With tools on, the model also sometimes calls one for a question that needs none, and once answered "I don't have that information" to "What is the capital of France?" (seen on the scratch hub). Tools stay off by default.
+
 ## The choice
 
 **Q4_K_M stays the default** (2026-11-11). Over these prompts Q8_0 answered the same questions right and wrong (17 of 20 each: both add 17 and 25 to forty, both get the train time wrong, both stumble on the Italian prompt), wrote your words down no better, and spoke no more clearly to Whisper's ear (11.2 % against 12.5 %, within the noise of 27 replies). It costs about 50 ms more before the first audio, 0.8 GB more memory and makes speech a fifth slower. Nothing here measures how the two voices *sound*: that is for the user's ears, with the paired WAVs (`outputs/voice/eval/<n>-<id>-q4_k_m.wav` and `-q8_0.wav`). If Q8_0 sounds better to them, Settings → Speech → Voice mode → Size switches it; both files stay on disk until they say otherwise.

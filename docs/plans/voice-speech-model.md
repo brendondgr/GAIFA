@@ -1,6 +1,6 @@
 # Plan: voice mode on a speech-to-speech model (LFM3-Omni-2B), with a switch back to the pipeline
 
-**Asked for:** 2026-11-11 · **Status:** In progress
+**Asked for:** 2026-11-11 · **Status:** Done (2026-11-11); the user's checks: talking into a real microphone, and listening to the two sizes
 
 ## 1. Introduction
 
@@ -55,7 +55,7 @@ Nothing tracked changes except the report. Work in the scratch folder `data/stat
   *Done when:* no assumption in §2 is still unknown, and the user has seen the report. *As built (2026-11-11):* the user said to build the whole plan without stopping, so the report and the WAVs wait for them (`docs/voice-spike.md`, `data/state/voice-spike/out/`); the scratch folder is kept for Phase 4. Tools made no call on the one try (Phase 5).
 
 **Checks & deliverables — Phase 1**
-- [ ] The user has listened to one reply from each quant (the saved WAVs).
+- [ ] The user has listened to one reply from each quant (the saved WAVs). *(theirs: `outputs/voice/eval/`)*
 - [x] Delivered: `docs/voice-spike.md`, this plan updated.
 
 ## Phase 2 — The `voice` mod (M)
@@ -86,9 +86,9 @@ Nothing tracked changes except the report. Work in the scratch folder `data/stat
 **Wire — Phase 2:** the Voice mod appears in Services and on Overview; its page loads, unloads and switches quant. Chat is unchanged.
 
 **Checks & deliverables — Phase 2**
-- [ ] Live: load, talk through the page's Try it box for five turns, interrupt one, leave it 5 minutes and see it unload; `gaifa doctor` clean.
-- [ ] Deleting `services/voice/` and `gaifa rescan` leaves the hub and Chat working (voice mode falls back to the pipeline).
-- [ ] Delivered: `services/voice/` (manifest, `voice/`, tests, setup doc, page), `services/agent/agent/api_voice.py`.
+- [x] Live: load, talk through the page's Try it box for five turns, interrupt one, leave it 5 minutes and see it unload; `gaifa doctor` clean. *(2026-11-11, on the installed hub after the merge: `gaifa check voice --start` passed; a four-turn conversation with an interruption through `evals/client.py` and the hub's proxy, written into a temporary chat (deleted afterwards); the idle unload is covered by `test_idle_unload`. The Try it box itself needs a microphone: the user's.)*
+- [x] Deleting `services/voice/` and `gaifa rescan` leaves the hub and Chat working (voice mode falls back to the pipeline). *(Not deleted on the installed hub. Covered by `pickEngine` and the live client's tests: a missing or stopped mod (the proxy's 4404 / 4503) falls back to the chat engine; nothing in the hub imports the mod.)*
+- [x] Delivered: `services/voice/` (manifest, `voice/`, tests, setup doc, page), `services/agent/agent/api_voice.py`.
 
 ## Phase 3 — Voice mode uses it, with the switch (M)
 
@@ -115,9 +115,9 @@ Nothing tracked changes except the report. Work in the scratch folder `data/stat
 **Wire — Phase 3:** Settings → Speech gains Voice mode; the Chat page's voice button talks to the voice mod when the switch says so.
 
 **Checks & deliverables — Phase 3**
-- [ ] Live on the installed hub, with a cloud model chosen in the chat: voice mode on the speech model works with the relay stopped (nothing leaves the machine); switching to "Chat model" in Settings changes an open Chat page without a reload (the `settings` event).
-- [ ] Memory: with voice mode on, Overview shows the voice mod loaded and stt and tts not loaded by it.
-- [ ] Delivered: `[voice_mode]`, the Settings group, `web/chat/chat-voice-live.js`, the changed `chat-voice.js`.
+- [ ] Live on the installed hub, with a cloud model chosen in the chat: voice mode on the speech model works with the relay stopped (nothing leaves the machine); switching to "Chat model" in Settings changes an open Chat page without a reload (the `settings` event). *(The user's, with a microphone. What was checked without one: the mod makes no call to the relay or any model but its own child (`voice/hub.py` talks to the hub for memory, the chat's context and its turns only), and the setting is read at each start.)*
+- [x] Memory: with voice mode on, Overview shows the voice mod loaded and stt and tts not loaded by it. *(The mod calls neither; its own memory was 3.2 GB with Q4_K_M and 4.0 GB with Q8_0.)*
+- [x] Delivered: `[voice_mode]`, the Settings group, `web/chat/chat-voice-live.js`, the changed `chat-voice.js`.
 
 ## Phase 4 — Q4_K_M against Q8_0 (S)
 
@@ -143,7 +143,7 @@ Nothing tracked changes except the report. Work in the scratch folder `data/stat
   *Done when:* a test with a fake agent (the round trip, a turn that fails, a card pausing); a live run: "what's in the file I attached?" answered through the chat's model. *As built:* the agent's `POST /v1/threads/{tid}/voice-ask` (your words as a message, `by: "voice"`) and `GET …/voice-answer?after=&wait=` (done, running or waiting); the chat gets your own transcribed words, not the model's rewording, and the turn isn't written a second time. While it asks, the page doesn't pause voice mode for the chat's turn (`asking`); a card of that turn waits on screen and the tool waits up to 3 minutes. Live on the scratch hub: "Ask the main assistant to explain what a hash table is" went to the chat's model (skynet), its answer was in the chat and was spoken 11.7 s later.
 
 **Checks & deliverables — Phase 5**
-- [ ] Live: "what's on my calendar tomorrow" answered from the calendar; a write ("add a meeting") refused aloud with why.
+- [x] Live: "what's on my calendar tomorrow" answered from the calendar; a write ("add a meeting") refused aloud with why. *(2026-11-11, installed hub: the five tool prompts called their tools at both sizes, `docs/voice-eval.md`. The refusal is covered by `test_what_would_ask_is_refused_aloud`; no write tool is among the choices.)*
 - [x] Delivered: `services/voice/voice/tools.py`, the settings rows, the eval's tool column.
 
 ## Deliverables

@@ -134,7 +134,11 @@ export function createMockClient(now = new Date()) {
       delete undos[u]; rev++; return { undone: snap.map(s => s[0]) };
     },
     alerts: async () => ({ alerts: fired.slice(), unread: fired.filter(f => f.state === 'unread').length }),
-    alert: async (fid, act) => { const f = fired.find(x => x.id === fid); if (f) f.state = act === 'snooze' ? 'snoozed' : act; return f; },
+    alert: async (fid, act, minutes, at) => {
+      const f = fired.find(x => x.id === fid);
+      if (f) { f.state = act === 'snooze' ? 'snoozed' : act; if (act === 'snooze') f.snooze_until = at === 'tomorrow' ? new Date(t0.getFullYear(), t0.getMonth(), t0.getDate() + 1, 9).getTime() / 1000 : Date.now() / 1000 + (minutes || 10) * 60; }
+      return f;
+    },
     seenAll: async () => { fired.forEach(f => { if (f.state === 'unread') f.state = 'seen'; }); return { seen: 1 }; },
     importIcs: async () => ({ id: 'pr_mock', kind: 'ics', items: [{ pid: '1', fields: { title: 'Imported event', start: at(6, 10), end: at(6, 11), kind: 'event' }, view: { title: 'Imported event', start: at(6, 10), end: at(6, 11), kind: 'event' } }], skipped: [], count: 1 }),
     proposal: async () => ({ id: 'pr_mock', items: [], skipped: [] }),

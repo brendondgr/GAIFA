@@ -8,6 +8,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Body, Query, Request
 
+from alerts import snooze_until
 from api_items import cal
 from items import Invalid
 
@@ -44,12 +45,17 @@ async def done(request: Request, fid: str) -> dict:
     return await _alerts(request).mark(fid, "done")
 
 
-@router.post("/v1/alerts/{fid}/snooze", summary="Snooze a reminder: minutes, or until (unix seconds)")
-async def snooze(request: Request, fid: str, minutes: int | None = Query(None, ge=1, le=10080),
-                 body: dict | None = Body(None)) -> dict:
+@router.post("/v1/alerts/{fid}/snooze", summary="Snooze a reminder: minutes (up to 30 days), at=tomorrow (the all-day "
+             "alert time tomorrow), or until (unix seconds, in the body)")
+async def snooze(request: Request, fid: str, minutes: int | None = Query(None, ge=1, le=43200),
+                 at: Literal["tomorrow"] | None = None, body: dict | None = Body(None)) -> dict:
     body = body or {}
     until = body.get("until")
     m = minutes or body.get("minutes")
+    if m is not None and not (isinstance(m, int) and 1 <= m <= 43200):
+        raise Invalid("minutes: 1–43200 (30 days)", "bad_minutes")
     if until is None:
-        until = time.time() + int(m or 10) * 60
+        until = snooze_until(time.time(), cal(request).settings.get()["allday_alert"], m, at or body.get("at"))
+    elif float(until) <= time.time():
+        raise Invalid("until: a time still to come", "bad_until")
     return await _alerts(request).mark(fid, "snoozed", float(until))

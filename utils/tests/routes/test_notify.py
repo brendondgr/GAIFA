@@ -54,6 +54,6 @@ async def test_refusals(rig, serve):
     async with httpx.AsyncClient(base_url=served.url) as c:
         r = await c.post("/api/notify", json={"service": "nope", "title": "x"})
         assert r.status_code == 422 and r.json()["code"] == "unknown_service"
-        for bad in ([{"label": "x", "op": "GET /v1/x"}], [{"label": "x", "op": "POST /v1/x"}] * 4, [{"label": "", "op": "POST /v1/x"}]):
+        for bad in ([{"label": "x", "op": "GET /v1/x"}], [{"label": "x", "op": "POST /v1/x"}] * 5, [{"label": "", "op": "POST /v1/x"}]):
             assert (await c.post("/api/notify", json={"service": "fake-ok", "title": "x", "actions": bad})).status_code == 422
         assert (await c.post("/api/notify", json={"service": "fake-ok", "title": "x", "route": "http://evil"})).status_code == 422

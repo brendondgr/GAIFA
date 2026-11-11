@@ -57,8 +57,8 @@ def check(k: str, v: Any) -> Any:
                 raise ValueError(f"work_hours: {d!r} isn't [\"HH:MM\", \"HH:MM\"] with from before to")
         return v
     if k in ("event_alerts", "todo_alerts"):
-        if not isinstance(v, list) or len(v) > 5 or not all(isinstance(x, int) and 0 <= x <= 40320 for x in v):
-            raise ValueError(f"{k}: up to five whole minutes before, 0–40320")
+        if not isinstance(v, list) or len(v) > 8 or not all(isinstance(x, int) and 0 <= x <= 40320 for x in v):
+            raise ValueError(f"{k}: up to eight whole minutes before, 0–40320")
         return sorted(set(v))
     if k == "allday_alert":
         if not (isinstance(v, str) and HHMM.match(v)):

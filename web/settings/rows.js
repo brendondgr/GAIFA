@@ -26,7 +26,8 @@ export function Toggle({ on, onChange, label, disabled }) {
 }
 export function Segmented({ value, choices, onChange, label }) {
   return h('div', { role: 'group', 'aria-label': label, style: { display: 'inline-flex', flexWrap: 'wrap', maxWidth: '100%', padding: 2, borderRadius: 7, border: '1px solid ' + T.bd, background: T.sb } },
-    choices.map(c => h('button', { key: String(c.value), type: 'button', 'aria-pressed': c.value === value ? 'true' : 'false', onClick: () => onChange(c.value), style: segSt(c.value === value) }, c.label)));
+    choices.map(c => h('button', { key: String(c.value), type: 'button', disabled: !!c.disabled, title: c.title, 'aria-pressed': c.value === value ? 'true' : 'false', onClick: () => onChange(c.value),
+      style: c.disabled ? { ...segSt(false), opacity: 0.5, cursor: 'not-allowed' } : segSt(c.value === value) }, c.label)));
 }
 export function Chips({ value = [], choices, onChange, label }) {
   return h('div', { role: 'group', 'aria-label': label, style: { display: 'flex', flexWrap: 'wrap', gap: 6 } },
@@ -99,7 +100,7 @@ export function Row({ row, value, onChange, error, ctx = {}, first }) {
   let control = null;
   const c = row.control;
   if (c === 'toggle') control = h(Toggle, { on: !!value, onChange, label: row.aria || row.label });
-  else if (c === 'segmented') control = h(Segmented, { value, onChange, label: row.label, choices: row.choices });
+  else if (c === 'segmented') control = h(Segmented, { value, onChange, label: row.label, choices: typeof row.choices === 'function' ? row.choices(ctx) : row.choices });
   else if (c === 'select') control = h(Select, { id, value, onChange, row, choices: typeof row.choices === 'function' ? row.choices(ctx) : row.choices || [] });
   else if (c === 'number') control = h(NumberInput, { id, value, onChange, bad, row });
   else if (c === 'text') control = h(TextInput, { id, value, onChange, bad, row });

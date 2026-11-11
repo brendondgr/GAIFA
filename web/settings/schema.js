@@ -55,6 +55,24 @@ export function subAgentRows(d) {
 }
 
 const knownMods = ctx => (ctx.services || []).filter(s => !(s.manifest_errors || []).length);
+/** Settings → Speech → Voice mode (plan voice-speech-model 3.2): which engine answers in Chat's voice mode. */
+export const VOICE_SIZES = [{ value: 'q4_k_m', label: 'Q4_K_M (smaller, faster)' }, { value: 'q8_0', label: 'Q8_0 (closer to the original)' }];
+export function voiceModeGroup(d, ctx) {
+  const speech = () => d.voice_mode?.engine === 'speech', has = c => !c.services || hasMod(c, 'voice');
+  const kw = ['voice mode', 'speech to speech', 'LFM3', 'omni', 'local'];
+  return { id: 'voiceMode', label: 'Voice mode', when: () => !ctx.services || hasMod(ctx, 'voice', 'stt', 'tts'),
+    summary: () => (speech() ? `Speech model (LFM3-Omni-2B ${(VOICE_SIZES.find(s => s.value === d.voice_mode?.quant)?.label || 'Q4_K_M').split(' ')[0]}, ${d.voice_mode?.voice || 'female'} voice)` : 'The chat’s model, read aloud'),
+    rows: [
+      field('vmEngine', 'voice_mode.engine', { label: 'Voice mode uses', control: 'segmented', keywords: kw,
+        hint: 'Chat model: your words are written down, the chat’s model answers, and the answer is read aloud. Speech model: a small model that hears and speaks answers itself, on this machine, in a fraction of a second. It doesn’t use the chat’s model or its tools.',
+        choices: c => [{ value: 'chat', label: 'Chat model, read aloud' },
+          { value: 'speech', label: 'Speech model (local)', disabled: !has(c) && d.voice_mode?.engine !== 'speech', title: has(c) ? undefined : 'Install the Voice mod: gaifa setup voice' }] }),
+      field('vmQuant', 'voice_mode.quant', { label: 'Size', hint: 'Both are compared in docs/voice-eval.md.', control: 'segmented', choices: VOICE_SIZES, when: speech, keywords: [...kw, 'quant', 'Q4', 'Q8'] }),
+      field('vmVoice', 'voice_mode.voice', { label: 'Voice', hint: 'The speech model has two voices; the voices above are for reading replies aloud.', control: 'segmented',
+        choices: [{ value: 'female', label: 'Female' }, { value: 'male', label: 'Male' }], when: speech, keywords: kw }),
+      block('vmStatus', 'VoiceModelStatus', { label: 'The speech model', when: speech, keywords: kw }),
+    ] };
+}
 const hasMod = (ctx, ...ids) => (ctx.services || []).some(s => ids.includes(s.id));
 const n = (k, word) => `${k} ${word}${k === 1 ? '' : 's'}`;
 const onOff = v => (v ? 'on' : 'off');
@@ -208,7 +226,7 @@ export function sections(ctx = {}) {
       ] },
       { id: 'judged', label: 'Judged calls', summary: () => 'What the judge ran and asked, newest first', rows: [block('judged', 'JudgedList', { label: 'Judged calls', keywords: ['auto', 'verdicts'] })] },
     ] },
-    { id: 'speech', label: 'Speech', icon: 'mic', areas: SETTINGS_AREAS.speech, when: () => !ctx.services || hasMod(ctx, 'stt', 'tts'), groups: [
+    { id: 'speech', label: 'Speech', icon: 'mic', areas: SETTINGS_AREAS.speech, when: () => !ctx.services || hasMod(ctx, 'stt', 'tts', 'voice'), groups: [
       { id: 'dictation', label: 'Dictation', when: () => !ctx.services || hasMod(ctx, 'stt'), summary: () => `${d.speech_input?.preset || 'balanced'} · ${n((d.speech_input?.mics || []).length, 'microphone')} ranked`, rows: [
         block('mics', 'MicsBlock', { label: 'Microphones', keys: ['speech_input.mics'], keywords: ['microphone', 'dictation', 'stt', 'level'] }),
         field('language', 'speech_input.language', { label: 'Language', hint: 'An ISO code such as en or de; empty detects it.', control: 'text', placeholder: 'detect', maxLength: 3, width: 90,
@@ -225,7 +243,8 @@ export function sections(ctx = {}) {
         field('autoRead', 'speech_output.auto_read', { label: 'Read every reply aloud', hint: 'When a reply is finished. With a model on this GPU it waits for the reply to end.', control: 'toggle' }),
         field('pause', 'speech_output.pause_ms', { label: 'Voice mode: end of what you said', hint: 'The quiet that sends your message.', control: 'segmented',
           choices: [800, 1200, 1600, 2400].map(ms => ({ value: ms, label: ms / 1000 + ' s' })), keywords: ['voice mode', 'silence'] }),
-      ] }] },
+      ] },
+      voiceModeGroup(d, ctx)] },
     { id: 'sessions', label: 'Sessions', icon: 'refresh', areas: SETTINGS_AREAS.sessions, when: () => ctx.hasSessions !== false, groups: [
       { id: 'sessions', label: 'Sessions', summary: () => 'Save the current setup, switch between them', rows: [
         block('sessions', 'SessionsPanel', { label: 'Sessions', card: true, keywords: ['save session', 'restore', 'switch', 'MCP'] }),

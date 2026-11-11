@@ -38,11 +38,27 @@ function MicsBlock({ ctx }) {
   return pad(h(SpeechInputPanel, { api: ctx.api, toast: ctx.toast, fields: false, value: ctx.draft?.speech_input,
     onChange: v => ctx.setDraft(d => { d.speech_input = { ...d.speech_input, ...v }; }) }));
 }
+/** What the voice mod says about the speech model, in words (plan voice-speech-model 3.2). `st`: its GET /v1/status. */
+export function voiceModelText(st, quant, hasMod = true) {
+  if (!hasMod) return 'The Voice mod isn’t installed: gaifa setup voice. Until then voice mode uses the chat’s model.';
+  if (!st) return 'The Voice mod isn’t running. Voice mode starts it, or uses the chat’s model when it can’t.';
+  const m = (st.models || []).find(x => x.quant === quant), eng = st.engine || {};
+  if (m && !m.present) return `LFM3-Omni-2B ${m.label} isn’t downloaded: gaifa setup voice.`;
+  const name = `LFM3-Omni-2B ${m?.label || ''}`.trim();
+  if (eng.state === 'ready' && eng.quant === quant) return `${name}, loaded. It unloads after 5 minutes without a conversation.`;
+  if (eng.state === 'ready') return `${eng.label} is loaded; ${name} loads the next time voice mode starts.`;
+  if (eng.state === 'failed') return `${name} failed to load: ${eng.error || 'see the Voice mod’s log'}`;
+  return `${name}, not loaded. It loads in about a second when voice mode starts (about 5 GB).`;
+}
+function VoiceModelStatus({ ctx }) {
+  const has = !ctx.services || ctx.services.some(s => s.id === 'voice');
+  return h('div', { role: 'status', style: { padding: '12px 0', fontSize: 12.5, color: T.mut } }, voiceModelText(ctx.voiceModel, ctx.draft?.voice_mode?.quant || 'q4_k_m', has));
+}
 const LearningLink = () => h('div', { style: { padding: '12px 0' } }, h('a', { href: '#/s/agent/learning', style: { fontSize: 12.5 } }, 'Open Memory & learning →'));
 
 export const AGENT_BLOCKS = {
   AgentNotes: wrap(AgentNotes), ModelsCard: ({ ctx }) => pad(h(ModelsCard, { ...p(ctx), bare: true })), DocumentsCard: wrap(DocumentsCard),
-  InstructionsCard: wrap(InstructionsCard), MemoryCard: wrap(MemoryCard), SkillsCard: wrap(SkillsCard), LearningLink, MicsBlock,
+  InstructionsCard: wrap(InstructionsCard), MemoryCard: wrap(MemoryCard), SkillsCard: wrap(SkillsCard), LearningLink, MicsBlock, VoiceModelStatus,
   ModesCard: () => pad(h(ModesCard)), GrantsList: ({ ctx }) => pad(h(GrantsList, p(ctx))),
   JudgedList: JudgedBlock, JudgeModelBlock, ScreenModelBlock,
 };

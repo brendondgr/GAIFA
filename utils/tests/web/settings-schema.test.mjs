@@ -65,6 +65,7 @@ const FULL = {
   learning: { enabled: true, nightly_at: '03:00', idle_min: 60, infer_after: 2, fade_days: 60 },
   speech_input: { mics: ['USB mic'], language: '', preset: 'balanced', mode: 'both' },
   speech_output: { voice: 'Hope', engine: 'auto', speed: 1, auto_read: false, pause_ms: 1200 },
+  voice_mode: { engine: 'chat', quant: 'q4_k_m', voice: 'female', tools: [], ask_chat: false },
   judge: { backend: 'decide', model: 'gemma4-26B', url: 'u', threshold: 0.35, timeout_s: 3, context: 'none', allow_commands: ['pytest *', 'ls *'], ask_commands: ['git push *'] },
   screen: { pages: true, documents: false, transcripts: false, timeout_s: 30, window_chars: 6000, backend: null, model: null, url: null, threshold: null, confirm: true, parallel: 4 },
   permissions: { deny: [], ask: ['hub_set_preference'], allow: ['hub_start_service'] },
@@ -81,7 +82,7 @@ test('2.1: nine sections in order, with their groups (LLMs since llm-servers 4.1
     general: ['hub', 'interface', 'outputs'], machine: ['memory', 'storage', 'hardware'], services: ['services', 'repositories'],
     llms: ['servers', 'add', 'engines', 'defaults'],
     agent: ['model', 'documents', 'web', 'instructions', 'memory', 'skills', 'learning'],
-    permissions: ['modes', 'rules', 'grants', 'judge', 'screening', 'judged'], speech: ['dictation', 'voice'], sessions: ['sessions'], about: ['versions', 'cli', 'doctor'] });
+    permissions: ['modes', 'rules', 'grants', 'judge', 'screening', 'judged'], speech: ['dictation', 'voice', 'voiceMode'], sessions: ['sessions'], about: ['versions', 'cli', 'doctor'] });
   assert.ok(secs.every(s => s.groups.length >= 1 && s.groups.length <= 7));
   const rows = S.rowsOf(secs);
   assert.equal(S.rowFor(secs, 'outputs.hidden_keep_days').ref, 'general/outputs/hiddenDays');
@@ -115,6 +116,7 @@ test('2.1: the summaries render from a fixed draft', () => {
   assert.equal(sum('general/outputs'), 'Saved web pages kept 7 days');
   assert.equal(sum('machine/storage'), '500 GB free of 2.0 TB');
   assert.equal(sum('speech/voice'), 'Hope · read every reply off');
+  assert.equal(sum('speech/voiceMode'), 'The chat’s model, read aloud');
   for (const s of secs) for (const g of s.groups) assert.ok(S.summaryOf(g, ctx), `${s.id}/${g.id}`);
 });
 
@@ -183,4 +185,32 @@ test('settings-that-stick 2.3: a save elsewhere reaches an open page', () => {
   assert.equal(theirs.draft.judge.threshold, 0.5); assert.deepEqual(theirs.elsewhere, {});
   const mine = S.resolveElsewhere(r2, 'judge.threshold', 'mine');
   assert.equal(mine.draft.judge.threshold, 0.4); assert.equal(mine.orig.judge.threshold, 0.5);
+});
+
+test('voice-speech-model 3.2: Speech → Voice mode', async () => {
+  const draft = JSON.parse(JSON.stringify(FULL));
+  const withVoice = { services: [...ALL, { id: 'voice', name: 'Voice', manifest_errors: [] }], draft };
+  const rows = c => { const g = S.sections(c).find(s => s.id === 'speech').groups.find(x => x.id === 'voiceMode'); return { g, rows: g.rows.filter(r => !r.when || r.when()) }; };
+  let { g, rows: shown } = rows(withVoice);
+  assert.deepEqual(shown.map(r => r.id), ['vmEngine']);                 // the chat model: only the switch
+  assert.equal(g.rows[0].key, 'voice_mode.engine');
+  assert.deepEqual(g.rows[0].choices(withVoice).map(c => [c.value, !!c.disabled]), [['chat', false], ['speech', false]]);
+  const without = { services: ALL, draft };
+  const off = rows(without).g.rows[0].choices(without)[1];
+  assert.ok(off.disabled && /gaifa setup voice/.test(off.title));       // no Voice mod: the speech model can't be chosen
+  draft.voice_mode = { ...draft.voice_mode, engine: 'speech', quant: 'q8_0', voice: 'male' };
+  ({ g, rows: shown } = rows(withVoice));
+  assert.deepEqual(shown.map(r => r.id), ['vmEngine', 'vmQuant', 'vmVoice', 'vmStatus']);
+  assert.equal(S.summaryOf(g, withVoice), 'Speech model (LFM3-Omni-2B Q8_0, male voice)');
+  assert.equal(rows(without).g.rows[0].choices(without)[1].disabled, false);   // already chosen: it can be switched back
+  // a machine with only the Voice mod still has the Speech section
+  assert.ok(S.sections({ services: [...services.filter(s => s.id !== 'tts'), { id: 'voice', name: 'Voice', manifest_errors: [] }], draft }).some(s => s.id === 'speech'));
+  const B = await import(pathToFileURL(path.join(root, 'web', 'settings', 'blocks-agent.js')).href).catch(() => null);
+  if (B) {
+    const st = { engine: { state: 'ready', quant: 'q4_k_m', label: 'LFM3-Omni-2B Q4_K_M' }, models: [{ quant: 'q4_k_m', label: 'Q4_K_M', present: true }, { quant: 'q8_0', label: 'Q8_0', present: false }] };
+    assert.match(B.voiceModelText(st, 'q4_k_m'), /^LFM3-Omni-2B Q4_K_M, loaded/);
+    assert.match(B.voiceModelText(st, 'q8_0'), /isn’t downloaded: gaifa setup voice/);
+    assert.match(B.voiceModelText(null, 'q4_k_m'), /isn’t running/);
+    assert.match(B.voiceModelText(null, 'q4_k_m', false), /isn’t installed/);
+  }
 });

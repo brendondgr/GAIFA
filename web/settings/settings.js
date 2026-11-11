@@ -78,6 +78,7 @@ export function SettingsPage(props) {
     api.getSettingsDefaults?.().then(x => live && up({ defaults: x }), () => {});   // 4.2: each row's default, for Reset
     api.getJudgeStatus?.().then(x => live && up({ judgeStatus: x }), () => {});
     if ((props.services || []).some(s => s.id === 'tts')) api.callService?.('tts', 'GET', '/v1/voices').then(r => live && up({ voices: r.json }), () => {});   // Speech → Voice's choices
+    if ((props.services || []).some(s => s.id === 'voice')) api.callService?.('voice', 'GET', '/v1/status').then(r => live && up({ voiceModel: r.json }), () => {});   // Speech → Voice mode's status line
     api.getWebReading?.().then(x => live && up({ reading: x }), () => {});
     api.getRepos?.(true).then(x => live && up({ repos: x }), () => {});   // Services → Repositories' summary (mod-repos 3.5)
     api.getToolIndex?.().then(ix => live && up({ toolCounts: ix.reduce((m, t) => ({ ...m, [t.mod]: (m[t.mod] || 0) + 1 }), {}) }), () => {});
@@ -126,7 +127,7 @@ export function SettingsPage(props) {
 
   const setDraft = fn => setSt(s => { const d = clone(s.draft); fn(d); return { ...s, draft: d, err: null }; });
   const ctx = { ...props, api, services: props.services || [], system: st.sys, draft: st.draft, orig: st.orig, setDraft,
-    judgeStatus: st.judgeStatus, reading: st.reading, voiceChoices: st.voices ? voiceChoices(st.voices) : null, toolCounts: st.toolCounts, hasSessions: !!api.listSessions,
+    judgeStatus: st.judgeStatus, reading: st.reading, voiceChoices: st.voices ? voiceChoices(st.voices) : null, voiceModel: st.voiceModel, toolCounts: st.toolCounts, hasSessions: !!api.listSessions,
     repos: st.repos, onRepos: x => up({ repos: x }), llm: st.llm, onLlm: x => up(s => ({ llm: { ...s.llm, ...x } })) };
   const secs = sections(ctx);
   ctx.defaults = st.defaults;

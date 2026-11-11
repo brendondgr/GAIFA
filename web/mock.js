@@ -1,7 +1,7 @@
 // GAIFA mock API — in-memory GAIFA + services with simulated time.
 // Implements the Section 6 contract; becomes web/js/mock.js in the vanilla port.
 import { createHistory, withSeries } from './mock-history.js';
-import { createModMocks, WORKSPACE_SVC } from './mock-mods.js';
+import { createModMocks, WORKSPACE_SVC, AGENT_SVC, CALENDAR_SVC } from './mock-mods.js';
 import { createToolMocks } from './mock-tools.js';
 import { createSessionMocks } from './mock-sessions.js';
 import { createLlmMocks } from './mock-llm.js';
@@ -247,6 +247,7 @@ function seedServices(base) {
     svc({ id: 'example', name: 'Example', description: 'The mod template. Copy it with gaifa new <id>.', icon: 'puzzle', port: 5099, used: 0.05 * GB, has_page: true, stats: [{ label: 'Calls', value: 0 }], priority: 3, autostart: false }),
     svc({ id: 'embed', name: 'Embeddings', description: 'EmbeddingGemma 2 and the library: every output indexed for search by meaning', icon: 'search', port: 5104, used: 1.2 * GB, stats: [{ label: 'Indexed', value: 120 }], priority: 6 }),   // the embed mod: By meaning and its scores in ?mock
     svc(WORKSPACE_SVC),   // environments for the chat list (chat-history 1.2)
+    svc(AGENT_SVC), svc(CALENDAR_SVC),   // the Overview's Today and Recent chats (overview-bento 2.2)
   ];
 }
 
@@ -280,7 +281,7 @@ export function createMockApi() {
     hub: { port: 7000 },
     memory: { reserve_gb: 12, auto_make_room: false, never_unload: ['lcpp'], priority: ['tts', 'comfy', 'gen3d', 'example', 'relay', 'lcpp'] },
     services: { order: services.map(s => s.id), enabled: Object.fromEntries(services.map(s => [s.id, true])), autostart: Object.fromEntries(services.map(s => [s.id, s.autostart])) },
-    ui: { theme: 'system', density: 'compact', dashboard: { order: [], hidden: [], ranges: {} }, nav: { collapsed: false, services: 'list', hidden: [], folded: false },
+    ui: { theme: 'system', density: 'compact', dashboard: { order: [], hidden: [], ranges: {}, shown: [], sizes: {} }, nav: { collapsed: false, services: 'list', hidden: [], folded: false },
       chat: { steps: 'fold', list: { show: 'chats', group: 'environment', env_order: 'activity', chat_order: 'updated', collapsed: [] }, environment: null },   // settings-that-stick 3.1
       overview: { view: 'dashboard', timeline_range: '24h', services_range: '24h' } },
     learning: { enabled: true, nightly_at: '03:00', idle_min: 60, infer_after: 2, fade_days: 60 },

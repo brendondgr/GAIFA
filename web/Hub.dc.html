@@ -29,9 +29,6 @@ button:disabled{cursor:not-allowed;opacity:.5}
 ::-webkit-scrollbar-thumb{background:var(--bds,#2A3547);border-radius:10px;border:2px solid transparent;background-clip:padding-box}
 @keyframes hubpulse{0%,100%{opacity:1}50%{opacity:.3}}
 @keyframes hubshimmer{0%{background-position:-480px 0}100%{background-position:480px 0}}
-.hubtile .hubacts{position:absolute;top:8px;right:40px;z-index:2;padding:0 2px 0 14px;background:linear-gradient(90deg,transparent,var(--card,#11151D) 12px);opacity:0;pointer-events:none;transition:opacity .12s}
-.hubtile:hover .hubacts,.hubtile:focus-within .hubacts{opacity:1;pointer-events:auto}
-@media (hover: none){.hubtile .hubacts{position:static;opacity:1;pointer-events:auto;padding:0;background:none}}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition:none!important}}
 </style>
 </helmet>
@@ -125,128 +122,6 @@ button:disabled{cursor:not-allowed;opacity:.5}
         <sc-if value="{{ ov.isDash }}" hint-placeholder-val="{{ true }}">{{ ov.dash }}</sc-if>
         <sc-if value="{{ ov.isTable }}" hint-placeholder-val="{{ false }}">{{ ov.table }}</sc-if>
         <sc-if value="{{ ov.isTimeline }}" hint-placeholder-val="{{ false }}">{{ ov.timeline }}</sc-if>
-        <sc-if value="{{ ov.isServices }}" hint-placeholder-val="{{ false }}">
-        <div style="{{ ov.wrapSt }}">
-        <section aria-labelledby="ov-svc" style="display:flex;flex-direction:column;gap:8px">
-          <h2 id="ov-svc" style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Services</h2>
-          <div style="{{ ov.gridSt }}">
-            <sc-for list="{{ ov.tiles }}" as="t" hint-placeholder-count="6">
-              <article class="hubtile" style="{{ t.cardSt }}">
-                <div style="display:flex;align-items:center;gap:8px;min-width:0">
-                  {{ t.logoEl }}
-                  <a href="{{ t.href }}" style="flex:1;min-width:0;font-weight:600;font-size:13px;color:var(--tx,#E6EAF2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.name }}</a>
-                  <span class="hubacts" style="display:inline-flex;gap:4px;flex:none">
-                    <sc-for list="{{ t.actions }}" as="a" hint-placeholder-count="2"><button onClick="{{ a.on }}" disabled="{{ a.dis }}" title="{{ a.label }}" aria-label="{{ a.aria }}" style="{{ a.st }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ a.d }}"></path></svg>{{ a.text }}</button></sc-for>
-                  </span>
-                  <span style="{{ t.sb.st }}">{{ t.sb.dot }}{{ t.sb.label }}</span>
-                  <span style="position:relative;flex:none">
-                    <button onClick="{{ t.menuToggle }}" aria-label="{{ t.menuAria }}" aria-haspopup="menu" aria-expanded="{{ t.menuOpen }}" style="width:24px;height:24px;display:grid;place-items:center;border:0;border-radius:5px;background:transparent;color:var(--mut,#8A94A6);cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.more }}"></path></svg></button>
-                    <sc-if value="{{ t.menuOpen }}" hint-placeholder-val="{{ false }}">
-                      <div onClick="{{ t.menuClose }}" aria-hidden="true" style="position:fixed;inset:0;z-index:44"></div>
-                      <div role="menu" style="position:absolute;right:0;top:28px;z-index:45;min-width:170px;padding:4px;border-radius:9px;background:var(--card,#11151D);border:1px solid var(--bds,#2A3547);box-shadow:0 14px 34px rgba(0,0,0,.4);display:flex;flex-direction:column">
-                        <sc-for list="{{ t.menu }}" as="m" hint-placeholder-count="3"><a role="menuitem" href="{{ m.href }}" onClick="{{ t.menuClose }}" style="display:flex;align-items:center;height:30px;padding:0 9px;border-radius:5px;color:var(--tx,#E6EAF2);font-size:12.5px;text-decoration:none" style-hover="background:var(--hov,#161C28)">{{ m.label }}</a></sc-for>
-                      </div>
-                    </sc-if>
-                  </span>
-                </div>
-                <sc-if value="{{ t.hasErr }}" hint-placeholder-val="{{ false }}">
-                  <div style="padding:6px 8px;border-radius:6px;background:var(--trd,rgba(248,81,73,.13));color:var(--rd,#F85149);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;word-break:break-word;max-height:52px;overflow:hidden">{{ t.err }}</div>
-                  <a href="{{ t.errHref }}" style="font-size:12px;font-weight:500;white-space:nowrap">Show details →</a>
-                </sc-if>
-                <sc-if value="{{ t.ok }}" hint-placeholder-val="{{ true }}">
-                  <div title="{{ t.line }}" style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--mut,#8A94A6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.line }}</div>
-                  <sc-if value="{{ t.hasLastErr }}" hint-placeholder-val="{{ false }}"><div title="{{ t.lastErr }}" style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:var(--rd,#F85149);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.lastErr }}</div></sc-if>
-                  <div style="{{ t.statsSt }}">
-                    <sc-for list="{{ t.stats }}" as="x" hint-placeholder-count="2">
-                      <div style="min-width:0;display:flex;flex-direction:column;gap:1px">
-                        <div style="font-size:10.5px;color:var(--mut,#8A94A6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ x.label }}</div>
-                        <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ x.value }}<span style="font-size:10.5px;color:var(--mut,#8A94A6)">{{ x.unit }}{{ x.hint }}</span></div>
-                        {{ x.spark }}
-                      </div>
-                    </sc-for>
-                  </div>
-                </sc-if>
-              </article>
-            </sc-for>
-          </div>
-        </section>
-
-
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:14px;align-items:start">
-          <section aria-labelledby="ov-mem" style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0">
-            <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
-              <h2 id="ov-mem" style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Memory</h2>
-              <span style="margin-left:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px">{{ ov.mem.total }}</span>
-            </div>
-            <div style="position:relative;height:16px">
-              <div style="position:absolute;inset:0;display:flex;border-radius:5px;overflow:hidden;background:var(--row,#1A2130)">
-                <sc-for list="{{ ov.mem.segs }}" as="g" hint-placeholder-count="3"><span title="{{ g.tip }}" style="{{ g.st }}"></span></sc-for>
-              </div>
-              <span aria-hidden="true" style="{{ ov.mem.reserveZone }}"></span>
-              <span aria-hidden="true" title="Reserve" style="{{ ov.mem.reserveSt }}"></span>
-            </div>
-            <div style="display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px">
-              <sc-for list="{{ ov.mem.legend }}" as="g" hint-placeholder-count="4">
-                <span style="display:inline-flex;align-items:center;gap:6px;color:var(--mut,#8A94A6)"><span style="{{ g.sw }}"></span>{{ g.name }}<span style="font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--tx,#E6EAF2)">{{ g.size }}</span></span>
-              </sc-for>
-            </div>
-            <div style="overflow-x:auto;margin:0 -16px">
-              <table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:480px">
-                <thead><tr>
-                  <th style="padding:8px 16px;text-align:left;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Service</th>
-                  <th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Used</th>
-                  <th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Estimate</th>
-                  <th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Idle</th>
-                  <th style="padding:8px 16px;text-align:left;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Auto-unload</th>
-                </tr></thead>
-                <tbody>
-                  <sc-for list="{{ ov.mem.rows }}" as="m" hint-placeholder-count="5">
-                    <tr>
-                      <td style="padding:8px 16px;border-top:1px solid var(--bd,#1D2430)"><span style="display:flex;align-items:center;gap:8px"><span style="{{ m.sw }}"></span><a href="{{ m.href }}" style="color:var(--tx,#E6EAF2)">{{ m.name }}</a><sc-if value="{{ m.hasLoad }}" hint-placeholder-val="{{ false }}"><span style="{{ m.lb.st }}">{{ m.lb.label }}</span></sc-if></span></td>
-                      <td style="padding:8px 10px;border-top:1px solid var(--bd,#1D2430);text-align:right;font-family:'JetBrains Mono',ui-monospace,monospace">{{ m.used }}</td>
-                      <td style="padding:8px 10px;border-top:1px solid var(--bd,#1D2430);text-align:right;font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--mut,#8A94A6)">{{ m.est }}</td>
-                      <td style="padding:8px 10px;border-top:1px solid var(--bd,#1D2430);text-align:right;font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--mut,#8A94A6)">{{ m.idle }}</td>
-                      <td style="padding:8px 16px;border-top:1px solid var(--bd,#1D2430)"><span style="{{ m.autoSt }}">{{ m.auto }}</span></td>
-                    </tr>
-                  </sc-for>
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section aria-labelledby="ov-act" style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0">
-            <h2 id="ov-act" style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Activity</h2>
-            <div style="display:flex;flex-direction:column">
-              <sc-for list="{{ ov.activity }}" as="a" hint-placeholder-count="6">
-                <div style="display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-top:1px solid var(--bd,#1D2430);font-size:12.5px;min-width:0">
-                  <span title="{{ a.ago }}" style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--mut,#8A94A6);flex:none;padding-top:1px">{{ a.time }}</span>
-                  <span title="{{ a.svc }}" style="{{ a.ist }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ a.d }}"></path></svg></span>
-                  <sc-if value="{{ a.hasHref }}" hint-placeholder-val="{{ true }}"><a href="{{ a.href }}" style="flex:1;min-width:0;color:var(--tx,#E6EAF2)">{{ a.text }}</a></sc-if>
-                  <sc-if value="{{ a.noHref }}" hint-placeholder-val="{{ false }}"><span style="flex:1;min-width:0">{{ a.text }}</span></sc-if>
-                </div>
-              </sc-for>
-            </div>
-          </section>
-        </div>
-
-        <section aria-labelledby="ov-out" style="display:flex;flex-direction:column;gap:10px;min-width:0">
-          <div style="display:flex;align-items:baseline;gap:10px">
-            <h2 id="ov-out" style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Recent outputs</h2>
-            <a href="#/outputs" style="margin-left:auto;font-size:12.5px;font-weight:500">View all →</a>
-          </div>
-          <sc-if value="{{ ov.hasRecent }}" hint-placeholder-val="{{ true }}">
-            <div style="display:grid;grid-auto-flow:column;grid-auto-columns:minmax(180px,200px);gap:12px;overflow-x:auto;padding-bottom:6px">
-              <sc-for list="{{ ov.recent }}" as="c" hint-placeholder-count="6">
-                <dc-import name="OutputCard" c="{{ c }}" hint-size="200px,230px"></dc-import>
-              </sc-for>
-            </div>
-          </sc-if>
-          <sc-if value="{{ ov.noRecent }}" hint-placeholder-val="{{ false }}">
-            <div style="padding:28px;border:1px dashed var(--bds,#2A3547);border-radius:10px;text-align:center;color:var(--mut,#8A94A6)">Nothing produced yet. Outputs from Speech, 3D Generate and Images &amp; Video appear here.</div>
-          </sc-if>
-        </section>
-        </div>
-        </sc-if>
       </div>
     </sc-if>
     <sc-if value="{{ pg.service }}" hint-placeholder-val="{{ false }}">
@@ -1026,9 +901,9 @@ class Component extends DCLogic {
     audio: { key: null, playing: false, t: 0, dur: 0 },
     jopen: {}, speed: 1,
     // revision 2: Overview views, dashboard layout (Settings.ui.dashboard), metric history for sparklines
-    ovView: uiCached('overview.view', lsGet('hub.ovView', 'dashboard')), dash: { order: [], hidden: [], ranges: {} }, customizing: false, widgets: [], hist1: null, hist24: null,
+    ovView: uiCached('overview.view', lsGet('hub.ovView', 'dashboard')), dash: { order: [], hidden: [], ranges: {}, shown: [], sizes: {} }, customizing: false, widgets: [], hist1: null, hist24: null,
     nav: (() => { try { return JSON.parse(lsGet('hub.nav', 'null')); } catch { return null; } })(),  // plan 33: Settings.ui.nav, this browser's copy first
-    tlRange: uiCached('overview.timeline_range', lsGet('hub.tlRange', '24h')), tlTable: false, svcRange: uiCached('overview.services_range', lsGet('hub.svcRange', '24h')), tileMenu: null, outTick: 0,
+    tlRange: uiCached('overview.timeline_range', lsGet('hub.tlRange', '24h')), tlTable: false, svcRange: uiCached('overview.services_range', lsGet('hub.svcRange', '24h')), outTick: 0,
     approvals: [], apLoaded: false, memReview: 0, toolIx: null, sessions: [],  // sessions: the palette's "Switch to …" (Wire 15)  // Phase 13 Wire: the header's Approvals popover; the API tab's tool risk levels
   };
 
@@ -1171,7 +1046,7 @@ class Component extends DCLogic {
     try { globalThis.dispatchEvent?.(new CustomEvent('gaifa:settings', { detail: st })); } catch { /* no window */ }
     const u = st.ui || {};
     this.savedUi = u;   // settings-that-stick 2.2: the base of the next dashboard and sidebar saves
-    if (!this.dashT) this.setState({ dash: { order: [], hidden: [], ranges: {}, ...(u.dashboard || {}) } });   // not over a change still waiting to save
+    if (!this.dashT) this.setState({ dash: { order: [], hidden: [], ranges: {}, shown: [], sizes: {}, ...(u.dashboard || {}) } });   // not over a change still waiting to save
     if (u.nav && !this.navT) { this.setState({ nav: u.nav }); lsSet('hub.nav', JSON.stringify(u.nav)); }
     // 3.3: config.toml wins; hub.theme / hub.density are only this browser's copy for the first paint
     if (!this.uiSaving && u.density && u.density !== this.state.density) { lsSet('hub.density', u.density); this.setState({ density: u.density }); }
@@ -1230,8 +1105,8 @@ class Component extends DCLogic {
     }, 500);
   };
   bumpOutputs() { clearTimeout(this.outT); this.outT = setTimeout(() => this.setState(s => ({ outTick: s.outTick + 1 })), 2000); }
-  ovView() { const v = this.state.route.params.view; return ['dashboard', 'services', 'table', 'timeline'].includes(v) ? v : this.state.ovView; }
-  setView(v) { this.UiPrefs?.uiPrefs.set('overview.view', v); this.setState({ ovView: v, tileMenu: null }); this.go('#/overview?view=' + v); }
+  ovView() { const v = this.state.route.params.view, ok = ['dashboard', 'table', 'timeline']; return ok.includes(v) ? v : ok.includes(this.state.ovView) ? this.state.ovView : 'dashboard'; }   // overview-bento 3.1: no Services view (a saved one opens the Dashboard)
+  setView(v) { this.UiPrefs?.uiPrefs.set('overview.view', v); this.setState({ ovView: v }); this.go('#/overview?view=' + v); }
   applyOverview(ov) { this.setState({ services: ov.services, memory: ov.memory, jobs: ov.jobs.filter(j => ['queued', 'running'].includes(j.state)), activity: ov.activity, alerts: ov.alerts, recent: ov.recent_outputs, system: ov.system }); }
   // A dropped stream isn't a down hub: Firefox closes quiet connections whenever a network
   // interface changes (a container starting, say). Ask the hub first; if it answers, reopen the
@@ -1817,22 +1692,6 @@ class Component extends DCLogic {
   }
   // Revision 2 tile: name + state + ⋯ menu; one mono line (port, load, memory, idle); up to 4 stats with 24 h
   // sparklines; actions as icon buttons on hover or focus (text buttons in comfortable).
-  tileVM(sv, compact = true) {
-    const err = sv.manifest_errors.length > 0, h = React.createElement, C = this.C, idx = this.svcMap[sv.id]?.idx ?? 0, open = this.state.tileMenu === sv.id;
-    const stats = sv.stats.slice(0, 4), hist = this.state.hist24?.series || {};
-    return { id: sv.id, name: sv.name, d: ICON[sv.icon] || ICON.puzzle, href: '#/s/' + sv.id, logoEl: this.Nav ? h(this.Nav.ServiceLogo, { sv, size: compact ? 26 : 32 }) : null,  // plan 33.1
-      sb: this.stateBadge(sv.state), hasErr: err, ok: !err, err: sv.manifest_errors[0] || '', errHref: `#/s/${sv.id}/settings`,
-      line: [sv.port ? ':' + sv.port : 'no port', sv.kind === 'external' ? 'external' : null, sv.load !== 'n/a' ? sv.load : null, this.memText(sv), this.idleText(sv)].filter(Boolean).join(' · '),
-      hasLastErr: !err && !!sv.last_error && sv.state === 'failed', lastErr: sv.last_error,
-      cardSt: { position: 'relative', background: 'var(--card,#11151D)', border: '1px solid var(--bd,#1D2430)', borderRadius: compact ? 9 : 10, padding: compact ? '10px 11px' : 16, display: 'flex', flexDirection: 'column', gap: compact ? 6 : 10, minWidth: 0 },
-      icoSt: { width: compact ? 26 : 32, height: compact ? 26 : 32, flex: 'none', borderRadius: 7, background: 'var(--inset,#131926)', border: '1px solid var(--bd,#1D2430)', display: 'grid', placeItems: 'center', color: 'var(--mut,#8A94A6)' },
-      statsSt: { display: stats.length ? 'grid' : 'none', gridTemplateColumns: `repeat(${Math.max(1, stats.length)},minmax(0,1fr))`, gap: '4px 10px', paddingTop: 6, borderTop: '1px solid var(--bd,#1D2430)' },
-      stats: stats.map(x => ({ label: x.label, value: fnum(x.value), unit: x.unit ? ' ' + x.unit : '', hint: x.hint && !compact ? ' ' + x.hint : '',
-        spark: C && x.series && typeof x.value === 'number' ? h(C.Sparkline, { values: hist[x.series] || [], color: SERIES[idx % SERIES.length], height: 16, label: `${sv.name} ${x.label}, 24 h`, unit: x.unit === 'ms' ? 'ms' : 'count' }) : null })),
-      actions: this.svcActions(sv, true).map(a => ({ ...a, text: compact ? '' : a.label, aria: `${a.label} ${sv.name}`, st: compact ? { ...a.st, width: 28, padding: 0 } : a.st })),
-      menuOpen: open, menuAria: `More for ${sv.name}`, menuToggle: () => this.setState({ tileMenu: open ? null : sv.id }), menuClose: () => this.setState({ tileMenu: null }),
-      menu: [['Open', ''], ['API', '/api'], ['Logs', '/logs'], ['Settings', '/settings']].map(([label, t]) => ({ label, href: `#/s/${sv.id}${t}` })) };
-  }
   cardVM(o, fresh) {
     const sv = this.svcMap[o.service], key = 'o:' + o.id, a = this.state.audio, mine = a.key === key, pct = mine && a.dur ? a.t / a.dur : 0;
     const badge = o.kind === 'audio' || o.kind === 'video' ? fmmss(o.duration_s) : o.dims ? `${o.dims.w}×${o.dims.h}` : o.kind === 'model3d' ? `${o.files.filter(f => f.role === 'part').length} parts` : '';
@@ -1910,12 +1769,12 @@ class Component extends DCLogic {
     const compact = s.density === 'compact', view = this.ovView(), h = React.createElement, V = this.V, D = this.D;
     const badge = (st, isLoad) => (isLoad ? this.loadBadge(st) : this.stateBadge(st));
     const ov = {
-      views: [['dashboard', 'Dashboard'], ['services', 'Services'], ['table', 'Table'], ['timeline', 'Timeline']].map(([k, l]) => ({ label: l, st: segSt(view === k), pressed: view === k ? 'true' : 'false', on: () => this.setView(k) })),
-      isDash: view === 'dashboard', isServices: view === 'services', isTable: view === 'table', isTimeline: view === 'timeline',
+      views: [['dashboard', 'Dashboard'], ['table', 'Table'], ['timeline', 'Timeline']].map(([k, l]) => ({ label: l, st: segSt(view === k), pressed: view === k ? 'true' : 'false', on: () => this.setView(k) })),
+      isDash: view === 'dashboard', isTable: view === 'table', isTimeline: view === 'timeline',
       wrapSt: { display: 'flex', flexDirection: 'column', gap: compact ? 12 : 22, minWidth: 0 },
-      gridSt: { display: 'grid', gridTemplateColumns: `repeat(auto-fill,minmax(min(100%,${compact ? 230 : 290}px),1fr))`, gap: compact ? 10 : 14 },
       customizing: s.customizing ? 'true' : 'false', onCustomize: () => this.setState(st => ({ customizing: !st.customizing })), custSt: btn(s.customizing ? 'pri' : 'sec', { sm: true }),
       dash: view === 'dashboard' && D ? h(D.Dashboard, { api: this.api, services: svcs, memory: s.memory, gpu: s.gpu, cancelGpu: this.cancelGpu, jobs: s.jobs, activity: s.activity, recent: s.recent, hist1: s.hist1, hist24: s.hist24, widgets: s.widgets,
+        alerts: s.alerts, approvals: s.approvals, memReview: s.memReview, onApprovals: () => { this.togglePop('approvals'); this.loadApprovals(); },   // overview-bento 2.1: Needs you
         layout: s.dash, onLayout: this.onLayout, customizing: s.customizing, onCustomize: v => this.setState({ customizing: v }), go: hh => this.go(hh), badge, compact, outTick: s.outTick }) : null,
       table: view === 'table' && V ? h(V.ServiceTable, { services: svcs, hist1: s.hist1, jobs: s.jobs, icons: ICON, badge, compact, actionsFor: sv => this.svcActions(sv, true).map(a => ({ label: a.label, d: a.d, on: a.on, dis: a.dis, primary: a.label === 'Start' })) }) : null,
       timeline: view === 'timeline' && V ? h(V.TimelineView, { api: this.api, services: svcs, go: hh => this.go(hh), range: s.tlRange, onRange: r => { this.UiPrefs?.uiPrefs.set('overview.timeline_range', r); this.setState({ tlRange: r }); }, table: s.tlTable, onTable: v => this.setState({ tlTable: v }), mock: !this.api.isLive?.('metrics') }) : null,
@@ -1923,14 +1782,8 @@ class Component extends DCLogic {
     return {
       ...ov,
       sub: `${svcs.length} services · ${ready} ready · ${loaded} holding models in memory`,
-      hasAlerts: s.alerts.length > 0,
+      hasAlerts: s.alerts.length > 0 && view !== 'dashboard',   // the Dashboard shows them in Needs you (overview-bento 3.1)
       alerts: [...s.alerts].sort((a, b) => (a.level === 'error' ? 0 : 1) - (b.level === 'error' ? 0 : 1)).map(a => { const t = a.level === 'error' ? 'red' : 'accent'; return { text: a.text, href: a.action?.route || '#/overview', label: a.action?.label || 'Open', level: a.level === 'error' ? 'Error' : 'Warning', st: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: compact ? '6px 10px' : '9px 12px', borderRadius: 8, background: TONE[t][1], border: '1px solid ' + TONE[t][1] }, ist: { color: TONE[t][0], flex: 'none', display: 'flex' }, d: a.level === 'error' ? ICON.alert : ICON.info }; }),
-      tiles: view === 'services' ? svcs.map(sv => this.tileVM(sv, compact)) : [],
-      mem: this.memVM(s.memory, true),
-      hasRecent: s.recent.length > 0, noRecent: s.recent.length === 0,
-      recent: s.recent.map(o => this.cardVM(o, s.out.fresh[o.id])),
-      hasActivity: s.activity.length > 0,
-      activity: s.activity.slice(0, 15).map(a => this.actRow(a)),
     };
   }
   actRow(a) {

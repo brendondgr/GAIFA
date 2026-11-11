@@ -69,12 +69,17 @@ class PortsCfg(_Strict):
         return v
 
 
+TILE_SIZE = Literal["xs", "s", "m", "w", "l", "f"]   # the bento grid's sizes (web/bento.js SIZES)
+
+
 class DashboardCfg(_Strict):
     """`[ui.dashboard]`: the Overview dashboard's Customize choices (brief §11.5)."""
 
     order: list[str] = []
     hidden: list[str] = []
     ranges: dict[str, str] = {}
+    shown: list[str] = []                        # tiles that are off by default, turned on (plan overview-bento 1.2)
+    sizes: dict[str, TILE_SIZE] = {}             # a tile's size, when not its default
 
 
 class NavCfg(_Strict):

@@ -59,6 +59,8 @@ test('this browser’s old choices are saved once, unless config.toml already se
   assert.deepEqual(browserChoices({ ...fresh, theme: 'light', chat: { ...fresh.chat, steps: 'fold', environment: 'home' } }, store({ 'hub.theme': 'dark', 'gaifa.chat.environment': '"work"' })), {});
   // the name before GAIFA counts
   assert.deepEqual(browserChoices(fresh, store({ 'aihub.chat.steps': '"split"' })), { chat: { steps: 'split' } });
+  // the Services view is gone (overview-bento 3.1): a browser that chose it saves nothing
+  assert.deepEqual(browserChoices(fresh, store({ 'hub.ovView': 'services' })), {});
   const calls = [];
   const api = { saveSettings: async b => { calls.push(b); return { settings: { ui: fresh } }; } };
   assert.deepEqual(await importBrowser(api, { ui: fresh }, s), browserChoices(fresh, s));

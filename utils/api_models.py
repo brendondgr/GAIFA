@@ -688,6 +688,8 @@ class DashboardLayout(_Model):
     order: list[str] = Field([], description="Widget keys in the order shown (missing ones follow in the default order)")
     hidden: list[str] = []
     ranges: dict[str, str] = Field({}, description="Widget key → its chosen range")
+    shown: list[str] = Field([], description="Tiles that are off by default, turned on")
+    sizes: dict[str, Literal["xs", "s", "m", "w", "l", "f"]] = Field({}, description="Tile key → its size (xs 3×1, s 4×2, m 4×3, w 6×3, l 8×3, f 12×2)")
 
 
 class NavSettings(_Model):

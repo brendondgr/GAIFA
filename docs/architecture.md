@@ -572,10 +572,12 @@ new_mods = [5100, 5199]
 theme = "system"
 density = "compact"         # or "comfortable"
 
-[ui.dashboard]              # the Overview dashboard's Customize choices (written by the UI)
-order = ["kpi", "memory-time", "memory-now"]
-hidden = ["heatmap"]
-ranges = { memory-time = "6h" }
+[ui.dashboard]              # the Overview dashboard's Customize choices (written by the UI; plan overview-bento)
+order = ["needs", "running", "memory-hero"]
+hidden = ["activity"]       # tiles on by default, turned off
+shown = ["storage"]         # tiles off by default, turned on
+sizes = { memory = "f" }    # xs 3×1, s 4×2, m 4×3, w 6×3, l 8×3, f 12×2 (columns × rows); only those the tile allows
+ranges = { memory = "6h" }
 
 [ui.nav]                    # the sidebar (plan 33.2, written by the UI; only what differs from the defaults)
 collapsed = true            # the thin rail
@@ -591,7 +593,7 @@ environment = "work"        # the environment a new chat starts in (the last one
 group = "date"              # "environment" (default), "date" or "none"; show ("chats", "archived", "both"), env_order, chat_order, collapsed
 
 [ui.overview]               # the Overview (settings-that-stick 3.1)
-view = "timeline"           # "dashboard" (default), "services", "table" or "timeline"
+view = "timeline"           # "dashboard" (default), "table" or "timeline"; "services" (from before) opens the dashboard
 timeline_range = "7d"       # 1h, 6h, 24h (default) or 7d; services_range: a service's History charts
 
 [services]

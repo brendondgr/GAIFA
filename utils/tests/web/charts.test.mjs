@@ -68,37 +68,42 @@ test('the treemap fills its box with areas proportional to the values', () => {
   for (const x of r) assert.ok(x.x >= -1e-9 && x.y >= -1e-9 && x.x + x.w <= 200 + 1e-9 && x.y + x.h <= 100 + 1e-9);
 });
 
-test('dashboard order: saved keys first, unknown ones dropped, new widgets appended', () => {
+test('dashboard order: saved keys first, unknown ones dropped, new tiles appended', () => {
   const d = dash.DEFAULT_KEYS;
   assert.deepEqual(dash.orderKeys(d, []), d);
   const o = dash.orderKeys(d, ['activity', 'gone', 'memory', 'activity']);
   assert.deepEqual(o.slice(0, 2), ['activity', 'memory']);
   assert.equal(o.length, d.length);
   assert.ok(!o.includes('gone'));
-  assert.deepEqual(dash.moveKey(['a', 'b', 'c'], 'c', -1), ['a', 'c', 'b']);
-  assert.deepEqual(dash.moveKey(['a', 'b'], 'a', -1), ['a', 'b']);
 });
 
-test('widgets span one column on phones and double up on narrow screens', () => {
-  assert.equal(dash.spanAt(3, 360), 12);
-  assert.equal(dash.spanAt(4, 900), 6);
-  assert.equal(dash.spanAt(6, 900), 12);
-  assert.equal(dash.spanAt(3, 1400), 3);
-});
-
-test('mod widgets join the list; relay traffic becomes "LLM traffic"', () => {
+test('mod widgets join the list, off until turned on; relay traffic becomes "LLM traffic"', () => {
   assert.ok(!dash.widgetDefs([]).some(w => w.key === 'llm'));
   const defs = dash.widgetDefs([
     { service: 'relay', id: 'traffic', title: 'Traffic', kind: 'bar', ranges: ['24h', '7d'], span: 6 },
     { service: 'fake-ok', id: 'requests', title: 'Requests', kind: 'bar', ranges: ['24h', '7d'], span: 6 },
+    { service: 'fake-ok', id: 'total', title: 'Total', kind: 'number', ranges: ['24h'], span: 3 },
   ]);
   const llm = defs.find(w => w.key === 'llm');
   assert.equal(llm.info.id, 'traffic');
   assert.deepEqual(llm.ranges, ['24h', '7d']);
-  assert.ok(defs.some(w => w.key === 'mod:fake-ok:requests' && w.span === 6));
-  // every built-in has a title, a valid span and a default range when it has ranges
+  assert.ok(!llm.off);
+  const req = defs.find(w => w.key === 'mod:fake-ok:requests');
+  assert.ok(req.off && req.size === 'w' && req.sizes.includes('w'));
+  assert.ok(defs.find(w => w.key === 'mod:fake-ok:total').sizes.includes('xs'));
+  // every tile has a title, a default size it allows, and a default range when it has ranges
   for (const w of defs) {
-    assert.ok(w.title && [3, 4, 6, 12].includes(w.span), w.key);
+    assert.ok(w.title && (w.sizes || [w.size]).includes(w.size), w.key);
     if (w.ranges) assert.ok(w.ranges.includes(w.def), w.key);
   }
+});
+
+test('tiles that read a mod show only while one of their mods runs', () => {
+  const svc = (id, state = 'ready') => ({ id, state });
+  const keys = s => dash.widgetDefs([], s).map(w => w.key);
+  assert.ok(!keys([]).includes('today') && !keys([]).includes('chats') && !keys([]).includes('stat-task'));
+  assert.ok(keys([svc('calendar')]).includes('today') && !keys([svc('calendar')]).includes('chats'));
+  assert.ok(keys([svc('agent')]).includes('chats') && keys([svc('agent')]).includes('today'));
+  assert.ok(!keys([svc('agent', 'stopped')]).includes('chats'));
+  assert.ok(dash.widgetDefs([]).some(w => w.key === 'chats'));   // no service list yet: keep them
 });

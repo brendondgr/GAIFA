@@ -176,6 +176,8 @@ Every mod has a logo (`ServiceSummary.logo_url`); one without gets a monogram on
 ## 4. Views (Part A)
 
 ### 4.1 Overview (home)
+*As built today: the bento Dashboard of §11.11b.*
+
 
 - **Alerts strip** (only when present): for example "2 models have missing files", "Mod `broken` has a manifest error", "Speech failed to start". Each has an action link.
 - **Services grid**: one `ServiceTile` per service.
@@ -839,6 +841,8 @@ Thumbnails and posters are generated client-side (SVG gradients or canvas with a
 - the alerts
 
 ### 11.4 Overview has four views
+*Since plan overview-bento: three views (no Services) and a bento Dashboard; see §11.11b.*
+
 A segmented control at the top right of the Overview switches views. The choice is kept in the URL (`#/overview?view=dashboard`) and in `localStorage`.
 
 | View | What it shows |
@@ -849,6 +853,8 @@ A segmented control at the top right of the Overview switches views. The choice 
 | **Timeline** | One swimlane per service over 1 h / 6 h / 24 h / 7 d (Section 11.6, `Timeline`). Each lane shows state bands (stopped, starting, ready, failed), when models were loaded, jobs as bars, outputs as dots, and warning/error markers. Hover for details; click to jump to the service, job or output. |
 
 ### 11.5 Dashboard widgets
+*Since plan overview-bento the widgets are tiles of fixed sizes, and the KPI strip is four number tiles; see §11.11b.*
+
 Each widget is a card with a title, a range selector where it makes sense (1h · 6h · 24h · 7d · 30d), and a ⋯ menu ("View as table", "Open page"). A **Customize** button lets you show, hide and reorder widgets. The layout is saved in Settings (`Settings.ui.dashboard`: widget order, hidden widgets and each widget's range), so it follows you between browsers. The grid uses 12 columns: widgets span 3, 4, 6 or 12 columns and collapse to one column under 760 px.
 
 | # | Widget | Chart | Data |
@@ -1137,6 +1143,17 @@ Not built yet. Keep the shell ready for it (Section 3). It gets its own brief wh
 - **Rewind / branch:** pick an earlier step in a thread and continue from there. It forks the thread's event log at that point (architecture §14.2); the full chat brief is plan step 14.1.
 - **Sessions panel:** save the current setup (what's running and loaded), restore it, and switch between named setups.
 - **Composer:** model picker (via the relay), tool-group toggles, and attachments from Outputs.
+
+### 11.11b The bento Overview (plan overview-bento, 2026-11-10)
+
+The Dashboard below §11.11 was replaced; §11.4's Services view and §11.5's KPI strip and spans no longer apply. As built:
+- **The grid** (`web/bento.js`): 12 columns, fixed rows (60 px compact, 68 px comfortable; gaps 10 and 14 px), dense packing. Every tile is one of six sizes, columns × rows: `xs` 3×1 (a number), `s` 4×2, `m` 4×3 (a list), `w` 6×3, `l` 8×3 (a wide chart), `f` 12×2 (a strip). Each tile lists the sizes it allows. Under 1100 px, `s`, `m` and `w` take 6 columns and `l`, `f` 12; under 760 px everything is full width but `xs`, two to a row. Content that doesn't fit scrolls inside its tile; charts fill it exactly (`fit`, legend included).
+- **A tile:** a one-line header (icon, title, a count badge, range chips, ⋯ with Size, View as table, Open page and Hide), then its body.
+- **Default tiles, most relevant first:** Needs you `s` (alerts, failed mods and manifest errors, approvals waiting (opens the header's Approvals), memories to review; "All clear" when none) · Running now `s` (running then queued jobs with their live thumbnail and progress, the GPU slot when held or waited on, models in memory) · Memory `s` (used / total, the three largest users over 0.5 GB and Other, free, the reserve line, a 1 h sparkline when the tile is tall enough) · four numbers `xs`: services ready, outputs today vs yesterday, LLM tokens today, the next scheduled task · Services `m` (ready, stopped and failed counts; problems and mods working or holding memory as rows, the idle ones as pills) · Today `m` (the calendar's day: overdue to-dos, all-day items, then items and scheduled tasks by time, past ones dimmed, the current one marked "now") · Recent chats `m` (top-level chats, as many as fit, working / waiting / age) · Memory over time `l` · Activity `m` · Recent outputs `f` · LLM traffic `w` (while relay declares it) · Service uptime `w`.
+- **Off by default** (Customize turns them on): Jobs running and Models loaded (numbers), Memory now (the donut), GPU queue, Outputs per day, Activity heatmap, Job durations, Model storage, GPU memory, Outputs by service, and every mod widget (sized from its `span`).
+- **Tiles that read mods:** Today shows while the calendar or the agent mod runs (`GET /api/s/calendar/v1/agenda?day=today`, the agent's `GET /v1/tasks`), Recent chats and the next task while the agent runs (`GET /v1/threads?limit=12`); each polls every 30–60 s while the tab is visible.
+- **Customize** turns on editing: tiles get a dashed border and a grip; drag one onto another to put it before that one, or focus the grip and use the arrow keys. A panel lists every tile with a switch and a size, plus Reset and Done. Saved as `[ui.dashboard]` `order`, `hidden` (default tiles turned off), `shown` (off tiles turned on), `sizes` and `ranges`.
+- **Views:** Dashboard, Table, Timeline. A saved or linked `services` view opens the Dashboard. The alert strip shows on Table and Timeline; the Dashboard has them in Needs you.
 
 ### 11.12 Agent tools and approvals (plan Phase 13)
 

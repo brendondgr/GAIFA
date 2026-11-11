@@ -1,70 +1,58 @@
-// The Overview's Dashboard view (brief §11.4–11.5): the KPI strip, then a 12-column grid of
-// widgets you can show, hide, reorder and give a range (Customize). The layout is saved in
-// Settings (`ui.dashboard`) by the shell's `onLayout`. Written by us (web/PATCHES.md).
+// The Overview's Dashboard view (brief §11.4–11.5; plan overview-bento): a bento grid of tiles with fixed
+// sizes, what needs you and what's running on top, history below. Customize turns on editing (drag tiles
+// to move them) and lists every tile with a switch and a size; each tile's ⋯ menu has its sizes and Hide.
+// The layout is saved in Settings (`ui.dashboard`: order, hidden, shown, sizes, ranges) by the shell's
+// `onLayout`. Written by us (web/PATCHES.md).
 
 import { h, SERIES, OTHER, TONE, MONO, MUT, BD, fmtNum, useWidth, Frame, btnSt } from './chart-kit.js';
-import { AreaChart, LineChart, BarChart, HBarChart, Donut, Heatmap, Timeline, KpiTile, Sparkline } from './charts.js';
-import { useData, pollFor, chartState, Card, MemoryChart, StorageChart, svcColor, KIND_COLOR, KIND_LABEL } from './views.js';
-import { GpuQueueW, jobGpuText } from './gpu-queue.js';
+import { AreaChart, LineChart, BarChart, HBarChart, Donut, Heatmap, Timeline } from './charts.js';
+import { useData, pollFor, chartState, MemoryChart, StorageChart, svcColor, KIND_COLOR, KIND_LABEL } from './views.js';
+import { GpuQueueW } from './gpu-queue.js';
 import { PoolBars } from './mem-pools.js';
-import { LiveThumb } from './live-kit.js';
+import { BentoGrid, SIZES, SIZE_LABEL, sizeOf, orderKeys, visibleKeys, isOn, setOn, useTileSize } from './bento.js';
+import { NeedsW, needsCount, RunningW, runningCount, MemoryHeroW, ServicesW, statTile, jobStatusText, PATHS, Calm } from './overview-tiles.js';
+import { TodayW, ChatsW, NextTaskNum, hasMod } from './overview-day.js';
 
+export { jobStatusText, orderKeys };
 const R = () => globalThis.React;
 const RANGES = ['1h', '6h', '24h', '7d', '30d'];
 const MODEL_KINDS = { llm: 'LLM', tts: 'TTS', stt: 'STT', voice: 'Voice', '3d': '3D', image: 'Image', video: 'Video', 'text-encoder': 'Text encoder', vae: 'VAE', lora: 'LoRA', vision: 'Vision', upscale: 'Upscale', other: 'Other' };
 const dayLabel = key => { const d = new Date(key + 'T00:00:00'); return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' }); };
+const fitH = (min = 70) => { const { h: H } = useTileSize(); return Math.max(min, H || 150); };   // eslint-disable-line react-hooks/rules-of-hooks
 
-// ---------- layout (pure; tested in utils/tests/web/dashboard.test.mjs) ----------
-// Widget keys in display order: the saved order first (unknown keys dropped), then the rest in
-// the default order.
-export function orderKeys(defaults, saved = []) {
-  const known = new Set(defaults);
-  const head = saved.filter((k, i) => known.has(k) && saved.indexOf(k) === i);
-  return [...head, ...defaults.filter(k => !head.includes(k))];
+// ---------- chart tiles ----------
+function MemTimeW({ ctx, range, table }) {
+  const H = fitH();
+  return h(MemoryChart, { api: ctx.api, services: ctx.services, range, height: H, fit: H, table });
 }
-// Columns a widget spans at a container width: one column under 760 px, doubled under 1100 px.
-export function spanAt(span, width) {
-  if (width < 760) return 12;
-  if (width < 1100) return span <= 4 ? 6 : 12;
-  return span;
-}
-export function moveKey(order, key, dir) {
-  const i = order.indexOf(key), j = i + dir;
-  if (i < 0 || j < 0 || j >= order.length) return order;
-  const o = [...order]; [o[i], o[j]] = [o[j], o[i]];
-  return o;
-}
-
-// ---------- widgets ----------
-function MemTimeW({ ctx, range, table }) { return h(MemoryChart, { api: ctx.api, services: ctx.services, range, height: 160, table }); }
 
 function MemNowW({ ctx, table }) {
-  const m = ctx.memory;
-  if (!m) return h(Frame, { state: 'loading', height: 140 });
+  const m = ctx.memory, H = fitH(100);
+  if (!m) return h(Frame, { state: 'loading', height: H });
   const items = m.by_service.filter(x => x.used_bytes > 0.01e9).sort((a, b) => b.used_bytes - a.used_bytes)
     .map(x => ({ key: x.id, label: ctx.services.find(s => s.id === x.id)?.name || x.id, value: x.used_bytes, color: svcColor(ctx.services, x.id) }));
   items.push({ key: 'other', label: 'Other', value: m.other_bytes, color: OTHER }, { key: 'free', label: 'Free', value: Math.max(0, m.total_bytes - m.used_bytes), color: 'var(--row,#1A2130)' });
-  const donut = h(Donut, { items, unit: 'bytes', center: (m.used_bytes / 1e9).toFixed(1) + ' GB', sub: `of ${(m.total_bytes / 1e9).toFixed(0)} GB`, label: 'Memory now', table, size: 124 });
+  const donut = h(Donut, { items, unit: 'bytes', center: (m.used_bytes / 1e9).toFixed(1) + ' GB', sub: `of ${(m.total_bytes / 1e9).toFixed(0)} GB`, label: 'Memory now', table, size: Math.min(124, H - 8) });
   if ((m.pools || []).length < 2) return donut;               // one pool: GPUs share the RAM
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 12 } }, donut, h(PoolBars, { memory: m, services: ctx.services }));   // plan 36.4
 }
 
 function GpuW({ ctx, range, table }) {
   // Dedicated cards (plan 36.4): each one's VRAM; else the shared GPU's GTT, as before.
-  const cards = (ctx.memory?.pools || []).slice(1), names = cards.map(p => `gpu.${p.id.split(':')[1]}.mem_used`);
+  const cards = (ctx.memory?.pools || []).slice(1), names = cards.map(p => `gpu.${p.id.split(':')[1]}.mem_used`), H = fitH();
   const series = names.length ? names : ['gpu.gtt_used'];
   const d = useData(() => ctx.api.getMetrics({ series, range }), [ctx.api, range, series.join()], pollFor(range));
-  if (d.state !== 'ok') return h(AreaChart, { ...chartState(d), height: 130 });
-  if (!names.length) return h(AreaChart, { t: d.data.t, height: 130, unit: 'bytes', label: 'GPU memory (GTT)', table, series: [{ key: 'gtt', label: 'GTT used', values: d.data.series['gpu.gtt_used'] || [], color: SERIES[2] }] });
-  return h(AreaChart, { t: d.data.t, height: 130, unit: 'bytes', label: 'GPU memory (VRAM)', table,
+  if (d.state !== 'ok') return h(AreaChart, { ...chartState(d), height: H });
+  if (!names.length) return h(AreaChart, { t: d.data.t, fit: H, unit: 'bytes', label: 'GPU memory (GTT)', table, series: [{ key: 'gtt', label: 'GTT used', values: d.data.series['gpu.gtt_used'] || [], color: SERIES[2] }] });
+  return h(AreaChart, { t: d.data.t, fit: H, unit: 'bytes', label: 'GPU memory (VRAM)', table,
     series: cards.map((p, i) => ({ key: p.id, label: p.name, values: d.data.series[names[i]] || [], color: SERIES[(i + 2) % SERIES.length] })) });
 }
 
 function OutDayW({ ctx, table }) {
-  const d = useData(() => ctx.api.getOutputStats({ range: '30d', by: 'day' }), [ctx.api, ctx.outTick], 120000);
-  if (d.state !== 'ok') return h(BarChart, { ...chartState(d), height: 140 });
+  const H = fitH(), d = useData(() => ctx.api.getOutputStats({ range: '30d', by: 'day' }), [ctx.api, ctx.outTick], 120000);
+  if (d.state !== 'ok') return h(BarChart, { ...chartState(d), height: H });
   const b = d.data.buckets, kinds = Object.keys(KIND_COLOR).filter(k => b.some(x => x.by_kind[k]));
-  return h(BarChart, { categories: b.map(x => { const [, m, dd] = x.key.split('-'); return `${+m}/${+dd}`; }), stacked: true, height: 140, unit: 'count', label: 'Outputs per day', table,
+  return h(BarChart, { categories: b.map(x => { const [, m, dd] = x.key.split('-'); return `${+m}/${+dd}`; }), stacked: true, fit: H, unit: 'count', label: 'Outputs per day', table,
     series: kinds.map(k => ({ key: k, label: KIND_LABEL[k], values: b.map(x => x.by_kind[k] || 0), color: KIND_COLOR[k] })),
     onPick: i => ctx.go(`#/outputs?from=${b[i].key}&to=${b[i].key}`) });
 }
@@ -78,202 +66,174 @@ function OutSvcW({ ctx, range, table }) {
 }
 
 function HeatW({ ctx, range, table }) {
-  const d = useData(() => ctx.api.getActivityStats({ range }), [ctx.api, range], 300000);
-  if (d.state !== 'ok') return h(Heatmap, { ...chartState(d), height: 150 });
+  const H = fitH(), d = useData(() => ctx.api.getActivityStats({ range }), [ctx.api, range], 300000);
+  if (d.state !== 'ok') return h(Heatmap, { ...chartState(d), height: H });
   const days = [...new Set(d.data.cells.map(c => c.day))].sort();
   const rows = days.map(day => ({ label: dayLabel(day), cells: Array.from({ length: 24 }, (_, hr) => { const c = d.data.cells.find(x => x.day === day && x.hour === hr) || { count: 0, errors: 0 }; return { v: c.count, err: c.errors, tip: `${dayLabel(day)}, ${String(hr).padStart(2, '0')}:00` }; }) }));
   return h(Heatmap, { rows, cols: Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')), label: 'Activity by hour', table });
 }
 
-// Any widget a mod declares (§11.7 WidgetData); relay's `traffic` is the LLM traffic widget.
+// Any widget a mod declares (§11.7 WidgetData); relay's `traffic` is the LLM traffic tile.
 function ModW({ ctx, info, range, table }) {
-  const d = useData(() => ctx.api.getWidget(info.service, info.id, { range }), [ctx.api, info.service, info.id, range], pollFor(range));
+  const H = fitH(), d = useData(() => ctx.api.getWidget(info.service, info.id, { range }), [ctx.api, info.service, info.id, range], pollFor(range));
   const label = info.title;
-  if (d.state !== 'ok') return h(LineChart, { ...chartState(d), height: 140, label });
+  if (d.state !== 'ok') return h(LineChart, { ...chartState(d), height: H, label });
   const w = d.data, unit = w.unit, series = w.series.map((s, i) => ({ key: s.name, label: s.name, values: s.values, axis: s.axis || 'left', color: SERIES[i % SERIES.length], type: info.kind === 'bar' && (s.axis || 'left') === 'right' ? 'line' : undefined }));
-  if (info.kind === 'table') return h('div', { style: { overflow: 'auto', maxHeight: 220 } }, h('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 11.5 } },
+  if (info.kind === 'table') return h('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 11.5 } },
     h('thead', null, h('tr', null, Object.keys(w.rows?.[0] || {}).map(k => h('th', { key: k, style: { textAlign: 'left', padding: '3px 6px', color: MUT, fontSize: 10.5 } }, k)))),
-    h('tbody', null, (w.rows || []).map((r, i) => h('tr', { key: i }, Object.values(r).map((v, j) => h('td', { key: j, style: { padding: '3px 6px', borderTop: '1px solid ' + BD, fontFamily: typeof v === 'number' ? MONO : undefined } }, String(v))))))));
-  if (info.kind === 'number') { const v = w.series[0]?.values.at(-1); return h('div', { style: { fontFamily: MONO, fontSize: 26, fontWeight: 600, padding: '12px 0' } }, v == null ? '—' : fmtNum(v), h('span', { style: { fontSize: 12, color: MUT, marginLeft: 6 } }, unit && unit !== 'count' ? unit : '')); }
-  if (info.kind === 'donut') return h(Donut, { items: (w.categories || []).map((c, i) => ({ key: c, label: c, value: w.series[0]?.values[i] || 0 })), unit, label, table, size: 120 });
+    h('tbody', null, (w.rows || []).map((r, i) => h('tr', { key: i }, Object.values(r).map((v, j) => h('td', { key: j, style: { padding: '3px 6px', borderTop: '1px solid ' + BD, fontFamily: typeof v === 'number' ? MONO : undefined } }, String(v)))))));
+  if (info.kind === 'number') { const v = w.series[0]?.values.at(-1); return h('div', { style: { fontFamily: MONO, fontSize: 22, fontWeight: 600 } }, v == null ? '—' : fmtNum(v), h('span', { style: { fontSize: 12, color: MUT, marginLeft: 6 } }, unit && unit !== 'count' ? unit : '')); }
+  if (info.kind === 'donut') return h(Donut, { items: (w.categories || []).map((c, i) => ({ key: c, label: c, value: w.series[0]?.values[i] || 0 })), unit, label, table, size: Math.min(120, H - 8) });
   const Comp = info.kind === 'area' ? AreaChart : info.kind === 'bar' ? BarChart : LineChart;
-  return h(Comp, { t: w.t, categories: w.t ? undefined : w.categories, series, unit, height: 150, label, table });
-}
-
-/** A running job's words on the Overview: GPU wait, queued, its step (plan 44.5), its percent, or running. */
-export function jobStatusText(j) {
-  if (j.stage === 'waiting_gpu') return 'GPU wait';
-  if (j.state === 'queued') return 'queued';
-  if (j.live?.step != null && j.live?.steps) return `${Math.min(j.live.step, j.live.steps)}/${j.live.steps}`;
-  return j.progress != null ? Math.round(j.progress * 100) + '%' : 'running';
+  return h(Comp, { t: w.t, categories: w.t ? undefined : w.categories, series, unit, fit: H, label, table });
 }
 
 function JobsW({ ctx, range, table }) {
   const d = useData(() => ctx.api.getJobStats({ range }), [ctx.api, range], 120000);
-  const now = ctx.jobs.filter(j => j.state === 'running' || j.state === 'queued');
   const name = id => ctx.services.find(s => s.id === id)?.name || id;
-  const live = h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
-    now.length ? now.slice(0, 3).map(j => h('a', { key: j.id, href: j.route || '#/s/' + j.service, style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--tx,#E6EAF2)', minWidth: 0 } },
-      j.live?.preview ? h(LiveThumb, { live: j.live, size: 30 }) : null,    // plan 44.5: any job's preview, whoever started it
-      h('span', { title: jobGpuText(j, name) || undefined, style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, j.label),
-      h('span', { style: { width: 60, height: 5, borderRadius: 9, background: 'var(--row,#1A2130)', overflow: 'hidden', display: 'block', flex: 'none' } }, h('span', { style: { display: 'block', height: '100%', width: (j.progress || 0) * 100 + '%', background: TONE.accent } })),
-      h('span', { style: { fontFamily: MONO, fontSize: 10.5, color: MUT, width: 48, textAlign: 'right' } }, jobStatusText(j))))
-      : h('div', { style: { fontSize: 11.5, color: MUT } }, 'No jobs running'));
-  let chart;
-  if (d.state !== 'ok') chart = h(HBarChart, { ...chartState(d), height: 90 });
-  else {
-    const b = d.data.by_service;
-    chart = table ? h('div', null, h(HBarChart, { categories: b.map(x => name(x.service)), unit: 'seconds', table: true, label: 'Job durations', series: [{ key: 'n', label: 'Jobs', values: b.map(x => x.count) }, { key: 'f', label: 'Failed', values: b.map(x => x.failed) }, { key: 'p50', label: 'p50', values: b.map(x => x.p50_s) }, { key: 'p90', label: 'p90', values: b.map(x => x.p90_s) }, { key: 'max', label: 'Max', values: b.map(x => x.max_s) }] }))
-      : h(HBarChart, { categories: b.map(x => name(x.service)), unit: 'seconds', label: 'Job duration p50 and p90',
-        series: [{ key: 'p50', label: 'p50', values: b.map(x => x.p50_s), color: SERIES[0] }, { key: 'p90', label: 'p90', values: b.map(x => x.p90_s), color: SERIES[1] }] });
-  }
-  return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } }, live, chart);
+  if (d.state !== 'ok') return h(HBarChart, { ...chartState(d), height: 90 });
+  const b = d.data.by_service;
+  if (table) return h(HBarChart, { categories: b.map(x => name(x.service)), unit: 'seconds', table: true, label: 'Job durations', series: [{ key: 'n', label: 'Jobs', values: b.map(x => x.count) }, { key: 'f', label: 'Failed', values: b.map(x => x.failed) }, { key: 'p50', label: 'p50', values: b.map(x => x.p50_s) }, { key: 'p90', label: 'p90', values: b.map(x => x.p90_s) }, { key: 'max', label: 'Max', values: b.map(x => x.max_s) }] });
+  return h(HBarChart, { categories: b.map(x => name(x.service)), unit: 'seconds', label: 'Job duration p50 and p90',
+    series: [{ key: 'p50', label: 'p50', values: b.map(x => x.p50_s), color: SERIES[0] }, { key: 'p90', label: 'p90', values: b.map(x => x.p90_s), color: SERIES[1] }] });
 }
 
 function StorageW({ ctx, table }) {
-  const d = useData(() => ctx.api.listModels(), [ctx.api], 300000);
-  if (d.state !== 'ok') return h(Frame, { state: d.state, error: d.error, onRetry: d.retry, height: 120 });
-  return h(StorageChart, { totals: d.data.totals, disk: d.data.disk, kinds: MODEL_KINDS, height: 110, table, onPick: () => ctx.go('#/models') });
+  const H = fitH(), d = useData(() => ctx.api.listModels(), [ctx.api], 300000);
+  if (d.state !== 'ok') return h(Frame, { state: d.state, error: d.error, onRetry: d.retry, height: H });
+  return h(StorageChart, { totals: d.data.totals, disk: d.data.disk, kinds: MODEL_KINDS, height: Math.max(60, H - 26), table, onPick: () => ctx.go('#/models') });
 }
 
 function UptimeW({ ctx, table }) {
   const d = useData(() => ctx.api.getTimeline({ range: '24h' }), [ctx.api], 60000);
   const name = id => ctx.services.find(s => s.id === id)?.name || id;
-  if (d.state !== 'ok') return h(Timeline, { ...chartState(d), lanes: ctx.services.map(s => ({ key: s.id })), laneH: 20 });
-  return h(Timeline, { from: d.data.from, to: d.data.to, label: 'Service uptime, 24 hours', table, laneH: 20, labelW: 92, minWidth: 300,
+  if (d.state !== 'ok') return h(Timeline, { ...chartState(d), lanes: ctx.services.map(s => ({ key: s.id })), laneH: 18 });
+  return h(Timeline, { from: d.data.from, to: d.data.to, label: 'Service uptime, 24 hours', table, laneH: 18, labelW: 92, minWidth: 300,
     lanes: d.data.lanes.map(l => ({ key: l.service, label: name(l.service), href: '#/s/' + l.service, states: l.states, loaded: l.loaded, jobs: [], outputs: [], events: l.events.filter(e => e.level === 'error') })),
     onOpen: (k, x, lane) => ctx.go('#/s/' + lane.key + '/logs') });
 }
 
-function ServicesW({ ctx }) {
-  if (!ctx.services.length) return h(Frame, { state: 'empty', height: 80, emptyText: 'No mods installed yet' });
-  return h('div', { style: { display: 'flex', flexDirection: 'column' } }, ctx.services.map((s, i) => {
-    const b = ctx.badge(s.state), mem = s.memory.used_bytes;
-    return h('a', { key: s.id, href: '#/s/' + s.id, style: { display: 'flex', alignItems: 'center', gap: 8, height: 27, borderTop: i ? '1px solid ' + BD : 0, color: 'var(--tx,#E6EAF2)', fontSize: 12, minWidth: 0, textDecoration: 'none' } },
-      b.dot, h('span', { style: { flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, s.name, h('span', { style: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' } }, ', ' + s.state)),
-      s.load === 'loaded' && h('span', { style: { fontSize: 10.5, color: TONE.cyan, flex: 'none' } }, 'loaded'),
-      h('span', { style: { fontFamily: MONO, fontSize: 11, color: mem > 0.05e9 ? 'var(--tx,#E6EAF2)' : MUT, width: 56, textAlign: 'right', flex: 'none' } }, mem > 0.05e9 ? (mem / 1e9).toFixed(1) + ' GB' : '—'),
-      h('span', { style: { width: 64, flex: 'none' } }, h(Sparkline, { values: ctx.hist24?.series?.['mem.svc.' + s.id] || [], color: svcColor(ctx.services, s.id), width: 64, height: 18, label: `${s.name} memory, 24 h`, unit: 'bytes' })));
-  }));
-}
-
 function RecentW({ ctx }) {
-  if (!ctx.recent.length) return h(Frame, { state: 'empty', height: 100, emptyText: 'Nothing produced yet' });
-  return h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(104px,1fr))', gap: 8 } }, ctx.recent.slice(0, 8).map(o => h('a', { key: o.id, href: '#/outputs/' + o.id, title: o.title, style: { display: 'flex', flexDirection: 'column', minWidth: 0, borderRadius: 7, overflow: 'hidden', border: '1px solid ' + BD, color: 'var(--tx,#E6EAF2)', textDecoration: 'none', background: 'var(--inset,#131926)' } },
-    h('span', { style: { position: 'relative', aspectRatio: '4/3', display: 'grid', placeItems: 'center', background: 'var(--row,#1A2130)', color: KIND_COLOR[o.kind] || MUT, fontSize: 11, fontWeight: 600 } },
+  if (!ctx.recent.length) return h(Calm, { icon: PATHS.image, text: 'Nothing made yet', tone: 'dim' });
+  return h('div', { style: { display: 'grid', gridAutoFlow: 'column', gridAutoColumns: 'minmax(96px,1fr)', gap: 8, height: '100%', overflowX: 'auto' } }, ctx.recent.slice(0, 8).map(o => h('a', { key: o.id, href: '#/outputs/' + o.id, title: o.title, style: { display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, borderRadius: 7, overflow: 'hidden', border: '1px solid ' + BD, color: 'var(--tx,#E6EAF2)', textDecoration: 'none', background: 'var(--inset,#131926)' } },
+    h('span', { style: { position: 'relative', flex: '1 1 0', minHeight: 0, display: 'grid', placeItems: 'center', background: 'var(--row,#1A2130)', color: KIND_COLOR[o.kind] || MUT, fontSize: 11, fontWeight: 600 } },
       o.preview && o.kind !== 'audio' ? h('img', { src: o.preview, alt: '', loading: 'lazy', style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } }) : (KIND_LABEL[o.kind] || o.kind).toUpperCase()),
-    h('span', { style: { padding: '4px 6px', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, o.title))));
+    h('span', { style: { padding: '3px 6px', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 'none' } }, o.title))));
 }
 
 function ActivityW({ ctx }) {
   const React = R(), [lvl, setLvl] = React.useState('all');
-  const list = ctx.activity.filter(a => lvl === 'all' || a.level === lvl).slice(0, 14);
+  const list = ctx.activity.filter(a => lvl === 'all' || a.level === lvl || (lvl === 'warn' && a.level === 'error')).slice(0, 30);
   const chip = (k, l) => h('button', { key: k, type: 'button', 'aria-pressed': lvl === k, onClick: () => setLvl(k), style: { height: 20, padding: '0 8px', borderRadius: 99, fontSize: 11, cursor: 'pointer', border: '1px solid ' + (lvl === k ? 'var(--cy,#58C4DD)' : 'var(--bds,#2A3547)'), background: lvl === k ? 'var(--tcy,rgba(88,196,221,.13))' : 'transparent', color: lvl === k ? 'var(--tx,#E6EAF2)' : MUT } }, l);
   const clock = ts => { const d = new Date(ts * 1000); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 } },
-    h('div', { role: 'group', 'aria-label': 'Level', style: { display: 'flex', gap: 4 } }, chip('all', 'All'), chip('info', 'Info'), chip('warn', 'Warnings'), chip('error', 'Errors')),
-    list.length ? h('div', { style: { display: 'flex', flexDirection: 'column' } }, list.map(a => {
+    h('div', { role: 'group', 'aria-label': 'Level', style: { display: 'flex', gap: 4 } }, chip('all', 'All'), chip('warn', 'Problems'), chip('error', 'Errors')),
+    list.length ? h('div', { style: { display: 'flex', flexDirection: 'column' } }, list.map((a, i) => {
       const c = a.level === 'error' ? TONE.red : a.level === 'warn' ? TONE.accent : MUT;
-      const text = h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, a.text);
-      return h('div', { key: a.id, style: { display: 'flex', alignItems: 'center', gap: 8, height: 24, borderTop: '1px solid ' + BD, fontSize: 11.5, minWidth: 0 } },
+      const text = h('span', { title: a.text, style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, a.text);
+      return h('div', { key: a.id, style: { display: 'flex', alignItems: 'center', gap: 8, height: 24, borderTop: i ? '1px solid ' + BD : 0, fontSize: 11.5, minWidth: 0 } },
         h('span', { style: { fontFamily: MONO, fontSize: 10.5, color: MUT, flex: 'none' } }, clock(a.ts)),
         h('span', { 'aria-label': a.level, style: { width: 6, height: 6, borderRadius: 9, background: c, flex: 'none' } }),
         a.route ? h('a', { href: a.route, style: { flex: 1, minWidth: 0, display: 'flex', color: 'var(--tx,#E6EAF2)' } }, text) : text);
-    })) : h(Frame, { state: 'empty', height: 60, emptyText: 'Nothing here' }));
+    })) : h(Calm, { text: 'Nothing here', tone: 'dim' }));
 }
 
-// key → { title, span, ranges?, def?, href?, areas, C }
+// ---------- the tile list ----------
+// key → { title, icon, size, sizes, ranges?, def?, href?, link?, areas, C | stat, off?, needs? (mods, any running), noTable? }
+const STAT = ['xs'], LIST = ['s', 'm', 'w'], CHART = ['m', 'w', 'l', 'f'];
 const BASE = [
-  { key: 'services', title: 'Services', span: 4, areas: ['services'], C: ServicesW, noTable: true },
-  { key: 'memory', title: 'Memory over time', span: 4, ranges: RANGES, def: '6h', href: '#/settings/memory', areas: ['metrics'], C: MemTimeW },
-  { key: 'memory-now', title: 'Memory now', span: 4, areas: ['memory'], C: MemNowW },
-  { key: 'gpu-queue', title: 'GPU queue', span: 4, ranges: ['24h', '7d'], def: '24h', areas: ['gpu', 'metrics'], C: GpuQueueW },  // plan 31.5
-  { key: 'outputs-day', title: 'Outputs per day', span: 6, href: '#/outputs', areas: ['metrics'], C: OutDayW },
-  { key: 'llm', title: 'LLM traffic', span: 6, ranges: ['24h', '7d'], def: '24h', areas: ['widgets'], mod: ['relay', 'traffic'] },
-  { key: 'activity-heat', title: 'Activity heatmap', span: 6, ranges: ['7d', '14d'], def: '14d', areas: ['metrics'], C: HeatW },
-  { key: 'jobs', title: 'Jobs', span: 3, ranges: ['24h', '7d', '30d'], def: '7d', areas: ['metrics', 'events'], C: JobsW },
-  { key: 'storage', title: 'Model storage', span: 3, href: '#/models', areas: ['models'], C: StorageW },
-  { key: 'uptime', title: 'Service uptime (24 h)', span: 6, areas: ['metrics'], C: UptimeW },
-  { key: 'gpu', title: 'GPU memory', span: 3, ranges: RANGES, def: '6h', areas: ['metrics'], C: GpuW },
-  { key: 'outputs-service', title: 'Outputs by service', span: 3, ranges: ['24h', '7d', '30d'], def: '7d', href: '#/outputs', areas: ['metrics'], C: OutSvcW },
-  { key: 'recent', title: 'Recent outputs', span: 6, href: '#/outputs', areas: ['outputs'], C: RecentW, noTable: true },
-  { key: 'activity', title: 'Activity feed', span: 6, areas: ['events'], C: ActivityW, noTable: true },
+  { key: 'needs', title: 'Needs you', icon: PATHS.bell, size: 's', sizes: LIST, areas: ['services'], C: NeedsW, noTable: true, count: needsCount },
+  { key: 'running', title: 'Running now', icon: PATHS.play, size: 's', sizes: LIST, areas: ['services', 'events'], C: RunningW, noTable: true, count: runningCount },
+  { key: 'memory-hero', title: 'Memory', icon: PATHS.memory, size: 's', sizes: ['s', 'w'], href: '#/settings/memory', areas: ['memory'], C: MemoryHeroW, noTable: true },
+  { key: 'stat-services', title: 'Services ready', size: 'xs', sizes: STAT, areas: ['services'], stat: true },
+  { key: 'stat-outputs', title: 'Outputs today', size: 'xs', sizes: STAT, areas: ['metrics'], stat: true },
+  { key: 'stat-tokens', title: 'LLM tokens today', size: 'xs', sizes: STAT, areas: ['services'], stat: true },
+  { key: 'stat-task', title: 'Next scheduled task', size: 'xs', sizes: STAT, areas: ['services'], C: ({ ctx }) => h(NextTaskNum, { ctx }), needs: ['agent'] },
+  { key: 'stat-jobs', title: 'Jobs running', size: 'xs', sizes: STAT, areas: ['metrics', 'events'], stat: true, off: true },
+  { key: 'stat-models', title: 'Models loaded', size: 'xs', sizes: STAT, areas: ['services'], stat: true, off: true },
+  { key: 'services', title: 'Services', icon: PATHS.apps, size: 'm', sizes: ['m', 'w'], link: '#/services', areas: ['services'], C: ServicesW, noTable: true },
+  { key: 'today', title: 'Today', icon: PATHS.calendar, size: 'm', sizes: ['m', 'w', 'l'], link: '#/calendar', areas: ['services'], C: TodayW, noTable: true, needs: ['calendar', 'agent'] },
+  { key: 'chats', title: 'Recent chats', icon: PATHS.chat, size: 'm', sizes: ['m', 'w'], link: '#/chat/all', areas: ['services'], C: ChatsW, noTable: true, needs: ['agent'] },
+  { key: 'memory', title: 'Memory over time', icon: PATHS.chart, size: 'l', sizes: CHART, ranges: RANGES, def: '6h', href: '#/settings/memory', areas: ['metrics'], C: MemTimeW },
+  { key: 'activity', title: 'Activity', icon: PATHS.activity, size: 'm', sizes: ['m', 'w'], areas: ['events'], C: ActivityW, noTable: true },
+  { key: 'recent', title: 'Recent outputs', icon: PATHS.image, size: 'f', sizes: ['w', 'l', 'f'], link: '#/outputs', href: '#/outputs', areas: ['outputs'], C: RecentW, noTable: true },
+  { key: 'llm', title: 'LLM traffic', icon: PATHS.relay, size: 'w', sizes: CHART, ranges: ['24h', '7d'], def: '24h', areas: ['widgets'], mod: ['relay', 'traffic'] },
+  { key: 'uptime', title: 'Service uptime (24 h)', icon: PATHS.clock, size: 'w', sizes: ['w', 'l', 'f'], areas: ['metrics'], C: UptimeW },
+  { key: 'memory-now', title: 'Memory now', size: 'm', sizes: ['m', 'w'], areas: ['memory'], C: MemNowW, off: true },
+  { key: 'gpu-queue', title: 'GPU queue', size: 'm', sizes: ['m', 'w'], ranges: ['24h', '7d'], def: '24h', areas: ['gpu', 'metrics'], C: GpuQueueW, off: true },  // plan 31.5
+  { key: 'outputs-day', title: 'Outputs per day', size: 'w', sizes: CHART, href: '#/outputs', areas: ['metrics'], C: OutDayW, off: true },
+  { key: 'activity-heat', title: 'Activity heatmap', size: 'w', sizes: ['w', 'l', 'f'], ranges: ['7d', '14d'], def: '14d', areas: ['metrics'], C: HeatW, off: true },
+  { key: 'jobs', title: 'Job durations', size: 'm', sizes: ['m', 'w'], ranges: ['24h', '7d', '30d'], def: '7d', areas: ['metrics', 'events'], C: JobsW, off: true },
+  { key: 'storage', title: 'Model storage', icon: PATHS.layers, size: 'm', sizes: ['m', 'w'], href: '#/models', areas: ['models'], C: StorageW, off: true },
+  { key: 'gpu', title: 'GPU memory', size: 'w', sizes: CHART, ranges: RANGES, def: '6h', areas: ['metrics'], C: GpuW, off: true },
+  { key: 'outputs-service', title: 'Outputs by service', size: 'm', sizes: ['m', 'w'], ranges: ['24h', '7d', '30d'], def: '7d', href: '#/outputs', areas: ['metrics'], C: OutSvcW, off: true },
 ];
 export const DEFAULT_KEYS = BASE.map(w => w.key);
 
-// The widget list for this install: the built-ins plus one per mod widget (relay's traffic is "LLM traffic").
-export function widgetDefs(widgets = []) {
+// The tile list for this install: the built-ins (LLM traffic only while relay declares it) plus one per mod
+// widget, off until turned on. `services` drops tiles whose mods (`needs`) aren't running.
+export function widgetDefs(widgets = [], services = null) {
   const defs = [], relay = widgets.find(w => w.service === 'relay' && w.id === 'traffic');
   for (const w of BASE) {
     if (w.mod) { if (relay) defs.push({ ...w, ranges: relay.ranges, def: relay.ranges[0], info: relay, href: '#/s/relay' }); continue; }
+    if (w.needs && services && !w.needs.some(id => hasMod(services, id))) continue;
     defs.push(w);
   }
-  for (const w of widgets) if (w !== relay) defs.push({ key: `mod:${w.service}:${w.id}`, title: w.title, span: w.span, ranges: w.ranges, def: w.ranges[0], href: '#/s/' + w.service, areas: ['widgets'], info: w });
+  for (const w of widgets) if (w !== relay) {
+    const size = w.span >= 12 ? 'f' : w.span >= 8 ? 'l' : w.span >= 6 ? 'w' : 'm';
+    defs.push({ key: `mod:${w.service}:${w.id}`, title: w.title, size, sizes: w.kind === 'number' ? ['xs', 's', 'm'] : CHART, ranges: w.ranges, def: w.ranges[0], href: '#/s/' + w.service, areas: ['widgets'], info: w, off: true, noTable: w.kind === 'number' });
+  }
   return defs;
-}
-
-// ---------- KPI strip ----------
-function Kpis({ ctx }) {
-  const d = useData(() => ctx.api.getOutputStats({ range: '7d', by: 'day' }), [ctx.api, ctx.outTick], 120000);
-  const s = ctx.services, m = ctx.memory, ready = s.filter(x => x.state === 'ready').length, failed = s.filter(x => x.state === 'failed').length;
-  const pct = m ? m.used_bytes / m.total_bytes : 0, h1 = ctx.hist1?.series || {}, h24 = ctx.hist24?.series || {};
-  const days = d.data?.buckets || [], today = days.at(-1)?.count ?? null, yday = days.at(-2)?.count ?? null;
-  const tokStat = s.flatMap(x => x.stats.map(st => ({ st, x }))).find(({ st }) => /tokens today/i.test(st.label));
-  const running = ctx.jobs.filter(j => j.state === 'running').length, queued = ctx.jobs.filter(j => j.state === 'queued').length;
-  const tiles = [
-    { label: 'Memory used', value: m ? `${(m.used_bytes / 1e9).toFixed(1)} GB` : '—', sub: m ? `of ${(m.total_bytes / 1e9).toFixed(0)} GB` : '', tone: pct > 0.92 ? 'red' : pct > 0.8 ? 'accent' : null, delta: m ? Math.round(pct * 100) + '%' : '', spark: { values: h1['mem.used'] || [], color: SERIES[0] }, unit: 'bytes', href: '#/settings/memory' },
-    { label: 'Services ready', value: `${ready}/${s.length}`, sub: failed ? `${failed} failed` : 'ready', tone: failed ? 'red' : null, href: '#/overview?view=table' },
-    { label: 'Models loaded', value: String(s.filter(x => x.load === 'loaded').length), sub: 'in memory', spark: null, href: '#/overview?view=timeline' },
-    { label: 'Jobs running', value: String(running), sub: queued ? `${queued} queued` : 'now', tone: running ? 'accent' : null, spark: { values: h24['jobs.running'] || [], color: SERIES[1] }, unit: 'count' },
-    { label: 'Outputs today', value: today == null ? '—' : String(today), sub: 'files', delta: today != null && yday != null ? `${today - yday >= 0 ? '+' : ''}${today - yday} vs yday` : '', deltaTone: today != null && yday != null && today > yday ? 'green' : null, spark: { values: days.map(b => b.count), color: SERIES[3] }, unit: 'count', href: '#/outputs?range=today' },
-    { label: 'LLM tokens today', value: tokStat ? fmtNum(typeof tokStat.st.value === 'number' ? tokStat.st.value : Number(tokStat.st.value)) + (tokStat.st.unit && tokStat.st.unit !== 'count' ? tokStat.st.unit : '') : '—', sub: tokStat ? tokStat.x.name : 'no LLM relay', spark: tokStat?.st.series ? { values: h24[tokStat.st.series] || [], color: SERIES[2] } : null, unit: 'count', href: tokStat ? '#/s/' + tokStat.x.id : undefined },
-  ];
-  return h('div', { role: 'region', 'aria-label': 'Key figures', style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: ctx.gap } }, tiles.map(t => h(KpiTile, { key: t.label, ...t })));
 }
 
 // ---------- customize ----------
 function Customize({ defs, layout, onLayout, onClose, cols = 2 }) {
-  const order = orderKeys(defs.map(d => d.key), layout.order), hidden = new Set(layout.hidden || []);
-  const set = p => onLayout({ ...layout, ...p });
-  const row = (k, i) => {
-    const d = defs.find(x => x.key === k), on = !hidden.has(k);
-    return h('li', { key: k, style: { display: 'flex', alignItems: 'center', gap: 8, height: 32, borderBottom: '1px solid ' + BD, fontSize: 12.5, minWidth: 0 } },
-      h('label', { style: { display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, cursor: 'pointer' } },
-        h('input', { type: 'checkbox', checked: on, 'aria-label': `Show ${d.title}`, onChange: () => set({ hidden: on ? [...hidden, k] : [...hidden].filter(x => x !== k) }) }), d.title),
-      h('span', { style: { fontSize: 10.5, color: MUT, fontFamily: MONO } }, `${d.span}/12`),
-      h('button', { type: 'button', 'aria-label': `Move ${d.title} up`, disabled: i === 0, onClick: () => set({ order: moveKey(order, k, -1) }), style: { ...btnSt, width: 26, padding: 0 } }, '↑'),
-      h('button', { type: 'button', 'aria-label': `Move ${d.title} down`, disabled: i === order.length - 1, onClick: () => set({ order: moveKey(order, k, 1) }), style: { ...btnSt, width: 26, padding: 0 } }, '↓'));
+  const order = orderKeys(defs.map(d => d.key), layout.order);
+  const row = k => {
+    const d = defs.find(x => x.key === k), on = isOn(d, layout), size = sizeOf(d, layout), sizes = d.sizes || [d.size];
+    return h('li', { key: k, style: { display: 'flex', alignItems: 'center', gap: 8, height: 30, borderBottom: '1px solid ' + BD, fontSize: 12.5, minWidth: 0 } },
+      h('label', { style: { display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, cursor: 'pointer', color: on ? 'var(--tx,#E6EAF2)' : MUT } },
+        h('input', { type: 'checkbox', checked: on, 'aria-label': `Show ${d.title}`, onChange: () => onLayout(setOn(layout, d, !on)) }),
+        h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, d.title)),
+      sizes.length > 1 ? h('select', { 'aria-label': `${d.title} size`, value: size, onChange: e => onLayout({ ...layout, sizes: { ...(layout.sizes || {}), [k]: e.target.value } }),
+        style: { height: 24, fontSize: 11.5, borderRadius: 5, border: '1px solid var(--bds,#2A3547)', background: 'var(--inset,#131926)', color: 'var(--tx,#E6EAF2)' } },
+      sizes.map(z => h('option', { key: z, value: z }, `${SIZE_LABEL[z]} ${SIZES[z].join('×')}`)))
+        : h('span', { style: { fontSize: 11, color: MUT } }, SIZE_LABEL[size]));
   };
-  return h('div', { role: 'dialog', 'aria-label': 'Customize dashboard', style: { background: 'var(--card,#11151D)', border: '1px solid var(--acc,#FFB224)', borderRadius: 9, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 } },
-    h('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
-      h('strong', { style: { fontSize: 13 } }, 'Customize dashboard'),
-      h('span', { style: { fontSize: 11.5, color: MUT } }, 'Saved to config.toml, so it follows you between browsers.'),
+  return h('div', { role: 'dialog', 'aria-label': 'Customize dashboard', style: { background: 'var(--card,#11151D)', border: '1px solid var(--acc,#FFB224)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 } },
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+      h('strong', { style: { fontSize: 13 } }, 'Customize'),
+      h('span', { style: { fontSize: 11.5, color: MUT } }, 'Drag tiles to move them (or focus a grip and use the arrow keys). Pick sizes here or in a tile’s ⋯ menu.'),
       h('span', { style: { flex: 1 } }),
-      h('button', { type: 'button', onClick: () => onLayout({ order: [], hidden: [], ranges: {} }), style: btnSt }, 'Reset'),
+      h('button', { type: 'button', onClick: () => onLayout({ order: [], hidden: [], shown: [], sizes: {}, ranges: {} }), style: btnSt }, 'Reset'),
       h('button', { type: 'button', onClick: onClose, style: { ...btnSt, background: 'var(--acc,#FFB224)', color: '#1A1200', borderColor: 'transparent', fontWeight: 600 } }, 'Done')),
     h('ul', { style: { listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridAutoFlow: 'column', gridTemplateColumns: `repeat(${cols},minmax(0,1fr))`, gridTemplateRows: `repeat(${Math.ceil(order.length / cols)},auto)`, columnGap: 24 } }, order.map(row)));
 }
 
 // ---------- dashboard ----------
-// props: api, services, memory, gpu (GpuState) and cancelGpu(id) (plan 31.5), jobs, activity, recent, hist1, hist24, widgets (WidgetInfo[]),
-// layout ({order, hidden, ranges}), onLayout, customizing, onCustomize, go, badge, compact, outTick
+// props: api, services, memory, gpu (GpuState) and cancelGpu(id) (plan 31.5), jobs, activity, recent, alerts, approvals, memReview,
+// onApprovals, hist1, hist24, widgets (WidgetInfo[]), layout ({order, hidden, shown, sizes, ranges}), onLayout, customizing,
+// onCustomize, go, badge, compact, outTick
 export function Dashboard(props) {
   const React = R(), [ref, width] = useWidth(1200), [tables, setTables] = React.useState({});
-  const { layout = { order: [], hidden: [], ranges: {} }, onLayout, api } = props;
-  const gap = props.compact ? 10 : 14, ctx = { ...props, gap };
-  const defs = widgetDefs(props.widgets || []);
-  const hidden = new Set(layout.hidden || []);
-  const keys = orderKeys(defs.map(d => d.key), layout.order).filter(k => !hidden.has(k));
-  const cards = keys.map(k => {
-    const d = defs.find(x => x.key === k), range = layout.ranges?.[k] && d.ranges?.includes(layout.ranges[k]) ? layout.ranges[k] : d.def, table = !!tables[k];
+  const { layout = {}, onLayout, api, customizing } = props;
+  const ctx = { alerts: [], approvals: [], memReview: 0, ...props };
+  const defs = widgetDefs(props.widgets || [], props.services);
+  const keys = visibleKeys(defs, layout), order = orderKeys(defs.map(d => d.key), layout.order);
+  const tiles = keys.map(k => {
+    const d = defs.find(x => x.key === k), size = sizeOf(d, layout), table = !!tables[k];
+    const range = layout.ranges?.[k] && d.ranges?.includes(layout.ranges[k]) ? layout.ranges[k] : d.def;
     const mock = (d.areas || []).some(a => api.isLive && !api.isLive(a));
-    const body = d.info ? h(ModW, { ctx, info: d.info, range, table }) : h(d.C, { ctx, range, table });
-    return h(Card, { key: k, title: d.title, ranges: d.ranges, range, href: d.href, mock, table, onTable: d.noTable ? undefined : v => setTables(t => ({ ...t, [k]: v })),
-      onRange: r => onLayout({ ...layout, ranges: { ...layout.ranges, [k]: r } }), style: { gridColumn: `span ${spanAt(d.span, width)}` } }, body);
+    const badge = d.count ? d.count(ctx) : {};
+    return { key: k, title: d.title, icon: d.icon, size, sizes: d.sizes || [d.size], ranges: d.ranges, range, href: d.href, link: d.link, mock, table, count: badge.count, tone: badge.tone,
+      onTable: d.noTable ? undefined : v => setTables(t => ({ ...t, [k]: v })),
+      onRange: r => onLayout({ ...layout, ranges: { ...layout.ranges, [k]: r } }),
+      onSize: z => onLayout({ ...layout, sizes: { ...(layout.sizes || {}), [k]: z } }),
+      onHide: () => onLayout(setOn(layout, d, false)),
+      render: () => (d.stat ? statTile(k, ctx) : d.info ? h(ModW, { ctx, info: d.info, range, table }) : h(d.C, { ctx, range, table, size })) };
   });
-  return h('div', { ref, style: { display: 'flex', flexDirection: 'column', gap, minWidth: 0 } },
-    h(Kpis, { ctx }),
-    props.customizing && h(Customize, { defs, layout, onLayout, onClose: () => props.onCustomize(false), cols: width < 760 ? 1 : 2 }),
-    cards.length ? h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(12,minmax(0,1fr))', gridAutoFlow: 'row dense', gap, alignItems: 'start' } }, cards)
-      : h(Frame, { state: 'empty', height: 120, emptyText: 'Every widget is hidden. Use Customize to show some.' }));
+  return h('div', { ref, style: { display: 'flex', flexDirection: 'column', gap: props.compact ? 10 : 14, minWidth: 0 } },
+    customizing && h(Customize, { defs, layout, onLayout, onClose: () => props.onCustomize(false), cols: width < 760 ? 1 : width < 1100 ? 2 : 3 }),
+    tiles.length ? h(BentoGrid, { tiles, width, compact: props.compact !== false, editing: customizing, order, onOrder: o => onLayout({ ...layout, order: o }) })
+      : h(Frame, { state: 'empty', height: 120, emptyText: 'Every tile is hidden. Use Customize to show some.' }));
 }

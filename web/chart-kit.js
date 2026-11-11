@@ -144,6 +144,21 @@ export function useWidth(initial = 320) {
   }, []);
   return [ref, w];
 }
+// An element's height (a callback ref, so it follows an element that mounts later), e.g. a chart's legend.
+export function useHeight(initial = 0) {
+  const { useState, useRef, useCallback } = R();
+  const [hgt, set] = useState(initial), ro = useRef(null);
+  const ref = useCallback(el => {
+    ro.current?.disconnect(); ro.current = null;
+    if (!el) return;
+    const put = x => { x = Math.ceil(x); set(p => (p === x ? p : x)); };
+    put(el.getBoundingClientRect().height);
+    if (typeof ResizeObserver === 'undefined') return;
+    ro.current = new ResizeObserver(es => put(es[0].borderBoxSize?.[0]?.blockSize ?? es[0].contentRect.height));
+    ro.current.observe(el);
+  }, []);
+  return [ref, hgt];
+}
 // Hidden legend items.
 export function useHidden() {
   const [hidden, set] = R().useState(() => new Set());

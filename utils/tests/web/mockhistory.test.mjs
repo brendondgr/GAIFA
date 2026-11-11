@@ -183,7 +183,7 @@ test('settings: compact by default, partial saves merge like the hub', async () 
   const api = createMockApi();
   const s = await api.getSettings();
   assert.equal(s.ui.density, 'compact');
-  assert.deepEqual(s.ui.dashboard, { order: [], hidden: [], ranges: {} });
+  assert.deepEqual(s.ui.dashboard, { order: [], hidden: [], ranges: {}, shown: [], sizes: {} });
   const r = await api.saveSettings({ ui: { dashboard: { order: ['memory'], hidden: [], ranges: { memory: '6h' } } }, services: { enabled: { example: false } } });
   assert.equal(r.restart_required, false);
   assert.equal(r.settings.ui.theme, 'system');

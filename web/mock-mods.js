@@ -4,7 +4,9 @@
 
 import { comfyMock } from './mock-comfy.js';
 import { workspaceMock } from './mock-workspace.js';
+import { agentMock, calendarMock } from './mock-overview.js';
 export { WORKSPACE_SVC } from './mock-workspace.js';
+export { AGENT_SVC, CALENDAR_SVC } from './mock-overview.js';
 
 export function createModMocks(m) {
   const { ok, media, upstream, svcById, pushSvc, act, doLoad, doUnload, loadSvc, ttsOutput, makeWav, clone, now, GB, jobs, emit, models, usedBytes, renderImageBlob, voices, KOKORO, voice } = m;
@@ -46,6 +48,7 @@ export function createModMocks(m) {
   relay: relayMock(m),
   comfy: comfyMock(m),
   workspace: workspaceMock(m),   // chat-history 1.2: environments for the chat list
+  agent: agentMock(m), calendar: calendarMock(m),   // overview-bento 2.2: what the Overview's tiles read
   transcribe: {
     'GET /health': () => ok({ status: 'ok', model: 'whisper-large-v3-turbo' }),
     'POST /v1/transcribe': ({ form }) => { const f = form?.get?.('file'); if (!f || !f.size) throw upstream(422, 'file: an audio file is required');

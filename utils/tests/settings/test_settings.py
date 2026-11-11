@@ -32,7 +32,7 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
             # installed mods missing from the lists follow the configured ids
             "memory": {"reserve_gb": 12, "auto_make_room": False, "never_unload": ["lcpp"], "priority": ["comfy", "tts", "gen3d", "fake-ok"]},
             "services": {"order": ["relay", "lcpp", "tts", "gen3d", "comfy", "opencode", "fake-ok"], "enabled": {"fake-ok": True}, "autostart": {"fake-ok": True}},
-            "ui": {"theme": "system", "density": "compact", "dashboard": {"order": [], "hidden": [], "ranges": {}},
+            "ui": {"theme": "system", "density": "compact", "dashboard": {"order": [], "hidden": [], "ranges": {}, "shown": [], "sizes": {}},
                    "nav": {"collapsed": False, "services": "list", "hidden": [], "folded": False},
                    "chat": {"steps": "fold", "list": {"show": "chats", "group": "environment", "env_order": "activity", "chat_order": "updated", "collapsed": []}, "environment": None},
                    "overview": {"view": "dashboard", "timeline_range": "24h", "services_range": "24h"}},
@@ -74,7 +74,8 @@ async def test_memory_and_ui_changes_apply_at_once(rig, serve):
     hub = served.hub
     async with httpx.AsyncClient(base_url=served.url) as c:
         r = await c.put("/api/settings", json={"memory": {"reserve_gb": 20, "never_unload": ["lcpp", "fake-ok"]},
-                                               "ui": {"theme": "dark", "dashboard": {"order": ["kpi", "memory-time"], "hidden": ["heatmap"], "ranges": {"memory-time": "6h"}}}})
+                                               "ui": {"theme": "dark", "dashboard": {"order": ["kpi", "memory-time"], "hidden": ["heatmap"], "ranges": {"memory-time": "6h"},
+                                                                                     "shown": ["storage"], "sizes": {"memory-time": "f"}}}})
         assert r.status_code == 200 and not r.json()["restart_required"]
         s = r.json()["settings"]
         assert s["memory"]["reserve_gb"] == 20 and s["memory"]["never_unload"] == ["lcpp", "fake-ok"] and s["ui"]["theme"] == "dark"
@@ -82,13 +83,16 @@ async def test_memory_and_ui_changes_apply_at_once(rig, serve):
         assert "# reserve for the desktop" in text
         cfg = tomllib.loads(text)
         assert cfg["memory"]["reserve_gb"] == 20 and cfg["ui"] == {"theme": "dark", "dashboard": {
-            "order": ["kpi", "memory-time"], "hidden": ["heatmap"], "ranges": {"memory-time": "6h"}}}
+            "order": ["kpi", "memory-time"], "hidden": ["heatmap"], "ranges": {"memory-time": "6h"}, "shown": ["storage"], "sizes": {"memory-time": "f"}}}
         assert hub.config.memory.reserve_gb == 20
         assert (await c.get("/api/memory")).json()["reserve_bytes"] == 20 * 1000**3
         # a later save without ui leaves the dashboard alone; an empty one removes it
         await c.put("/api/settings", json={"memory": {"auto_make_room": True}})
         assert tomllib.loads(_file(served))["ui"]["dashboard"]["hidden"] == ["heatmap"]
-        await c.put("/api/settings", json={"ui": {"theme": "system", "dashboard": {"order": [], "hidden": [], "ranges": {}}}})
+        # a tile size the grid doesn't have is refused
+        r = await c.put("/api/settings", json={"ui": {"dashboard": {"sizes": {"memory-time": "huge"}}}})
+        assert r.status_code == 422
+        await c.put("/api/settings", json={"ui": {"theme": "system", "dashboard": {"order": [], "hidden": [], "ranges": {}, "shown": [], "sizes": {}}}})
         assert "ui" not in tomllib.loads(_file(served))
         assert any(a["text"] == "GAIFA settings saved" for a in hub.activity.recent(5))
 

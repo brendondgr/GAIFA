@@ -69,7 +69,7 @@ const menuItem = { display: 'flex', alignItems: 'center', height: 28, padding: '
 // ---------- memory history ----------
 // Stacked area per service + "other", with the reserve line (total − reserve) and available
 // memory. `reserveBytes` overrides the recorded reserve (Settings draws your unsaved value).
-export function MemoryChart({ api, services, range = '1h', height = 150, reserveBytes, table, label = 'Memory over time' }) {
+export function MemoryChart({ api, services, range = '1h', height = 150, reserveBytes, table, label = 'Memory over time', fit }) {
   const d = useData(() => api.getMetrics({ series: ['mem.svc.*', 'mem.other', 'mem.total', 'mem.reserve', 'mem.available'], range }), [api, range], pollFor(range));
   if (d.state !== 'ok') return h(AreaChart, { ...chartState(d), height, label });
   const m = d.data, S = m.series, ids = Object.keys(S).filter(k => k.startsWith('mem.svc.')).map(k => k.slice(8));
@@ -80,7 +80,7 @@ export function MemoryChart({ api, services, range = '1h', height = 150, reserve
   series.push({ key: 'reserve', label: 'Reserve line', type: 'line', dash: true, color: 'var(--tx,#E6EAF2)', values: total.map((t, i) => (t == null ? null : t - (reserveBytes ?? res[i] ?? 0))) });
   series.push({ key: 'avail', label: 'Available', type: 'line', dash: true, color: 'var(--gr,#3FB950)', values: S['mem.available'] || [] });
   const yMax = Math.max(0, ...total.filter(v => v != null));
-  return h(AreaChart, { t: m.t, series, stacked: true, unit: 'bytes', height, label, table, yMax: yMax || undefined });
+  return h(AreaChart, { t: m.t, series, stacked: true, unit: 'bytes', height, fit, label, table, yMax: yMax || undefined });
 }
 
 // ---------- model storage: size by kind + disk free ----------

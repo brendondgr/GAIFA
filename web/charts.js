@@ -8,7 +8,7 @@
 
 import {
   h, SERIES, TONE, MONO, MUT, BD, fmtValue, fmtNum, fmtTime, fmtStamp, fmtDur, niceTicks, byteTicks, timeTicks,
-  linePath, areaPath, stackValues, allNull, maxOf, lastValue, useWidth, useHidden, Frame, Legend, Tooltip, DataTable,
+  linePath, areaPath, stackValues, allNull, maxOf, lastValue, useWidth, useHeight, useHidden, Frame, Legend, Tooltip, DataTable,
   keyIndex, srOnly,
 } from './chart-kit.js';
 
@@ -32,8 +32,10 @@ function summary(label, series, unit, at) {
 // ---------- time / category chart ----------
 // series: [{ key, label, values, color?, type?: 'area'|'line'|'bar', axis?: 'left'|'right', dash?, unit? }]
 function XYChart(p) {
-  const { t, categories, series = [], type = 'line', stacked = false, unit, unitRight, height = 150, label, table, state, error, onRetry, yMax, onBrush, onPick, brush } = p;
-  const React = R(), [ref, width] = useWidth(), [hidden, toggle] = useHidden();
+  const { t, categories, series = [], type = 'line', stacked = false, unit, unitRight, label, table, state, error, onRetry, yMax, onBrush, onPick, brush, fit } = p;
+  const React = R(), [ref, width] = useWidth(), [hidden, toggle] = useHidden(), [legRef, legH] = useHeight(fit ? 18 : 0);
+  // `fit`: the whole chart, legend included, fills that many px (a bento tile's body, plan overview-bento 2.3)
+  const height = fit ? Math.max(60, fit - legH) : p.height ?? 150;
   const [idx, setIdx] = React.useState(null), drag = React.useRef(null), [sel, setSel] = React.useState(null);
   const xs0 = t || categories || [], n = xs0.length;
   const all = series.map((s, i) => ({ ...s, key: s.key || s.label, color: s.color || SERIES[i % SERIES.length], type: s.type || type, axis: s.axis || 'left' }));
@@ -102,7 +104,7 @@ function XYChart(p) {
         onClick: onPick && !onBrush ? e => onPick(at(e)) : undefined }, els)),
     tip && h(Tooltip, { x: xi(idx), width, title: tip.title, rows: tip.rows }),
     h('div', { 'aria-live': 'polite', style: srOnly }, tip ? tip.title + ': ' + tip.rows.map(r => r.label + ' ' + r.value).join(', ') : ''),
-    h(Legend, { items: legend, hidden, onToggle: toggle }));
+    h('div', { ref: legRef, style: { display: 'flow-root' } }, h(Legend, { items: legend, hidden, onToggle: toggle })));
 }
 export const AreaChart = p => h(XYChart, { type: 'area', ...p });
 export const LineChart = p => h(XYChart, { type: 'line', ...p });

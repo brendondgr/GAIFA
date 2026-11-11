@@ -153,13 +153,13 @@ export function SessionsBlock({ ctx }) {
   return h('section', { style: { background: T.card, border: '1px solid ' + T.bd, borderRadius: 10, padding: 16 } }, h(SessionsPanel, { api: ctx.api, toast: ctx.toast, on: ctx.on }));
 }
 
-/** Reset the dashboard layout: the Overview's order, hidden widgets and ranges back to the defaults ([ui.dashboard], saved at once). */
+/** Reset the dashboard layout: the Overview's order, hidden and shown tiles, sizes and ranges back to the defaults ([ui.dashboard], saved at once). */
 export function DashboardReset({ ctx }) {
-  const dash = ctx.dash || {}, custom = (dash.order || []).length + (dash.hidden || []).length + Object.keys(dash.ranges || {}).length > 0;
+  const dash = ctx.dash || {}, custom = (dash.order || []).length + (dash.hidden || []).length + (dash.shown || []).length + Object.keys(dash.sizes || {}).length + Object.keys(dash.ranges || {}).length > 0;
   return h('div', { style: { display: 'flex', alignItems: 'center', gap: 12, padding: '14px 0', borderTop: '1px solid ' + T.bd, flexWrap: 'wrap' } },
     h('div', { style: { flex: '1 1 220px', minWidth: 0 } }, h('div', { style: { fontWeight: 500 } }, 'Dashboard layout'),
-      h('div', { style: { fontSize: 12, color: T.mut } }, custom ? 'The Overview’s widgets are in your order, with some hidden or ranges changed.' : 'The Overview shows every widget in the default order.')),
-    h('button', { type: 'button', disabled: !custom, onClick: () => { ctx.onLayout?.({ order: [], hidden: [], ranges: {} }); ctx.toast?.('Dashboard layout reset', 'success'); },
+      h('div', { style: { fontSize: 12, color: T.mut } }, custom ? 'The Overview’s tiles are in your order, with some shown, hidden, resized or ranges changed.' : 'The Overview shows its default tiles, in the default order and sizes.')),
+    h('button', { type: 'button', disabled: !custom, onClick: () => { ctx.onLayout?.({ order: [], hidden: [], shown: [], sizes: {}, ranges: {} }); ctx.toast?.('Dashboard layout reset', 'success'); },
       style: { height: 30, padding: '0 12px', borderRadius: 6, border: '1px solid ' + T.bds, background: T.inset, color: T.tx, font: 'inherit', fontSize: 12.5, cursor: custom ? 'pointer' : 'not-allowed', opacity: custom ? 1 : 0.5 } }, 'Reset the dashboard layout'));
 }
 

@@ -57,6 +57,9 @@ export function subAgentRows(d) {
 const knownMods = ctx => (ctx.services || []).filter(s => !(s.manifest_errors || []).length);
 /** Settings → Speech → Voice mode (plan voice-speech-model 3.2): which engine answers in Chat's voice mode. */
 export const VOICE_SIZES = [{ value: 'q4_k_m', label: 'Q4_K_M (smaller, faster)' }, { value: 'q8_0', label: 'Q8_0 (closer to the original)' }];
+/** Tools the speech model may be given (plan voice-speech-model 5.1): read-only ones, plus the web search. */
+export const VOICE_TOOLS = [{ value: 'calendar_agenda', label: 'Calendar: your day' }, { value: 'calendar_search', label: 'Calendar: find' },
+  { value: 'calendar_free', label: 'Calendar: free time' }, { value: 'web_search', label: 'Web search' }, { value: 'time_now', label: 'The time' }];
 export function voiceModeGroup(d, ctx) {
   const speech = () => d.voice_mode?.engine === 'speech', has = c => !c.services || hasMod(c, 'voice');
   const kw = ['voice mode', 'speech to speech', 'LFM3', 'omni', 'local'];
@@ -70,6 +73,10 @@ export function voiceModeGroup(d, ctx) {
       field('vmQuant', 'voice_mode.quant', { label: 'Size', hint: 'Both are compared in docs/voice-eval.md.', control: 'segmented', choices: VOICE_SIZES, when: speech, keywords: [...kw, 'quant', 'Q4', 'Q8'] }),
       field('vmVoice', 'voice_mode.voice', { label: 'Voice', hint: 'The speech model has two voices; the voices above are for reading replies aloud.', control: 'segmented',
         choices: [{ value: 'female', label: 'Female' }, { value: 'male', label: 'Male' }], when: speech, keywords: kw }),
+      field('vmTools', 'voice_mode.tools', { label: 'Tools it may use', control: 'chips', choices: VOICE_TOOLS, when: speech, keywords: [...kw, 'tools', 'calendar', 'web search'],
+        hint: 'Off by default. A call runs only when this chat’s permissions allow it without asking; anything that would show a card is refused, and it says so. It is a small model: it won’t always call the right tool.' }),
+      field('vmAskChat', 'voice_mode.ask_chat', { label: 'Let it ask the chat’s model', control: 'toggle', when: speech, keywords: [...kw, 'hand off', 'ask chat'],
+        hint: 'For questions it can’t answer itself (a file, a long task), it sends your words to the chat’s own model and tells you the answer. That turn runs like a typed message, with its tools and cards.' }),
       block('vmStatus', 'VoiceModelStatus', { label: 'The speech model', when: speech, keywords: kw }),
     ] };
 }

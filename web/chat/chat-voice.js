@@ -102,7 +102,8 @@ export function useModUp(api, id) {
  * as a new session, which then knows that turn. */
 export function LiveVoice({ cfg, thread, running, waiting, disabled, onOff, onMode, start = liveVoice }) {
   const React = R(), [s, setS] = React.useState(() => liveStep({ mode: 'off' }, { type: 'start' }));
-  const talk = React.useRef(null), ended = React.useRef(false), hold = running || waiting;
+  const talk = React.useRef(null), ended = React.useRef(false), asking = React.useRef(false);
+  const hold = (running || waiting) && !asking.current && !s.asking;     // not while the speech model asked the chat's model itself
   const end = fb => { if (ended.current) return; ended.current = true; talk.current?.stop(); talk.current = null; onOff(fb); };
   React.useEffect(() => { onMode?.('listening'); return () => { talk.current?.stop(); talk.current = null; onMode?.('off'); }; }, []);
   React.useEffect(() => {
@@ -114,6 +115,8 @@ export function LiveVoice({ cfg, thread, running, waiting, disabled, onOff, onMo
       talk.current = start({ thread: tid, voice: cfg.voice, quant: cfg.quant, pauseMs: cfg.pauseMs, language: cfg.language, mics: cfg.mics, onEvent: ev => {
         if (!live) return;
         if (ev.type === 'done') { if (!ended.current && talk.current) end(); return; }
+        if (ev.type === 'tool' && ev.name === 'ask_chat') asking.current = ev.state === 'running';
+        if (ev.type === 'listening') asking.current = false;
         setS(p => { const n = liveStep(p, ev); if (n.mode === 'off' && n.error) setTimeout(() => end({ note: n.error, code: n.code, fix: n.fix }), 0); return n; });
       } });
     }, e => end({ note: e?.detail || e?.message || 'The chat could not be started' }));

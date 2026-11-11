@@ -3,6 +3,8 @@ agent only gives it what the chat knows and writes each spoken turn into the cha
 
     GET  /v1/threads/{tid}/voice-context   the profile, the calendar, a short project, and the last turns as text
     POST /v1/threads/{tid}/voice-turn      a `user` and an `assistant` event, with no model call
+    POST /v1/threads/{tid}/voice-ask       your spoken question as a message for the chat's own model (5.2)
+    GET  /v1/threads/{tid}/voice-answer    that turn's answer, once it has ended
 
 The events are ordinary ones (`via: "voice"`), so the chat shows the talk and the chat's own model reads it the
 next time you type.
@@ -10,10 +12,12 @@ next time you type.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from . import context as ctx
@@ -32,6 +36,11 @@ class VoiceTurn(BaseModel):
     model: str = Field("voice", max_length=120)
     first_audio_ms: int | None = Field(None, ge=0)
     interrupted: bool = False
+    tools: list[dict[str, Any]] = Field(default_factory=list, max_length=12, description="Tools the reply used: {name, arguments, state}")
+
+
+class VoiceAsk(BaseModel):
+    text: str = Field(min_length=1, max_length=8000, description="The question, as you said it")
 
 
 def history(events: list[dict[str, Any]], limit: int = HISTORY_CHARS) -> list[dict[str, str]]:
@@ -130,6 +139,34 @@ def add_routes(app: FastAPI) -> None:
             ev = agent.emit(tid, "assistant", {
                 "text": body.assistant.strip(), "model": body.model, "via": "voice", "step": f"voice-{user['seq']}",
                 **({"interrupted": True} if body.interrupted else {}),
+                **({"tools": body.tools} if body.tools else {}),
                 **({"first_audio_ms": body.first_audio_ms} if body.first_audio_ms is not None else {})})
             out["assistant_seq"] = ev["seq"]
         return out
+
+    @app.post("/v1/threads/{tid}/voice-ask", status_code=202, summary="The speech model hands your question to the chat's own "
+              "model: sent as a message of yours (`via: voice`), and the chat's turn starts")
+    async def voice_ask(tid: str, body: VoiceAsk, request: Request) -> dict[str, Any]:
+        agent = agent_of(request)
+        thread_or_404(agent, tid)
+        if agent.busy(tid):
+            raise HTTPException(409, {"code": "turn_running", "detail": "the chat's own turn is running"})
+        ev = await agent.send(tid, body.text.strip(), by="voice")
+        return {"seq": ev["seq"]}
+
+    @app.get("/v1/threads/{tid}/voice-answer", summary="The chat's answer to a voice-ask, waiting up to `wait` seconds for its "
+             "turn to end: state done (with the answer's text), running, or waiting (a card is on screen)")
+    async def voice_answer(tid: str, request: Request, after: int = Query(..., ge=0, description="The seq voice-ask returned"),
+                           wait: float = Query(25, ge=0, le=60)) -> dict[str, Any]:
+        agent = agent_of(request)
+        thread_or_404(agent, tid)
+        deadline = time.monotonic() + wait
+        while True:
+            state = (agent.store.thread(tid) or {}).get("state")
+            running = agent.running(tid)
+            if not running and state != "waiting":
+                texts = [str(e["payload"].get("text") or "").strip() for e in agent.store.events(tid, after=after, types=("assistant",))]
+                return {"state": "done", "text": " ".join(t for t in texts if t)}
+            if time.monotonic() >= deadline:
+                return {"state": "waiting" if state == "waiting" else "running", "text": ""}
+            await asyncio.sleep(0.1)

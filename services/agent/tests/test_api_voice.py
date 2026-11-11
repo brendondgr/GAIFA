@@ -30,6 +30,9 @@ async def test_an_interrupted_turn_and_one_with_no_answer(env):
     await env.client.post(f"/v1/threads/{tid}/voice-turn", json={"user": "Tell me a story", "assistant": "Once upon a…",
                                                                   "interrupted": True})
     assert env.payloads(tid, "assistant")[-1]["interrupted"] is True
+    await env.client.post(f"/v1/threads/{tid}/voice-turn", json={"user": "What time is it?", "assistant": "Six.", "tools": [
+        {"name": "time_now", "arguments": "{}", "state": "done"}]})
+    assert env.payloads(tid, "assistant")[-1]["tools"][0]["name"] == "time_now"
     r = await env.client.post(f"/v1/threads/{tid}/voice-turn", json={"user": "Never mind"})
     assert r.json()["assistant_seq"] is None and env.types(tid)[-1] == "user"
     assert (await env.client.post(f"/v1/threads/{tid}/voice-turn", json={"user": ""})).status_code == 422
@@ -70,3 +73,20 @@ def test_the_history_keeps_the_newest_inside_its_budget():
              {"seq": 3, "type": "tool_call", "payload": {"name": "x"}},
              {"seq": 4, "type": "assistant", "payload": {"text": "Then I answer."}}]
     assert history(steps) == [{"role": "user", "text": "go"}, {"role": "assistant", "text": "First I look. Then I answer."}]
+
+
+async def test_asking_the_chats_model(env):
+    """5.2: the question goes in as your message, the chat's model answers, and the answer can be read back."""
+    tid = await env.thread()
+    env.model.queue({"text": "The report says sales rose nine percent.", "delay": 0.3})
+    r = await env.client.post(f"/v1/threads/{tid}/voice-ask", json={"text": "What does the report say about sales?"})
+    assert r.status_code == 202
+    seq = r.json()["seq"]
+    assert env.payloads(tid, "user")[-1]["by"] == "voice"
+    early = (await env.client.get(f"/v1/threads/{tid}/voice-answer", params={"after": seq, "wait": 0})).json()
+    assert early == {"state": "running", "text": ""}
+    again = await env.client.post(f"/v1/threads/{tid}/voice-ask", json={"text": "And costs?"})
+    assert again.status_code == 409
+    done = (await env.client.get(f"/v1/threads/{tid}/voice-answer", params={"after": seq, "wait": 10})).json()
+    assert done == {"state": "done", "text": "The report says sales rose nine percent."}
+    assert (await env.client.get("/v1/threads/t_nope/voice-answer", params={"after": 0})).status_code == 404

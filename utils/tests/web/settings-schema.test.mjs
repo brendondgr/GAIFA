@@ -200,7 +200,8 @@ test('voice-speech-model 3.2: Speech → Voice mode', async () => {
   assert.ok(off.disabled && /gaifa setup voice/.test(off.title));       // no Voice mod: the speech model can't be chosen
   draft.voice_mode = { ...draft.voice_mode, engine: 'speech', quant: 'q8_0', voice: 'male' };
   ({ g, rows: shown } = rows(withVoice));
-  assert.deepEqual(shown.map(r => r.id), ['vmEngine', 'vmQuant', 'vmVoice', 'vmStatus']);
+  assert.deepEqual(shown.map(r => r.id), ['vmEngine', 'vmQuant', 'vmVoice', 'vmTools', 'vmAskChat', 'vmStatus']);
+  assert.ok(S.VOICE_TOOLS.length <= 6 && S.VOICE_TOOLS.every(t => /^[a-z][a-z0-9_]+$/.test(t.value)));     // the setting takes six at most
   assert.equal(S.summaryOf(g, withVoice), 'Speech model (LFM3-Omni-2B Q8_0, male voice)');
   assert.equal(rows(without).g.rows[0].choices(without)[1].disabled, false);   // already chosen: it can be switched back
   // a machine with only the Voice mod still has the Speech section

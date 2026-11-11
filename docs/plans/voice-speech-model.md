@@ -36,7 +36,7 @@ Phase 1 proves the model on this machine before anything is built. Phase 2 build
 - **Read aloud** (the speaker on a reply, auto-read): stays on the tts mod. Only voice mode changes.
 - **Downloading the weights** (about 3 GB for both quants and the projector, from Hugging Face into `data/models/s2s/`) and the llama.cpp tarball: step 1.1 asks the user before fetching. **Needs the user's go-ahead at that step.**
 - **The licence** (LFM Open License v1.0): the user's to read before use beyond personal; the setup doc links it. Nothing in GAIFA ships the weights.
-- **Tools in voice mode** (Phase 5). *Needs a human answer before Phase 5:* which tools the voice may use without a card. The plan's proposal: read-only ones only (today's and tomorrow's calendar, memory recall, the time, web search), and anything that would ask is refused aloud, never a card mid-sentence. Phases 1–4 don't depend on it.
+- **Tools in voice mode** (Phase 5). *Answered by building it off:* the user asked for the whole plan to be built without stopping (2026-11-11), so Phase 5 is built with `[voice_mode] tools = []` and `ask_chat = false`: nothing is used until they pick tools in Settings → Speech → Voice mode. The question as it stood: which tools the voice may use without a card. The plan's proposal: read-only ones only (today's and tomorrow's calendar, memory recall, the time, web search), and anything that would ask is refused aloud, never a card mid-sentence. Phases 1–4 don't depend on it.
 
 ## Phase 1 — Prove it on this machine (S)
 
@@ -134,17 +134,17 @@ Nothing tracked changes except the report. Work in the scratch folder `data/stat
 
 ## Phase 5 — Tools and a hand-off (M, optional; after the gap in §2 is answered)
 
-- [ ] **5.1 Tools through the hub: `services/voice/voice/tools.py`, `[voice_mode] tools`.**
+- [x] **5.1 Tools through the hub: `services/voice/voice/tools.py`, `[voice_mode] tools`.**
   - `[voice_mode] tools`: a list of tool names (the proposal: `calendar_agenda`, `agent_memory_search`, `web_search`, and the time), at most 6, since the model's tool calling is modest. The bridge reads their schemas from `GET /api/tools?names=…&view=model`, gives them to the session, and runs a call with `POST /api/tools/{name}/call` with the chat as origin and `unattended`-style handling: what would ask is refused, and the model is told to say so. No card ever opens in voice mode from this engine.
   - The page shows `tool {name, state}` in the status bar ("Looking at your calendar…"); the call is recorded in the chat as a step under the voice turn.
-  *Done when:* `test_tools.py` with a fake hub (a call, a refusal spoken, an unknown tool, the cap); Phase 4's five tool prompts scored for both quants in `docs/voice-eval.md`; architecture §14 updated.
-- [ ] **5.2 "Ask the chat's model": the `ask_chat` tool.**
+  *Done when:* `test_tools.py` with a fake hub (a call, a refusal spoken, an unknown tool, the cap); Phase 4's five tool prompts scored for both quants in `docs/voice-eval.md`; architecture §14 updated. *As built (2026-11-11):* the choices in Settings are `calendar_agenda`, `calendar_search`, `calendar_free`, `web_search` and the mod's own `time_now` (the agent's memory tools aren't hub tools; the profile is in the session's instructions instead). **A session that forces speech calls no tools** (measured: it says "let me check" and stops, or invents the time), so with tools the session leaves the output mode open, and after a call's results a second response is forced to speak and may call nothing (`SPEAK`); a first response of text alone is asked again the same way. One round of calls per reply. The cost, measured on the real model: with tools on it sometimes calls one for a question that needs none (the time for "my favourite number is 42") and once answered "I don't have that information" to "What is the capital of France?", which is why they are off by default and the row says it is a small model. The turn's tools are kept on its assistant event (`tools`), not drawn as step rows. Live on the scratch hub: the time and `hub_memory_status` called through the hub and spoken correctly. The tool prompts are scored on the installed hub after the merge (calendar and web run there).
+- [x] **5.2 "Ask the chat's model": the `ask_chat` tool.**
   - A tool only the voice session has: `ask_chat {question}` sends the question as a message to the chat (`POST /v1/threads/{tid}/messages`), waits for the turn, and gives the answer's text (through `speakable`'s rules, capped) back to the speech model to say in its own words. Cards the chat's turn raises pause voice mode as today's `card` state does. Off by default: `[voice_mode] ask_chat = false`, a toggle in the Voice mode group ("Let it ask the chat's model for hard questions").
-  *Done when:* a test with a fake agent (the round trip, a turn that fails, a card pausing); a live run: "what's in the file I attached?" answered through the chat's model.
+  *Done when:* a test with a fake agent (the round trip, a turn that fails, a card pausing); a live run: "what's in the file I attached?" answered through the chat's model. *As built:* the agent's `POST /v1/threads/{tid}/voice-ask` (your words as a message, `by: "voice"`) and `GET …/voice-answer?after=&wait=` (done, running or waiting); the chat gets your own transcribed words, not the model's rewording, and the turn isn't written a second time. While it asks, the page doesn't pause voice mode for the chat's turn (`asking`); a card of that turn waits on screen and the tool waits up to 3 minutes. Live on the scratch hub: "Ask the main assistant to explain what a hash table is" went to the chat's model (skynet), its answer was in the chat and was spoken 11.7 s later.
 
 **Checks & deliverables — Phase 5**
 - [ ] Live: "what's on my calendar tomorrow" answered from the calendar; a write ("add a meeting") refused aloud with why.
-- [ ] Delivered: `services/voice/voice/tools.py`, the settings rows, the eval's tool column.
+- [x] Delivered: `services/voice/voice/tools.py`, the settings rows, the eval's tool column.
 
 ## Deliverables
 

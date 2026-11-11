@@ -26,12 +26,15 @@ export function liveStep(s, ev) {
     case 'stop': case 'done': return { ...s, mode: 'off', you: '', reply: '', note: null };
     case 'waiting': return s.mode === 'off' ? s : { ...s, mode: 'connecting', note: ev.text || 'Waiting for the GPU' };
     case 'ready': return s.mode === 'off' ? s : { ...s, model: ev.model || s.model, note: null };
-    case 'listening': return s.mode === 'off' ? s : { ...s, mode: 'listening', you: '', reply: '' };
+    case 'listening': return s.mode === 'off' ? s : { ...s, mode: 'listening', you: '', reply: '', note: null, asking: false };
     case 'hearing': return s.mode === 'off' ? s : { ...s, mode: 'hearing', you: '', reply: '' };
     case 'thinking': return s.mode === 'off' ? s : { ...s, mode: 'thinking' };
     case 'speaking': return s.mode === 'off' ? s : { ...s, mode: 'speaking' };
     case 'heard': return s.mode === 'off' ? s : { ...s, you: ev.text || '' };
     case 'said': return s.mode === 'off' ? s : { ...s, reply: ev.text || '' };
+    // a tool the reply uses (Phase 5): its words while it runs; `asking`: the chat's own model is answering
+    case 'tool': return s.mode === 'off' ? s : ev.state === 'running' ? { ...s, note: ev.text || 'Using a tool…', asking: ev.name === 'ask_chat' }
+      : { ...s, note: ev.state === 'refused' ? 'That needs your approval in the chat' : null, asking: false };
     case 'error': return FATAL.has(ev.code) || ev.fatal ? { ...s, mode: 'off', you: '', reply: '', error: ev.detail || ev.code, code: ev.code, fix: ev.fix || null }
       : { ...s, note: ev.detail || ev.code };
     default: return s;

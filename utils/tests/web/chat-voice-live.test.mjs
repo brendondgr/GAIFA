@@ -24,6 +24,10 @@ test('the state machine: a round, the words, an error that ends it and one that 
   assert.deepEqual([soft.mode, soft.note], ['listening', 'a reply failed']);
   const hard = run([{ type: 'error', code: 'model_missing', detail: 'not downloaded', fix: 'gaifa setup voice' }], s);
   assert.deepEqual([hard.mode, hard.error, hard.fix], ['off', 'not downloaded', 'gaifa setup voice']);
+  const tool = run([{ type: 'tool', name: 'ask_chat', state: 'running', text: 'Asking the chat’s model…' }], s);     // Phase 5
+  assert.deepEqual([tool.note, tool.asking], ['Asking the chat’s model…', true]);
+  assert.deepEqual([run([{ type: 'tool', name: 'ask_chat', state: 'done' }], tool).note, run([{ type: 'tool', name: 'ask_chat', state: 'done' }], tool).asking], [null, false]);
+  assert.match(run([{ type: 'tool', name: 'calendar_add', state: 'refused' }], tool).note, /needs your approval/);
   assert.equal(run([{ type: 'stop' }], s).mode, 'off');
   assert.equal(run([{ type: 'listening' }], { mode: 'off' }).mode, 'off');     // a late event after it ended changes nothing
   assert.equal(L.liveUrl({ protocol: 'https:', host: 'h:1' }), 'wss://h:1/api/s/voice/v1/realtime');

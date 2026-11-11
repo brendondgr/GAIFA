@@ -68,3 +68,15 @@ test('the turn has ended only with a newer reply and nothing running', () => {
   assert.equal(v.turnEnded(true, { seq: 9, text: 'partial' }, 4), false);
   assert.equal(v.turnEnded(false, { seq: 9, text: 'new' }, 4), true);
 });
+
+test('voice-speech-model 3.4: which engine a start uses', () => {
+  assert.deepEqual(v.pickEngine({ engine: 'speech' }, true, true), { engine: 'speech' });
+  assert.deepEqual(v.pickEngine({ engine: 'chat' }, true, true), { engine: 'chat' });
+  assert.deepEqual(v.pickEngine(undefined, false, true), { engine: 'chat' });
+  const fb = v.pickEngine({ engine: 'speech' }, false, true);                // the Voice mod is missing or stopped
+  assert.equal(fb.engine, 'chat'); assert.match(fb.note, /isn’t available: using the chat’s model/);
+  assert.equal(v.pickEngine({ engine: 'speech' }, false, false).engine, null);
+  const only = v.pickEngine({ engine: 'chat' }, true, false);                // only the Voice mod is installed
+  assert.equal(only.engine, 'speech'); assert.match(only.note, /Using the speech model/);
+  assert.match(v.pickEngine({ engine: 'chat' }, false, false).error, /needs the Speech to Text and Speech mods, or the Voice mod/);
+});

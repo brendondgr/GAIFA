@@ -3,10 +3,16 @@
 // read the reply aloud (chat-speak.js) → listen again. Speaking while it reads stops the reading and listens (the
 // mic has echo cancellation; a sustained loud level counts). A card waiting for you (an approval, a question)
 // pauses it: the bar says so, and it carries on once you've answered on screen. Escape or the button ends it.
+//
+// Two engines (plan voice-speech-model 3.4; Settings → Speech → Voice mode, `[voice_mode] engine`): `chat` is the
+// loop above (ChatVoiceButton); `speech` is the voice mod's speech-to-speech model answering by itself (LiveVoice,
+// over chat-voice-live.js), its turns written into the chat by the mod. VoiceButton reads the setting each time
+// voice mode starts, and falls back to the chat engine when the speech model can't run.
 
 import { h, T, Icon, boxBtn } from './chat-ui.js';
 import { dictate, dictated, levelOf, speechSettings, useSttUp } from './chat-mic.js';
 import { speak, speakable } from './chat-speak.js';
+import { liveVoice, liveStep, LIVE_WORDS } from './chat-voice-live.js';
 
 const R = () => globalThis.React;
 export const BARGE_LEVEL = 0.5, BARGE_MS = 350, BARGE_GAP = 250, SETTLE_MS = 700;
@@ -52,11 +58,114 @@ export const turnEnded = (running, answer, sentSeq) => !running && answer.seq > 
 
 const WORDS = { listening: 'Listening…', sending: 'Sending…', thinking: 'Thinking…', speaking: 'Speaking (talk to interrupt)', paused: 'Waiting for you on screen' };
 
-export function VoiceButton({ api, onSend, running, waiting, answer = { seq: 0, text: '' }, speechOutput, disabled, onMode }) {
+/** Which engine a start uses: {engine: 'speech' | 'chat', note?}. `vm`: settings.voice_mode; `voiceUp`: the voice
+ * mod is running; `chatOk`: the stt and tts mods can run the chat engine. */
+export function pickEngine(vm, voiceUp, chatOk) {
+  if (vm?.engine === 'speech') {
+    if (voiceUp) return { engine: 'speech' };
+    return chatOk ? { engine: 'chat', note: 'The speech model isn’t available: using the chat’s model' } : { engine: null, error: 'The Voice mod isn’t running' };
+  }
+  if (chatOk) return { engine: 'chat' };
+  return voiceUp ? { engine: 'speech', note: 'Using the speech model: the Speech to Text and Speech mods aren’t running' }
+    : { engine: null, error: 'Voice mode needs the Speech to Text and Speech mods, or the Voice mod' };
+}
+
+const bar = (dot, words, text, extra) => h('div', { role: 'status', style: { position: 'absolute', left: 0, right: 0, bottom: 'calc(100% + 6px)', zIndex: 25, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+  background: T.card, border: '1px solid ' + T.bds, borderRadius: 9, boxShadow: '0 12px 30px rgba(0,0,0,.3)', fontSize: 12.5 } },
+  h('span', { 'aria-hidden': 'true', style: { width: 8, height: 8, borderRadius: '50%', flex: 'none', background: dot } }),
+  h('span', { style: { fontWeight: 600, whiteSpace: 'nowrap' } }, 'Voice mode'),
+  extra ? h('span', { style: { color: T.dim, whiteSpace: 'nowrap' } }, extra) : null,
+  h('span', { style: { color: T.mut, whiteSpace: 'nowrap' } }, words),
+  text ? h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: T.tx } }, text) : h('span', { style: { flex: 1 } }),
+  h('span', { style: { color: T.dim, fontSize: 11.5, whiteSpace: 'nowrap' } }, 'Esc ends'));
+const voiceBtn = (on, disabled, onClick) => h('button', { type: 'button', disabled, onClick, title: on ? 'End voice mode' : 'Voice mode: talk, and hear the replies',
+  'aria-label': on ? 'End voice mode' : 'Voice mode', 'aria-pressed': on ? 'true' : 'false',
+  style: { ...boxBtn(on), cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1 } },
+  h(Icon, { d: 'speaker', size: 14 }));
+
+/** True while the mod `id` is up; checked on mount and every 20 s. */
+export function useModUp(api, id) {
+  const React = R(), [up, setUp] = React.useState(false);
+  React.useEffect(() => {
+    let live = true;
+    const check = () => api?.getService?.(id).then(s => live && setUp(['ready', 'degraded'].includes(s.state))).catch(() => live && setUp(false));
+    check();
+    const t = setInterval(check, 20000);
+    return () => { live = false; clearInterval(t); };
+  }, [api, id]);
+  return up;
+}
+
+/** The speech engine while it is on: the bar and the pressed button. `cfg`: {voice, quant, pauseMs, language, mics, note};
+ * `thread()`: the chat's id (made when the chat is new); `onOff(fallback?)`: it ended (fallback: {note} to carry on
+ * with the chat engine). A turn of the chat's own (a typed message, a card) pauses it; it starts again afterwards
+ * as a new session, which then knows that turn. */
+export function LiveVoice({ cfg, thread, running, waiting, disabled, onOff, onMode, start = liveVoice }) {
+  const React = R(), [s, setS] = React.useState(() => liveStep({ mode: 'off' }, { type: 'start' }));
+  const talk = React.useRef(null), ended = React.useRef(false), hold = running || waiting;
+  const end = fb => { if (ended.current) return; ended.current = true; talk.current?.stop(); talk.current = null; onOff(fb); };
+  React.useEffect(() => { onMode?.('listening'); return () => { talk.current?.stop(); talk.current = null; onMode?.('off'); }; }, []);
+  React.useEffect(() => {
+    if (hold || ended.current) { talk.current?.stop(); talk.current = null; return undefined; }
+    let live = true;
+    setS(p => liveStep(p, { type: 'start' }));
+    Promise.resolve().then(thread).then(tid => {
+      if (!live || ended.current) return;
+      talk.current = start({ thread: tid, voice: cfg.voice, quant: cfg.quant, pauseMs: cfg.pauseMs, language: cfg.language, mics: cfg.mics, onEvent: ev => {
+        if (!live) return;
+        if (ev.type === 'done') { if (!ended.current && talk.current) end(); return; }
+        setS(p => { const n = liveStep(p, ev); if (n.mode === 'off' && n.error) setTimeout(() => end({ note: n.error, code: n.code, fix: n.fix }), 0); return n; });
+      } });
+    }, e => end({ note: e?.detail || e?.message || 'The chat could not be started' }));
+    return () => { live = false; talk.current?.stop(); talk.current = null; };
+  }, [hold]);
+  React.useEffect(() => {
+    const esc = e => { if (e.key === 'Escape') end(); };
+    globalThis.addEventListener('keydown', esc);
+    return () => globalThis.removeEventListener('keydown', esc);
+  }, []);
+  const mode = hold ? 'paused' : s.mode, words = s.note || LIVE_WORDS[mode] || '';
+  const text = mode === 'speaking' || (mode === 'thinking' && s.reply) ? s.reply : s.you ? '“' + s.you + '”' : cfg.note || '';
+  return h(R().Fragment, null,
+    bar(mode === 'paused' ? T.pu : mode === 'listening' || mode === 'hearing' ? T.gr : T.acc, words, text, s.model ? '· ' + s.model.replace(/ Q\d.*$/, '') : '· speech model'),
+    voiceBtn(true, disabled, () => end()));
+}
+
+/** Voice mode's button: reads Settings → Speech → Voice mode when it starts and runs that engine. */
+export function VoiceButton(props) {
+  const React = R(), { api, thread, running, waiting, disabled, onMode } = props;
+  const voiceUp = useModUp(api, 'voice'), [live, setLive] = React.useState(null), [fb, setFb] = React.useState({ n: 0, note: null });
+  const intercept = async chatOk => {
+    const st = await api?.getSettings?.().catch(() => null);
+    const pick = pickEngine(st?.voice_mode, voiceUp, chatOk);
+    if (pick.engine === 'speech') {
+      setLive({ voice: st?.voice_mode?.voice || 'female', quant: st?.voice_mode?.quant || 'q4_k_m', pauseMs: st?.speech_output?.pause_ms || 1200,
+        language: st?.speech_input?.language || undefined, mics: st?.speech_input?.mics || [], note: pick.note });
+      return { taken: true };
+    }
+    return { taken: false, note: pick.note, error: pick.error };
+  };
+  if (live) return h(LiveVoice, { cfg: live, thread: thread || (() => null), running, waiting, disabled, onMode,
+    onOff: fallback => { setLive(null); if (fallback) setFb(f => ({ n: f.n + 1, note: `The speech model isn’t available (${fallback.note}): using the chat’s model`, error: fallback.fix ? `${fallback.note} Fix: ${fallback.fix}` : fallback.note })); } });
+  return h(ChatVoiceButton, { ...props, intercept, show: voiceUp, autoStart: fb });
+}
+
+export function ChatVoiceButton({ api, onSend, running, waiting, answer = { seq: 0, text: '' }, speechOutput, disabled, onMode, intercept, show, autoStart }) {
   const React = R(), up = useSttUp(api), [s, setS] = React.useState({ mode: 'off', text: '', error: null });
   const st = React.useRef(s), sentSeq = React.useRef(0), dict = React.useRef(null), reading = React.useRef(null), timers = React.useRef({});
   const go = ev => setS(prev => { const n = voiceStep(prev, ev); st.current = n; return n; });
-  const pause = speechOutput?.pause_ms || 1200;
+  const pause = speechOutput?.pause_ms || 1200, [note, setNote] = React.useState(null), chatOk = !!(up && speechOutput);
+  const begin = async () => {        // the button: which engine? (the speech engine takes it over in VoiceButton)
+    const r = intercept ? await intercept(chatOk) : { taken: false };
+    if (r.taken) return;
+    if (!chatOk) { setS(p => ({ ...p, error: r.error || 'Voice mode needs the Speech to Text and Speech mods' })); return; }
+    setNote(r.note || null);
+    go({ type: 'start' });
+  };
+  React.useEffect(() => {            // the speech engine gave up: carry on with this one, or say why not
+    if (!autoStart?.n) return;
+    if (chatOk) { setNote(autoStart.note); go({ type: 'start' }); } else setS(p => ({ ...p, error: autoStart.error || autoStart.note }));
+  }, [autoStart?.n]);
 
   const stopListening = () => { clearInterval(timers.current.quiet); const d = dict.current; dict.current = null; return d ? d.stop() : Promise.resolve(null); };
   const stopReading = () => { reading.current?.stop(); reading.current = null; clearInterval(timers.current.barge); timers.current.bargeMic?.stop(); };
@@ -120,18 +229,9 @@ export function VoiceButton({ api, onSend, running, waiting, answer = { seq: 0, 
   React.useEffect(() => () => { stopListening(); stopReading(); }, []);
 
   const on = s.mode !== 'off';
-  if ((!up || !speechOutput) && !on) return null;     // needs the stt mod (listening) and the tts mod (speech_output's voices)
+  if (!chatOk && !on && !show) return null;     // needs the stt mod (listening) and the tts mod (speech_output's voices), or the voice mod
   return h(R().Fragment, null,
-    on ? h('div', { role: 'status', style: { position: 'absolute', left: 0, right: 0, bottom: 'calc(100% + 6px)', zIndex: 25, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-      background: T.card, border: '1px solid ' + T.bds, borderRadius: 9, boxShadow: '0 12px 30px rgba(0,0,0,.3)', fontSize: 12.5 } },
-      h('span', { 'aria-hidden': 'true', style: { width: 8, height: 8, borderRadius: '50%', flex: 'none', background: s.mode === 'paused' ? T.pu : s.mode === 'listening' ? T.gr : T.acc } }),
-      h('span', { style: { fontWeight: 600 } }, 'Voice mode'),
-      h('span', { style: { color: T.mut } }, WORDS[s.mode] || ''),
-      s.text ? h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: T.tx } }, '“' + s.text + '”') : h('span', { style: { flex: 1 } }),
-      h('span', { style: { color: T.dim, fontSize: 11.5 } }, 'Esc ends')) : null,
+    on ? bar(s.mode === 'paused' ? T.pu : s.mode === 'listening' ? T.gr : T.acc, WORDS[s.mode] || '', s.text ? '“' + s.text + '”' : note || '') : null,
     s.error && !on ? h('span', { role: 'alert', style: { fontSize: 11.5, color: T.rd } }, s.error) : null,
-    h('button', { type: 'button', disabled, onClick: () => go({ type: on ? 'stop' : 'start' }), title: on ? 'End voice mode' : 'Voice mode: talk, and hear the replies',
-      'aria-label': on ? 'End voice mode' : 'Voice mode', 'aria-pressed': on ? 'true' : 'false',
-      style: { ...boxBtn(on), cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1 } },
-      h(Icon, { d: 'speaker', size: 14 })));
+    voiceBtn(on, disabled, () => (on ? go({ type: 'stop' }) : begin())));
 }

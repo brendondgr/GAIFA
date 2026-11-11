@@ -339,7 +339,7 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
   const compacts = events.filter(e => e.type === 'compact').length;
   const composer = h(Composer, { draft, setDraft, attachments, setAttachments, onOpen: openOutput, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
       dock: [...toolForms, ...view.pending, ...requests].reverse().map(it => h(Card, { key: it.key, item: it, ctx })), placeholder,
-      voice: h(VoiceButton, { api, onSend: t => send(t), running, waiting: view.pending.length > 0, answer: lastAnswer(events), speechOutput: speechOut, onMode: m => { voiceOn.current = m !== 'off'; } }),
+      voice: h(VoiceButton, { api, thread: ensureThread, onSend: t => send(t), running, waiting: view.pending.length > 0, answer: lastAnswer(events), speechOutput: speechOut, onMode: m => { voiceOn.current = m !== 'off'; } }),
       queued: qRows.length,
       queue: h(React.Fragment, null,
         tid && thread?.children ? h(AgentStrip, { w: ctx.workflow, tid, count: thread.children }) : null,   // agent-workflows 3.3

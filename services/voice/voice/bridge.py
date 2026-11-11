@@ -14,6 +14,7 @@ The page speaks a small protocol of this mod's own, so it never depends on llama
                  binary frames: the reply, PCM16 mono at sample_rate_out
                  {"type":"said", "text", "final", "audio_ms"?}     the reply's text as it comes
                  {"type":"heard", "text"}           your turn as text
+                 {"type":"tool", "name", "state", "text"?}   a tool the reply uses: running, then done | refused | failed
                  {"type":"turn", "user", "assistant", "first_audio_ms", "interrupted", "saved"}
                  {"type":"error", "code", "detail", "fix"?}
                  {"type":"done"}
@@ -39,7 +40,7 @@ import websockets
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field, ValidationError
 
-from . import config, vad
+from . import config, tools, vad
 from .engine import EngineError
 from .gpu_slot import GpuCancelled, gpu_slot
 from .hub import HubError
@@ -47,6 +48,11 @@ from .hub import HubError
 log = logging.getLogger(__name__)
 
 BASE_INSTRUCTIONS = "Respond with interleaved text and audio."
+TOOLS_INSTRUCTIONS = "Respond with function calls, and interleaved text and audio."     # the model card's, with tools
+#: With tools, the session doesn't force speech: forced, the model says "let me check" and calls nothing (measured,
+#: docs/voice-eval.md). The reply's first response may then be calls, speech, or text alone; after the calls' results
+#: (or text alone) a second response is forced to speak and may call nothing.
+SPEAK = {"output_modalities": ["text", "audio"], "tool_choice": "none"}
 SPOKEN_STYLE = ("You are talking with the user out loud. Keep answers short and natural, as in a conversation; "
                 "no lists, markdown or code.")
 RENEW_TOKENS = 24000                      # of the 32,768 context: open a fresh session with the talk as text
@@ -84,8 +90,8 @@ def transcript(turns: list[dict[str, str]], limit: int = HISTORY_CHARS) -> str:
     return "\n".join(reversed(lines))
 
 
-def instructions(context: dict[str, Any], turns: list[dict[str, str]]) -> str:
-    parts = [BASE_INSTRUCTIONS, SPOKEN_STYLE]
+def instructions(context: dict[str, Any], turns: list[dict[str, str]], with_tools: bool = False) -> str:
+    parts = [TOOLS_INSTRUCTIONS if with_tools else BASE_INSTRUCTIONS, SPOKEN_STYLE]
     if context.get("instructions"):
         parts.append(str(context["instructions"]).strip())
     talk = transcript([*(context.get("history") or []), *turns])
@@ -113,6 +119,9 @@ class Reply:
         self.done = asyncio.Event()
         self.status = ""
         self.tokens = 0
+        self.generating = False            # between response.create and its response.done
+        self.rounds = 0                    # tool rounds so far
+        self.tools: list[dict[str, Any]] = []
 
 
 class Session:
@@ -136,7 +145,10 @@ class Session:
         self.spoke_s = 0.0
         self.tokens = 0
         self.send_lock = asyncio.Lock()
+        self.toolbox: tools.ToolBox | None = None
+        self.tool_task: asyncio.Task | None = None
         self.closed = False
+        self.start_tools: dict[str, Any] | None = app.state.voice_mode      # tests: [voice_mode] without a hub
 
     # ---- to the page
 
@@ -183,9 +195,11 @@ class Session:
         out: dict[str, Any] = {"voice": s.voice}
         if s.language:
             out["language"] = s.language.split("-")[0]
-        text = instructions(self.context, self.turns)
+        defs = self.toolbox.defs if self.toolbox else []
+        text = instructions(self.context, self.turns, with_tools=bool(defs))
         self.conv, sess = await self._open(port, {
-            "type": "realtime", "instructions": text, "output_modalities": ["text", "audio"],
+            "type": "realtime", "instructions": text,
+            **({"tools": defs, "tool_choice": "auto"} if defs else {"output_modalities": ["text", "audio"]}),
             "audio": {"input": {"format": {"type": "audio/pcm", "rate": s.sample_rate}}, "output": out}})
         self.out_rate = ((sess.get("audio") or {}).get("output") or {}).get("format", {}).get("rate") or 24000
         self.tokens = len(text) // 4
@@ -236,6 +250,9 @@ class Session:
             await self.emit("heard", text=typed)
             await self.up(self.conv, {"type": "conversation.item.create", "item": {
                 "type": "message", "role": "user", "content": [{"type": "input_text", "text": typed}]}})
+        if self.toolbox:
+            self.toolbox.asked = False
+        self.reply.generating = True
         await self.up(self.conv, {"type": "response.create"})
         await self.set_mode("thinking")
 
@@ -243,7 +260,7 @@ class Session:
         reply = self.reply
         if reply is None or self.mode not in ("thinking", "speaking"):
             return
-        if not reply.done.is_set():
+        if reply.generating:
             self.skip = True
             await self.up(self.conv, {"type": "response.cancel"})
         held = b"".join(self.hold)
@@ -271,10 +288,12 @@ class Session:
         if user:
             self.turns += [{"role": "user", "text": user}, *([{"role": "assistant", "text": said}] if said else [])]
             self.stats.turn(reply.first_audio_ms)
-            if self.start.thread and self.start.save:
+            if self.toolbox and self.toolbox.asked:
+                saved = True                    # asked of the chat's model: your words and its answer are in the chat
+            elif self.start.thread and self.start.save:
                 saved = await self.hub.voice_turn(self.start.thread, {
                     "user": user, "assistant": said, "model": config.MODEL_ID, "first_audio_ms": reply.first_audio_ms,
-                    "interrupted": interrupted}) is not None
+                    "interrupted": interrupted, **({"tools": reply.tools} if reply.tools else {})}) is not None
         await self.emit("turn", user=user, assistant=said, first_audio_ms=reply.first_audio_ms, interrupted=interrupted,
                         saved=saved)
         self.detector.reset()
@@ -307,6 +326,16 @@ class Session:
                     self.skip = False
                     continue
                 if reply is not None:
+                    reply.generating = False
+                    calls = [o for o in (ev.get("response") or {}).get("output") or [] if o.get("type") == "function_call"]
+                    if calls and self.toolbox and not reply.rounds:
+                        reply.rounds = 1
+                        self.tool_task = asyncio.create_task(self.run_tools(reply, calls))
+                        continue
+                    if self.toolbox and self.toolbox.defs and not reply.rounds and not reply.audio_bytes:
+                        reply.rounds, reply.text, reply.generating = 1, "", True      # text alone: say it
+                        await self.up(self.conv, {"type": "response.create", "response": SPEAK})
+                        continue
                     reply.status = (ev.get("response") or {}).get("status") or ""
                     reply.done.set()
                     await self.emit("said", text=reply.text, final=True,
@@ -328,6 +357,31 @@ class Session:
                 log.warning("llama.cpp: %s", detail)
                 await self.emit("error", code="engine_error", detail=detail)
                 reply.done.set()
+
+    async def run_tools(self, reply: Reply, calls: list[dict[str, Any]]) -> None:
+        """The reply asked for tools: run them, give the results back, and let it go on (unless you interrupted)."""
+        heard = ""
+        if self.heard is not None:
+            with contextlib.suppress(TimeoutError, asyncio.CancelledError):
+                heard = (await asyncio.wait_for(asyncio.shield(self.heard), 5)).strip()
+        for c in calls:
+            name = str(c.get("name") or "")
+            await self.emit("tool", name=name, state="running", text=tools.words_for(name))
+            try:
+                state, output = await self.toolbox.run(name, c.get("arguments") or "{}", heard)
+            except Exception as e:  # noqa: BLE001
+                log.warning("voice tool %s failed: %r", name, e)
+                state, output = "failed", json.dumps({"error": "the tool failed"})
+            reply.tools.append({"name": name, "arguments": str(c.get("arguments") or "")[:500], "state": state})
+            await self.emit("tool", name=name, state=state)
+            with contextlib.suppress(Exception):
+                await self.up(self.conv, {"type": "conversation.item.create", "item": {
+                    "type": "function_call_output", "call_id": c.get("call_id"), "output": output}})
+        if self.reply is reply and not self.closed:
+            reply.generating = True
+            await self.up(self.conv, {"type": "response.create", "response": SPEAK})
+        else:
+            reply.done.set()
 
     async def read_asr(self) -> None:
         async for raw in self.asr:
@@ -368,7 +422,8 @@ class Session:
         while True:
             await asyncio.sleep(1)
             r = self.reply
-            if r is not None and not r.done.is_set() and time.monotonic() - self.t_end > RESPONSE_TIMEOUT_S:
+            limit = RESPONSE_TIMEOUT_S + (tools.ASK_WAIT_S if r is not None and r.rounds else 0)
+            if r is not None and not r.done.is_set() and time.monotonic() - self.t_end > limit:
                 log.warning("a reply took over %.0f s: cancelled", RESPONSE_TIMEOUT_S)
                 with contextlib.suppress(Exception):
                     await self.up(self.conv, {"type": "response.cancel"})
@@ -386,6 +441,10 @@ class Session:
                 raise ValueError("the first message must be a start with voice female or male")
         except (ValidationError, ValueError, TimeoutError, KeyError, WebSocketDisconnect) as e:
             return await self.fail(4400, "bad_start", str(e).splitlines()[0] if str(e) else "no start message")
+        for _ in range(100):                                  # the conversation before this one may still be closing
+            if not (self.engine.sessions >= 1 and self.engine.closing):
+                break
+            await asyncio.sleep(0.1)
         if self.engine.sessions >= 1:
             return await self.fail(4409, "busy", "Another voice conversation is open.")
         self.engine.sessions += 1
@@ -401,6 +460,12 @@ class Session:
                         self.context = await self.hub.voice_context(self.start.thread)
                         if not self.start.language and self.context.get("language"):
                             self.start.language = self.context["language"]
+                    if self.settings.hub_url or self.start_tools is not None:
+                        vm = self.start_tools if self.start_tools is not None else await self.hub.voice_mode()
+                        names = [n for n in vm.get("tools") or [] if isinstance(n, str)]
+                        if names or vm.get("ask_chat"):
+                            self.toolbox = tools.ToolBox(self.hub, self.start.thread, names, bool(vm.get("ask_chat")))
+                            await self.toolbox.load()
                     await self.open_conv(port)
                     await self.open_asr(port)
                 except (EngineError, HubError) as e:
@@ -419,6 +484,7 @@ class Session:
                 while True:
                     done, _ = await asyncio.wait([*tasks, self._conv_task], return_when=asyncio.FIRST_COMPLETED)
                     if page in done:
+                        self.engine.closing = True
                         with contextlib.suppress(WebSocketDisconnect, RuntimeError):
                             page.result()
                         break
@@ -428,6 +494,7 @@ class Session:
                         if not t.cancelled() and t.exception():
                             log.warning("voice session ended: %r", t.exception())
                     await self.emit("error", code="engine_failed", detail="The speech model stopped. Start voice mode again.")
+                    self.engine.closing = True
                     break
                 if self.reply is not None:                    # you left mid-reply: keep what was said
                     with contextlib.suppress(Exception):
@@ -437,8 +504,9 @@ class Session:
             await self.fail(4409, "gpu_cancelled", "The wait for the GPU was cancelled.")
         finally:
             self.engine.sessions -= 1
+            self.engine.closing = False
             self.engine.touch()
-            for t in [*tasks, getattr(self, "_conv_task", None)]:
+            for t in [*tasks, getattr(self, "_conv_task", None), self.tool_task]:
                 if t is not None:
                     t.cancel()
             for sock in (self.conv, self.asr):

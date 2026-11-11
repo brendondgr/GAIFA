@@ -74,6 +74,7 @@ def create_app(settings: Settings | None = None, hub: Hub | None = None, log_dir
                   description="A speech-to-speech model for voice mode (LFM3-Omni-2B in llama.cpp). "
                               "Conversations run on the WebSocket /v1/realtime.")
     app.state.settings, app.state.engine, app.state.hub, app.state.stats = settings, engine, hub, stats
+    app.state.voice_mode = None            # [voice_mode] is read from the hub per conversation; tests set it here
 
     @app.exception_handler(EngineError)
     async def engine_error(_: Request, e: EngineError) -> JSONResponse:

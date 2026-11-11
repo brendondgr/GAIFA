@@ -73,11 +73,22 @@ async def realtime(ws, transcription=False):
                          "output": {"format": {"type": "audio/pcm", "rate": RATE}, "voice": None, "language": None}}}
     await ws.send(json.dumps({"type": "session.created", "session": session}))
     heard = 0
+    answered = False
+    outputs = []
     cancel = asyncio.Event()
     task = None
 
     async def respond():
+        nonlocal answered
         await ws.send(json.dumps({"type": "response.created"}))
+        if session.get("tools") and not answered and MODE != "notool":       # a tool first, then the answer
+            await ws.send(json.dumps({"type": "response.output_text.delta", "delta": "Let me check. "}))
+            call = {"type": "function_call", "name": os.environ.get("FAKE_LLAMA_TOOL") or session["tools"][0]["name"],
+                    "arguments": os.environ.get("FAKE_LLAMA_ARGS", '{"day": "tomorrow"}'), "call_id": "call_1"}
+            await ws.send(json.dumps({"type": "response.done", "response": {"status": "completed", "output": [
+                {"type": "message", "content": [{"type": "output_text", "text": "Let me check. "}]}, call], "usage": {"output_tokens": 5}}}))
+            return
+        answered = False
         words = REPLY.split(" ")
         said = ""
         for i in range(CHUNKS):
@@ -128,6 +139,9 @@ async def realtime(ws, transcription=False):
             else:
                 await ws.send(json.dumps({"type": "error", "error": {"message": "no response to cancel"}}))
         elif t == "conversation.item.create":
+            if ev["item"].get("type") == "function_call_output":
+                answered = True
+                print("TOOL_OUTPUT " + ev["item"]["output"], flush=True)
             await ws.send(json.dumps({"type": "conversation.item.added"}))
         if MODE == "drop" and t == "response.create":
             await asyncio.sleep(0.05)

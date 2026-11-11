@@ -50,6 +50,7 @@ class Engine:
         self.last_used = time.time()
         self.restarts = 0
         self.sessions = 0
+        self.closing = False                      # the open conversation's page has left; it is finishing its last turn
         self.log_path = (log_dir or config.MOD_DIR / "runtime" / "logs") / "llama-server.log"
         self._lock = asyncio.Lock()
 
@@ -191,6 +192,25 @@ class Engine:
             pass
         return 0
 
+    def gpu_bytes(self) -> int:
+        """The child's GPU memory (Linux DRM fdinfo: VRAM and GTT, once per DRM client); 0 when it can't be read."""
+        if not self.alive():
+            return 0
+        clients: dict[str, int] = {}
+        try:
+            for f in Path(f"/proc/{self.proc.pid}/fdinfo").iterdir():
+                try:
+                    lines = dict(line.split(":", 1) for line in f.read_text().splitlines() if ":" in line)
+                except OSError:
+                    continue
+                cid = lines.get("drm-client-id", "").strip()
+                if cid:
+                    kib = sum(int(lines.get(k, "0").split()[0]) for k in ("drm-total-vram", "drm-total-gtt") if lines.get(k, "").split())
+                    clients[cid] = max(clients.get(cid, 0), kib * 1024)
+        except (OSError, ValueError):
+            return 0
+        return sum(clients.values())
+
     def log_tail(self, n: int = 3) -> str:
         try:
             return " | ".join(self.log_path.read_text(errors="replace").strip().splitlines()[-n:])[-600:]
@@ -202,5 +222,5 @@ class Engine:
         return {"state": self.state if ready or self.state != "ready" else "failed", "quant": self.quant,
                 "label": f"{config.MODEL} {config.QUANT_LABELS[self.quant]}", "model": config.MODEL,
                 "pid": self.proc.pid if self.alive() else None, "port": self.port if ready else None,
-                "rss_bytes": self.rss_bytes(), "loaded_at": self.loaded_at, "restarts": self.restarts,
+                "rss_bytes": self.rss_bytes(), "gpu_bytes": self.gpu_bytes(), "loaded_at": self.loaded_at, "restarts": self.restarts,
                 "error": self.error, "voices": list(config.VOICES)}

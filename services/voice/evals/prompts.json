@@ -1,0 +1,254 @@
+{
+ "note": "30 spoken prompts for the size comparison (plan voice-speech-model 4.1). kind: short, long, numbers, followup (needs the turn named by `after`, in the same conversation), language, tool (Phase 5's tools). `expect`: words the answer should hold (a|b = either).",
+ "prompts": [
+  {
+   "id": "s1",
+   "kind": "short",
+   "text": "What is the capital of France?",
+   "expect": [
+    "Paris"
+   ]
+  },
+  {
+   "id": "s2",
+   "kind": "short",
+   "text": "How many days are there in a week?",
+   "expect": [
+    "seven|7"
+   ]
+  },
+  {
+   "id": "s3",
+   "kind": "short",
+   "text": "What colour do you get when you mix blue and yellow?",
+   "expect": [
+    "green"
+   ]
+  },
+  {
+   "id": "s4",
+   "kind": "short",
+   "text": "Which planet is known as the red planet?",
+   "expect": [
+    "Mars"
+   ]
+  },
+  {
+   "id": "s5",
+   "kind": "short",
+   "text": "What is the opposite of hot?",
+   "expect": [
+    "cold"
+   ]
+  },
+  {
+   "id": "s6",
+   "kind": "short",
+   "text": "Who wrote Romeo and Juliet?",
+   "expect": [
+    "Shakespeare"
+   ]
+  },
+  {
+   "id": "s7",
+   "kind": "short",
+   "text": "What is the boiling point of water in degrees Celsius?",
+   "expect": [
+    "100|hundred"
+   ]
+  },
+  {
+   "id": "s8",
+   "kind": "short",
+   "text": "Name a fruit that is yellow.",
+   "expect": [
+    "banana|lemon|pineapple|mango"
+   ]
+  },
+  {
+   "id": "l1",
+   "kind": "long",
+   "text": "I am planning a three day trip to Lisbon in March with my sister. Can you suggest what we should see on the first day, and roughly how long each thing takes?",
+   "expect": []
+  },
+  {
+   "id": "l2",
+   "kind": "long",
+   "text": "I have chicken, rice, a tin of tomatoes and some spinach in the kitchen. What could I cook for dinner tonight, and how long would it take?",
+   "expect": []
+  },
+  {
+   "id": "l3",
+   "kind": "long",
+   "text": "My laptop has become very slow over the last month. Before I take it to a shop, what are three simple things I could check myself?",
+   "expect": []
+  },
+  {
+   "id": "l4",
+   "kind": "long",
+   "text": "Explain in two or three sentences why the sky is blue during the day but turns red at sunset.",
+   "expect": []
+  },
+  {
+   "id": "l5",
+   "kind": "long",
+   "text": "I want to start running but I get out of breath after a few minutes. How should I build up over the first four weeks?",
+   "expect": []
+  },
+  {
+   "id": "n1",
+   "kind": "numbers",
+   "text": "What is seventeen plus twenty five?",
+   "expect": [
+    "42|forty two"
+   ]
+  },
+  {
+   "id": "n2",
+   "kind": "numbers",
+   "text": "My train leaves at a quarter past eight and the journey takes ninety minutes. When do I arrive?",
+   "expect": [
+    "9:45|nine forty five|quarter to ten"
+   ]
+  },
+  {
+   "id": "n3",
+   "kind": "numbers",
+   "text": "Please repeat this phone number back to me: five five five, zero one four two.",
+   "expect": [
+    "5",
+    "0",
+    "1",
+    "4",
+    "2"
+   ]
+  },
+  {
+   "id": "n4",
+   "kind": "numbers",
+   "text": "Doctor Katarzyna Nowak and Professor Hiroshi Tanaka are visiting on Thursday. Who is visiting?",
+   "expect": [
+    "Nowak",
+    "Tanaka"
+   ]
+  },
+  {
+   "id": "n5",
+   "kind": "numbers",
+   "text": "If a shirt costs forty pounds and is reduced by twenty five percent, what does it cost now?",
+   "expect": [
+    "30|thirty"
+   ]
+  },
+  {
+   "id": "f1a",
+   "kind": "short",
+   "text": "My name is Brendon and my favourite number is forty two. Please remember that.",
+   "expect": []
+  },
+  {
+   "id": "f1b",
+   "kind": "followup",
+   "after": "f1a",
+   "text": "What is my favourite number?",
+   "expect": [
+    "42|forty two"
+   ]
+  },
+  {
+   "id": "f2a",
+   "kind": "short",
+   "text": "I am thinking of adopting a dog called Biscuit.",
+   "expect": []
+  },
+  {
+   "id": "f2b",
+   "kind": "followup",
+   "after": "f2a",
+   "text": "What was the dog's name again?",
+   "expect": [
+    "Biscuit"
+   ]
+  },
+  {
+   "id": "g1",
+   "kind": "language",
+   "language": "de",
+   "text": "Was ist die Hauptstadt von Deutschland?",
+   "expect": [
+    "Berlin"
+   ]
+  },
+  {
+   "id": "g2",
+   "kind": "language",
+   "language": "fr",
+   "text": "Quelle est la capitale de l'Italie ?",
+   "expect": [
+    "Rome"
+   ]
+  },
+  {
+   "id": "g3",
+   "kind": "language",
+   "language": "es",
+   "text": "¿Cuántos días tiene una semana?",
+   "expect": [
+    "siete|7"
+   ]
+  },
+  {
+   "id": "g4",
+   "kind": "language",
+   "language": "it",
+   "text": "Di che colore è il cielo in una giornata di sole?",
+   "expect": [
+    "blu|azzurro"
+   ]
+  },
+  {
+   "id": "g5",
+   "kind": "language",
+   "language": "pt",
+   "text": "Qual é a capital de Portugal?",
+   "expect": [
+    "Lisboa"
+   ]
+  },
+  {
+   "id": "t1",
+   "kind": "tool",
+   "text": "What is on my calendar tomorrow?",
+   "tool": "calendar_agenda",
+   "expect": []
+  },
+  {
+   "id": "t2",
+   "kind": "tool",
+   "text": "What time is it right now?",
+   "tool": "time_now",
+   "expect": []
+  },
+  {
+   "id": "t3",
+   "kind": "tool",
+   "text": "Do I have anything planned for today?",
+   "tool": "calendar_agenda",
+   "expect": []
+  },
+  {
+   "id": "t4",
+   "kind": "tool",
+   "text": "When am I free tomorrow afternoon?",
+   "tool": "calendar_free",
+   "expect": []
+  },
+  {
+   "id": "t5",
+   "kind": "tool",
+   "text": "Search the web for the weather in Tallahassee.",
+   "tool": "web_search",
+   "expect": []
+  }
+ ]
+}

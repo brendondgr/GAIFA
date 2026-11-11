@@ -156,3 +156,18 @@ def test_the_conversation_picks_the_size(client):
         ws.send_json({"type": "stop"})
         until(ws, "done")
     assert client.get("/v1/status").json()["engine"]["quant"] == "q8_0"
+
+
+def test_a_conversation_right_after_another(client):
+    """The page restarts voice mode at once (after a typed turn): the one that is closing is waited for, not 'busy'."""
+    for _ in range(4):
+        with client.websocket_connect("/v1/realtime") as ws:
+            ws.send_json(START)
+            until(ws, "listening")
+            ws.send_json({"type": "text", "text": "hello"})
+            until(ws, "speaking")
+        # left mid-reply, without stop: the next one opens while that one finishes its turn
+    with client.websocket_connect("/v1/realtime") as ws:
+        ws.send_json(START)
+        until(ws, "listening")
+        ws.send_json({"type": "stop"})

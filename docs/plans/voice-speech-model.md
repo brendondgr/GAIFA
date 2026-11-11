@@ -121,16 +121,16 @@ Nothing tracked changes except the report. Work in the scratch folder `data/stat
 
 ## Phase 4 — Q4_K_M against Q8_0 (S)
 
-- [ ] **4.1 The comparison: `services/voice/evals/compare.py`, `evals/prompts.json`.**
+- [x] **4.1 The comparison: `services/voice/evals/compare.py`, `evals/prompts.json`.**
   - 30 spoken prompts (made once with the tts mod, kept in `outputs/voice/eval/`, gitignored): short questions, long ones, numbers and names, two follow-ups that need the earlier turn, five in other languages, five that should call a tool (Phase 5's, skipped until then).
   - For each quant: first-audio ms (median, p90), real-time factor, memory, the word error rate of its transcription of you (against the prompt's text), how intelligible its own speech is (the stt mod's transcript of the reply against the reply's text), and the reply's text saved for reading. Runs one quant at a time through the mod's own routes; the GPU is used by nothing else during a run.
   - Reply WAVs saved in pairs, `outputs/voice/<date>/<n>-q4.wav` / `-q8.wav`, for listening.
-  *Done when:* `services/voice/tests/test_compare.py` (the scoring on fixtures, no model); a real run writes `docs/voice-eval.md` with the table.
-- [ ] **4.2 Pick the default.** The user listens to the pairs and reads the table; `VOICE_QUANT`'s default, `[voice_mode] quant`'s default and the setup doc's first suggestion follow their choice. The other file may be deleted from `data/models/s2s/` (the user's call).
-  *Done when:* `docs/voice-eval.md` records the choice and why.
+  *Done when:* `services/voice/tests/test_compare.py` (the scoring on fixtures, no model); a real run writes `docs/voice-eval.md` with the table. *As built:* 32 prompts (27 without the tool ones). The prompts are spoken by the model's own male voice (`POST /v1/speech`), not the tts mod (13 GB to load for this), which the report says; the replies' intelligibility comes from the installed stt mod (`save=false`). The first run found a bug: a conversation opened right after another was refused as busy while the first was still closing (5 of 54 turns); the mod now waits for a closing conversation (`Engine.closing`, `test_a_conversation_right_after_another`), and the rerun had no failed turn.
+- [x] **4.2 Pick the default.** The user listens to the pairs and reads the table; `VOICE_QUANT`'s default, `[voice_mode] quant`'s default and the setup doc's first suggestion follow their choice. The other file may be deleted from `data/models/s2s/` (the user's call).
+  *Done when:* `docs/voice-eval.md` records the choice and why. *As built (2026-11-11):* the numbers chose Q4_K_M (the same answers, 50 ms sooner, 0.8 GB less); how the two sound is still the user's to judge from the WAV pairs, and both files are kept.
 
 **Checks & deliverables — Phase 4**
-- [ ] Delivered: `services/voice/evals/`, `docs/voice-eval.md`.
+- [x] Delivered: `services/voice/evals/`, `docs/voice-eval.md`.
 
 ## Phase 5 — Tools and a hand-off (M, optional; after the gap in §2 is answered)
 

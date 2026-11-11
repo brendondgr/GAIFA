@@ -16,7 +16,78 @@ class HubError(Exception):
         self.status, self.detail, self.code, self.data = status, detail, code, data
 
 
-class Hub:
+class _More:
+    """Phase 5: the settings, tools and the chat's own model."""
+
+    async def voice_mode(self) -> dict[str, Any]:
+        """`[voice_mode]` from the hub's settings ({} when the hub doesn't answer)."""
+        if not self.url:
+            return {}
+        try:
+            async with self._client() as c:
+                r = await c.get("/api/settings")
+            return (r.json().get("voice_mode") or {}) if r.status_code == 200 else {}
+        except (httpx.HTTPError, ValueError):
+            return {}
+
+    async def tool(self, name: str) -> dict[str, Any]:
+        """One tool as a model reads it (`GET /api/tools?names=&view=model`)."""
+        try:
+            async with self._client() as c:
+                r = await c.get("/api/tools", params={"names": name, "view": "model"})
+        except httpx.HTTPError as e:
+            raise HubError(502, f"GAIFA didn't answer for the tool {name} ({e})", "hub_unreachable") from e
+        if r.status_code >= 400 or not r.json():
+            raise HubError(r.status_code, _detail(r) or f"no tool {name}", "unknown_tool")
+        return r.json()[0]
+
+    async def call_tool(self, name: str, arguments: dict[str, Any], thread: str | None, wait: float = 25) -> dict[str, Any]:
+        """Run a tool as an unattended call of this chat: what would ask is refused, never a card."""
+        origin = {"service": self.service, "unattended": True, **({"thread": thread} if thread else {})}
+        try:
+            async with self._client(read=wait + 10) as c:
+                r = await c.post(f"/api/tools/{name}/call", params={"wait": wait},
+                                 json={"arguments": arguments, "origin": origin, "mode": "manual"})
+        except httpx.HTTPError as e:
+            raise HubError(502, f"GAIFA didn't answer for {name} ({e})", "hub_unreachable") from e
+        if r.status_code >= 400:
+            raise HubError(r.status_code, _detail(r), "tool_failed")
+        return r.json()
+
+    async def voice_ask(self, thread: str, text: str) -> dict[str, Any]:
+        """Send the question to the chat as a message (the agent's /voice-ask): {seq}."""
+        try:
+            async with self._client() as c:
+                r = await c.post(f"/api/s/agent/v1/threads/{thread}/voice-ask", json={"text": text})
+        except httpx.HTTPError as e:
+            raise HubError(502, f"the chat didn't answer ({e})", "hub_unreachable") from e
+        if r.status_code >= 400:
+            raise HubError(r.status_code, _detail(r), "ask_failed")
+        return r.json()
+
+    async def voice_answer(self, thread: str, after: int, wait_s: float) -> dict[str, Any]:
+        """The chat's answer to it, waiting for the turn to end: {state: done | running | waiting, text}."""
+        import asyncio
+        import time
+
+        deadline = time.monotonic() + wait_s
+        out: dict[str, Any] = {"state": "running", "text": ""}
+        while time.monotonic() < deadline:
+            try:
+                async with self._client(read=40) as c:
+                    r = await c.get(f"/api/s/agent/v1/threads/{thread}/voice-answer", params={"after": after, "wait": 25})
+            except httpx.HTTPError as e:
+                raise HubError(502, f"the chat didn't answer ({e})", "hub_unreachable") from e
+            if r.status_code >= 400:
+                raise HubError(r.status_code, _detail(r), "ask_failed")
+            out = r.json()
+            if out.get("state") == "done":
+                return out
+            await asyncio.sleep(0.2)
+        return out
+
+
+class Hub(_More):
     def __init__(self, url: str, service: str = "voice") -> None:
         self.url, self.service = url.rstrip("/"), service
 

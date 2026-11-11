@@ -839,6 +839,16 @@ class SpeechOutputSettings(_Model):
     pause_ms: int = Field(ge=400, le=5000, description="Voice mode: the quiet that ends what you said")
 
 
+class VoiceModeSettings(_Model):
+    """Plan voice-speech-model 3.1: what answers in Chat's voice mode."""
+    engine: Literal["chat", "speech"] = Field(description="chat: the chat's model, heard by the stt mod and read by the tts mod; "
+                                              "speech: the voice mod's speech-to-speech model, by itself")
+    quant: Literal["q4_k_m", "q8_0"] = Field(description="The speech model's size")
+    voice: Literal["female", "male"] = Field(description="The speech model's voice")
+    tools: list[str] = Field(max_length=6, description="Tools the speech model may call; what would ask is refused")
+    ask_chat: bool = Field(description="The speech model may hand a hard question to the chat's own model")
+
+
 class Settings(_Model):
     hub: HubSettings
     memory: MemorySettings
@@ -847,6 +857,7 @@ class Settings(_Model):
     learning: LearningSettings
     speech_input: SpeechInputSettings
     speech_output: SpeechOutputSettings
+    voice_mode: VoiceModeSettings
     judge: JudgeSettings
     screen: ScreenSettings
     permissions: PermissionsSettings
@@ -866,6 +877,7 @@ class SettingsPatch(_Model):
     learning: dict[str, Any] | None = None
     speech_input: dict[str, Any] | None = None
     speech_output: dict[str, Any] | None = None
+    voice_mode: dict[str, Any] | None = None
     judge: dict[str, Any] | None = None
     screen: dict[str, Any] | None = None
     permissions: dict[str, Any] | None = None

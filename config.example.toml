@@ -51,6 +51,13 @@ fetch_every_h = 24          # relay, lcpp, tts and gen3d are their own repositor
 notify = "warnings"         # warnings: changed files, unpushed commits and the like as alerts; all: updates too; off
 check_on_start = true
 
+# Voice mode in Chat (plan voice-speech-model; Settings → Speech → Voice mode).
+# [voice_mode]
+# engine = "chat"           # chat: the chat's model, heard by the stt mod and read by the tts mod
+#                           # speech: the voice mod's speech-to-speech model answers by itself, on this machine
+# quant = "q4_k_m"          # the speech model's size: q4_k_m (smaller, faster) | q8_0
+# voice = "female"          # female | male
+
 [docs]
 regenerate = false          # true keeps this machine's model inventory (data/state/setup/models/, local) current as the registry changes
 

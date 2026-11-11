@@ -340,6 +340,27 @@ class SpeechOutputCfg(_Strict):
     pause_ms: int = Field(1200, ge=400, le=5000)   # voice mode: the quiet that ends what you said (plan 49.2)
 
 
+class VoiceModeCfg(_Strict):
+    """Plan voice-speech-model 3.1: what answers in Chat's voice mode. `chat`: the chat's model, heard through the stt
+    mod and read by the tts mod (plan 49.2). `speech`: the voice mod's speech-to-speech model, by itself, on this machine."""
+    engine: Literal["chat", "speech"] = "chat"
+    quant: Literal["q4_k_m", "q8_0"] = "q4_k_m"      # the speech model's size (docs/voice-eval.md)
+    voice: Literal["female", "male"] = "female"      # the speech model's voice
+    tools: list[str] = Field([], max_length=6)       # tools the speech model may call (5.1); what would ask is refused
+    ask_chat: bool = False                           # it may hand a hard question to the chat's own model (5.2)
+
+    @field_validator("tools")
+    @classmethod
+    def _tool_names(cls, v: list[str]) -> list[str]:
+        out: list[str] = []
+        for name in v:
+            if not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_]{1,63}", name):
+                raise ValueError("each tool is its name: lower-case letters, digits and _")
+            if name not in out:
+                out.append(name)
+        return out
+
+
 class OutputsCfg(_Strict):
     """Plan 30.9: hidden outputs (the web mod's saved pages) older than this go to the outputs trash; 0 keeps them."""
     hidden_keep_days: float = Field(0, ge=0)
@@ -384,6 +405,7 @@ class Config(_Strict):
     learning: LearningCfg = LearningCfg()
     speech_input: SpeechInputCfg = SpeechInputCfg()
     speech_output: SpeechOutputCfg = SpeechOutputCfg()
+    voice_mode: VoiceModeCfg = VoiceModeCfg()
     docs: DocsCfg = DocsCfg()
     outputs: OutputsCfg = OutputsCfg()
     gpu: GpuCfg = GpuCfg()

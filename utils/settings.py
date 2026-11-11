@@ -50,6 +50,7 @@ def _shape(cfg: config_mod.Config, svcs: list[Any], eff: Any) -> dict[str, Any]:
         "learning": cfg.learning.model_dump(),
         "speech_input": cfg.speech_input.model_dump(),
         "speech_output": cfg.speech_output.model_dump(),   # plan 49.1
+        "voice_mode": cfg.voice_mode.model_dump(),         # plan voice-speech-model 3.1
         "judge": cfg.agent.judge.model_dump(),      # config.toml [agent.judge] (plan 30.3)
         "screen": cfg.agent.screen.model_dump(),    # [agent.screen] (plan 30.6)
         "permissions": cfg.agent.permissions.model_dump(),   # [agent.permissions]: tool-name globs (plan 13.2)
@@ -193,6 +194,7 @@ async def _save(hub: Hub, patch: dict[str, Any], base: dict[str, Any] | None) ->
         "learning": d.learning.model_dump(),
         "speech_input": d.speech_input.model_dump(),
         "speech_output": d.speech_output.model_dump(),
+        "voice_mode": d.voice_mode.model_dump(),
         "judge": d.agent.judge.model_dump(),
         "screen": d.agent.screen.model_dump(),
         "permissions": d.agent.permissions.model_dump(),

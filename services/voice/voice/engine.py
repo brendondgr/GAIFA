@@ -88,14 +88,14 @@ class Engine:
                 "--temp", "0", "--host", "127.0.0.1", "--port", str(port), "-c", str(config.CONTEXT),
                 "-np", str(config.SLOTS), "-ngl", str(s.gpu_layers), "--no-webui"]
 
-    async def load(self, quant: str | None = None, make_room: bool = False) -> dict[str, Any]:
+    async def load(self, quant: str | None = None, make_room: bool = False, own: bool = False) -> dict[str, Any]:
         quant = (quant or self.quant).lower()
         async with self._lock:
             if self.state == "ready" and self.alive() and quant == self.quant:
                 self.last_used = time.time()
                 return self.status()
             self._check_files(quant)
-            if self.sessions and self.alive():
+            if self.sessions and self.alive() and not own:
                 raise EngineError(409, "a conversation is open: end it before changing the model", "busy")
             await self._stop()
             self.state, self.error = "loading", None
@@ -153,14 +153,15 @@ class Engine:
             self.error = None
         return self.status()
 
-    async def ensure(self) -> int:
-        """The child's port, loading the model (or starting it again after it died) when needed."""
+    async def ensure(self, quant: str | None = None) -> int:
+        """The child's port, loading the model (or starting it again after it died) when needed. `quant`: the size
+        the one conversation that is opening wants; another size loaded is replaced."""
         if self.state == "ready" and not self.alive():
             log.warning("llama-server died (exit %s); starting it again", self.proc.returncode if self.proc else "?")
             self.restarts += 1
             self.state = "unloaded"
-        if self.state != "ready":
-            await self.load()
+        if self.state != "ready" or (quant and quant != self.quant):
+            await self.load(quant, own=True)
         self.last_used = time.time()
         assert self.port
         return self.port

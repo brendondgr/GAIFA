@@ -2,7 +2,7 @@
 
 The page speaks a small protocol of this mod's own, so it never depends on llama.cpp's schema.
 
-    page → mod   {"type":"start", "thread"?, "voice"?, "language"?, "pause_ms"?, "sample_rate"?}
+    page → mod   {"type":"start", "thread"?, "voice"?, "language"?, "pause_ms"?, "sample_rate"?, "quant"?, "save"?}
                  binary frames: PCM16 mono at sample_rate (16000 unless said)
                  {"type":"text", "text"}            a typed turn (the mod's page, the eval)
                  {"type":"interrupt", "played_ms"}  you started talking over the reply
@@ -63,6 +63,7 @@ class Start(BaseModel):
     language: str | None = Field(None, pattern=r"^[a-z]{2,3}(-[A-Za-z]{2,4})?$")
     pause_ms: int = Field(1200, ge=300, le=5000)
     sample_rate: int = Field(16000, ge=8000, le=48000)
+    quant: str | None = Field(None, pattern=r"^(q4_k_m|q8_0)$")     # the size to talk to; the loaded or default one when left out
     save: bool = True                      # False: nothing is written into the chat (a test of the microphone)
 
 
@@ -395,7 +396,7 @@ class Session:
 
             async with gpu_slot("Voice conversation", est_s=120, on_wait=waiting):
                 try:
-                    port = await self.engine.ensure()
+                    port = await self.engine.ensure(self.start.quant)
                     if self.start.thread:
                         self.context = await self.hub.voice_context(self.start.thread)
                         if not self.start.language and self.context.get("language"):

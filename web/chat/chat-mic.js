@@ -188,6 +188,23 @@ export async function openMic({ media, mics = [], onSwitch = () => {} }) {
   };
 }
 
+/** The preferred microphone as 16 kHz mono frames of about 100 ms: `onFrame(Float32Array)`. Returns {stop(), mic}
+ * (plan voice-speech-model 3.3: the voice mod's live client; dictation below has its own copy of this wiring). */
+export async function micFrames({ media = globalThis.navigator?.mediaDevices, mics = [], onFrame, onMic = () => {} }) {
+  const ctx = new AudioContext();
+  const mod = URL.createObjectURL(new Blob([WORKLET], { type: 'text/javascript' }));
+  await ctx.audioWorklet.addModule(mod);
+  URL.revokeObjectURL(mod);
+  const node = new AudioWorkletNode(ctx, 'mic-16k');
+  let src = null;
+  const plug = (stream, mic) => { src?.disconnect(); src = ctx.createMediaStreamSource(stream); src.connect(node); onMic(mic.label); };
+  let input;
+  try { input = await openMic({ media, mics, onSwitch: plug }); } catch (e) { ctx.close().catch(() => {}); throw e; }
+  plug(input.stream, input.mic);
+  node.port.onmessage = e => onFrame(e.data);
+  return { get mic() { return input.mic; }, stop() { node.port.onmessage = null; src?.disconnect(); node.disconnect(); input.stop(); ctx.close().catch(() => {}); } };
+}
+
 /** Starts dictating; returns { stop() } (stop flushes and resolves with the final state). The state also
  * carries `mic` (the label in use) and `level` (0–1, about ten times a second). */
 export async function dictate({ onState, url = streamUrl(), media = globalThis.navigator?.mediaDevices, preset, language, mics = [] }) {

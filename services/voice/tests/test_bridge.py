@@ -145,3 +145,14 @@ def test_instructions_carry_the_chat():
     assert text.endswith("User: My dog is Biscuit.\nAssistant: Nice name.\nUser: And my cat is Pepper.")
     long = [{"role": "user", "text": "x" * 300} for _ in range(200)]
     assert len(transcript(long)) <= 24000 and transcript(long).count("User:") < 200
+
+
+def test_the_conversation_picks_the_size(client):
+    assert client.post("/v1/load", json={"quant": "q4_k_m"}).json()["quant"] == "q4_k_m"
+    with client.websocket_connect("/v1/realtime") as ws:
+        ws.send_json({**START, "quant": "q8_0"})
+        assert until(ws, "ready")[0]["model"].endswith("Q8_0")
+        assert client.post("/v1/load", json={"quant": "q4_k_m"}).json()["code"] == "busy"     # not under a conversation
+        ws.send_json({"type": "stop"})
+        until(ws, "done")
+    assert client.get("/v1/status").json()["engine"]["quant"] == "q8_0"

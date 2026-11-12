@@ -107,6 +107,7 @@ class Hub:
     allowed_hosts: frozenset[str] = LOOPBACK_HOSTS  # Host header names the hub answers (utils/origin.py)
     lan: Any = None  # utils.lan.Lan: other devices on the network (plan lan-access)
     exit_code: int = 0  # 75 after POST /api/system/restart: the unit starts the hub again
+    stop_server: Any = None  # app.py's Server.stop, for that route
 
     @property
     def port(self) -> int:

@@ -114,6 +114,16 @@ class Server(uvicorn.Server):
 
     tls = None
 
+    def stop(self) -> None:
+        """Stop as on SIGTERM, but without a signal: uvicorn re-raises a caught one after shutting down, and a process
+        ended by SIGTERM is one systemd doesn't start again (POST /api/system/restart needs exit code 75)."""
+        hub = getattr(getattr(self.config.app, "state", None), "hub", None)
+        if hub is not None:
+            hub.bus.close()
+        self.should_exit = True
+        if self.tls is not None:
+            self.tls.should_exit = True
+
     def run_with(self, tls, tls_socks, sockets) -> None:
         """This server and the HTTPS one (plan lan-access 3.2) on one event loop; stopping this stops both."""
         import asyncio
@@ -180,6 +190,7 @@ def main(argv: list[str] | None = None) -> int:
             timeout_graceful_shutdown=10,
         )
     )
+    hub.stop_server = server.stop                 # POST /api/system/restart
     log.info(
         "listening on %s",
         ", ".join(

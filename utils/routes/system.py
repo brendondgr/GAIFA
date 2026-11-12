@@ -100,10 +100,7 @@ def _in_hub_unit(cgroup: str | None = None) -> bool:
 async def restart_hub(request: Request) -> dict:
     """The hub stops cleanly with exit code 75 and its unit (`Restart=on-failure`) starts it again; started by hand
     (`python app.py`) it would only stop, so that is refused."""
-    import os
-    import signal
-
-    if not _in_hub_unit():
+    if not _in_hub_unit() or getattr(request.app.state.hub, "stop_server", None) is None:
         from utils.server import HubError
 
         raise HubError(409, "not_a_service", "GAIFA isn't running as its systemd unit, so it can't start itself again: restart it where you started it.")
@@ -111,7 +108,7 @@ async def restart_hub(request: Request) -> dict:
     hub.exit_code = 75
     if hub.activity:
         await hub.activity.add("GAIFA restarting (asked from Settings)")
-    asyncio.get_running_loop().call_later(0.3, os.kill, os.getpid(), signal.SIGTERM)
+    asyncio.get_running_loop().call_later(0.3, hub.stop_server)       # not a signal: uvicorn would re-raise it, and systemd counts that as a stop
     return {"restarting": True}
 
 

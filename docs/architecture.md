@@ -666,6 +666,8 @@ voice = "female"         # female | male
 tools = []               # answers = "speech": tools it may call (at most 6); what would ask is refused, never a card
 ask_chat = false         # answers = "speech": it may hand a hard question to the chat's own model
 start_muted = false      # plan voice-mute 1.3: voice mode (either engine) starts muted; the bar's button and M unmute
+talk = "open"            # plan voice-mute 2.2: open (always listening) | push (heard only while push_key or the button is held)
+push_key = "Space"       # Space | Backquote | F2 | F8 | ControlRight
 [repos]                  # plan mod-repos 3.3: relay, lcpp, tts and gen3d are their own repositories (submodules)
 fetch_every_h = 24       # how often the hub asks GitHub what's new; 0 = never
 notify = "warnings"      # warnings | all (updates and unpinned commits too) | off

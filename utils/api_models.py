@@ -850,6 +850,8 @@ class VoiceModeSettings(_Model):
     tools: list[str] = Field(max_length=6, description="Tools the speech model may call; what would ask is refused")
     ask_chat: bool = Field(description="The speech model may hand a hard question to the chat's own model")
     start_muted: bool = Field(description="Voice mode starts muted (either engine); the bar's mute button and M unmute it")
+    talk: Literal["open", "push"] = Field(description="open: always listening; push: heard only while push_key or the bar's button is held")
+    push_key: Literal["Space", "Backquote", "F2", "F8", "ControlRight"] = Field(description="Push to talk's key (a KeyboardEvent.code)")
 
 
 class Settings(_Model):

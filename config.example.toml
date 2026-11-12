@@ -60,6 +60,8 @@ check_on_start = true
 # quant = "q4_k_m"          # the speech model's size: q4_k_m (smaller, faster) | q8_0
 # voice = "female"          # female | male
 # start_muted = false       # voice mode starts muted (either engine); the bar's mute button and M unmute it
+# talk = "open"             # open: always listening | push: heard only while push_key or the bar's button is held
+# push_key = "Space"        # push to talk's key: Space | Backquote | F2 | F8 | ControlRight
 
 [docs]
 regenerate = false          # true keeps this machine's model inventory (data/state/setup/models/, local) current as the registry changes

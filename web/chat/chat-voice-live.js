@@ -3,7 +3,9 @@
 // PCM16 frames; the reply comes down as PCM16 and plays as it arrives. The mod finds the end of what you said,
 // answers (itself, or by sending your words to the chat's agent and saying its answer: `answers`), and the turn is in the chat; this client plays, shows the words, and tells the mod when a
 // reply has finished playing or you talked over it (the microphone staying loud while it plays). Muted (plan
-// voice-mute 1.2), no frames go up and nothing interrupts: the mod hears nothing, and a reply goes on.
+// voice-mute 1.2), no frames go up and nothing interrupts: the mod hears nothing, and a reply goes on. With push to
+// talk (2.2) frames go up only while held (with the 400 ms before the press, so a first syllable isn't lost), a
+// press during a reply stops it, and letting go sends the turn; loudness interrupts nothing.
 // Written by us (web/PATCHES.md).
 
 import { micFrames, toInt16, levelOf } from './chat-mic.js';
@@ -16,9 +18,18 @@ export const liveUrl = (loc = globalThis.location) => `${loc.protocol === 'https
 export const LIVE_WORDS = { connecting: 'Starting…', listening: 'Listening…', hearing: 'Listening…', thinking: 'Thinking…',
   speaking: 'Speaking (talk to interrupt)', paused: 'Waiting for the chat', card: 'Waiting for you on screen', muted: 'Muted' };
 
-/** The bar's words for a mode, muted or not. */
-export const liveWords = (mode, muted) => !muted ? LIVE_WORDS[mode] || ''
-  : mode === 'speaking' ? 'Speaking (muted)' : mode === 'listening' || mode === 'hearing' ? LIVE_WORDS.muted : LIVE_WORDS[mode] || '';
+/** The bar's words for a mode, muted or not; `push`: {key, held} with push to talk. */
+export function liveWords(mode, muted, push) {
+  if (push) {
+    if (push.held && (mode === 'listening' || mode === 'hearing')) return 'Listening… (let go to send)';
+    if (mode === 'listening' || mode === 'hearing') return `Hold ${push.key} to talk`;
+    if (mode === 'speaking') return `Speaking (hold ${push.key} to interrupt)`;
+    return LIVE_WORDS[mode] || '';
+  }
+  return !muted ? LIVE_WORDS[mode] || ''
+    : mode === 'speaking' ? 'Speaking (muted)' : mode === 'listening' || mode === 'hearing' ? LIVE_WORDS.muted : LIVE_WORDS[mode] || '';
+}
+export const PREROLL_SAMPLES = 6400;     // push to talk: 400 ms at 16 kHz before the press go up with it
 /** Errors that end the session before it could talk: the caller may fall back to the chat-model engine. */
 export const FATAL = new Set(['model_missing', 'engine_missing', 'engine_failed', 'engine_timeout', 'needs_room', 'busy', 'bad_start', 'not_found',
   'gpu_cancelled', 'hub_unreachable', 'context_failed', 'unreachable']);
@@ -30,7 +41,7 @@ export function liveStep(s, ev) {
     case 'start': return { mode: 'connecting', you: '', reply: '', model: s.model || '', error: null, note: null, muted: !!s.muted };
     case 'stop': case 'done': return { ...s, mode: 'off', you: '', reply: '', note: null };
     case 'waiting': return s.mode === 'off' ? s : { ...s, mode: 'connecting', note: ev.text || 'Waiting for the GPU' };
-    case 'ready': return s.mode === 'off' ? s : { ...s, model: ev.model || s.model, answers: ev.answers || 'speech', note: null, muted: ev.muted ?? !!s.muted };
+    case 'ready': return s.mode === 'off' ? s : { ...s, model: ev.model || s.model, answers: ev.answers || 'speech', note: null, muted: ev.muted ?? !!s.muted, talk: ev.talk || 'open' };
     case 'muted': return { ...s, muted: !!ev.on, ...(ev.on && s.mode === 'hearing' ? { mode: 'listening', you: '' } : {}) };
     case 'listening': return s.mode === 'off' ? s : { ...s, mode: 'listening', you: '', reply: '', note: null, asking: false };
     case 'hearing': return s.mode === 'off' ? s : { ...s, mode: 'hearing', you: '', reply: '' };
@@ -50,17 +61,26 @@ export function liveStep(s, ev) {
 let current = null;     // one conversation per page: starting another ends this one
 
 /** Start a conversation. `onEvent(ev)` gets every event of the mod, plus {type:'mic', label} and, when the socket
- * drops for good, {type:'error', code:'unreachable', fatal:true}. Returns {stop(), mute(on)}. */
-export function liveVoice({ thread, voice = 'female', language, pauseMs = 1200, quant, answers, muted: startMuted = false, save = true, mics = [], onEvent,
+ * drops for good, {type:'error', code:'unreachable', fatal:true}. Returns {stop(), mute(on), talk(on)}. `talk`: open | push. */
+export function liveVoice({ thread, voice = 'female', language, pauseMs = 1200, quant, answers, muted: startMuted = false, talk: talkMode = 'open', save = true, mics = [], onEvent,
   url = liveUrl(), WebSocketImpl = globalThis.WebSocket, Player = PcmPlayer, frames = micFrames, now = () => globalThis.performance.now() }) {
   let ws = null, mic = null, player = null, stopped = false, retried = false, ready = false, rate = 24000;
-  let speaking = false, dropping = false, playedFrom = null, loud = bargeTracker(), finalSeen = false, muted = !!startMuted;
+  let speaking = false, dropping = false, playedFrom = null, loud = bargeTracker(), finalSeen = false, muted = !!startMuted, held = false;
+  const ring = [];                                     // push to talk: the frames just before a press
   const send = o => { if (ws && ws.readyState === 1) ws.send(typeof o === 'string' || o instanceof ArrayBuffer ? o : JSON.stringify(o)); };
   const endPlayer = () => { player?.stop(); player = null; speaking = false; playedFrom = null; finalSeen = false; };
   const played = () => (playedFrom == null ? 0 : Math.max(0, now() - playedFrom));
 
   const onFrame = f => {
     if (stopped || !ready || muted) return;              // muted: the mod hears nothing, and nothing interrupts
+    if (talkMode === 'push') {                           // heard only while held; the press, not loudness, interrupts
+      const b = toInt16(f).buffer;
+      if (held) { send(b); return; }
+      ring.push(b);
+      let n = ring.reduce((a, x) => a + x.byteLength / 2, 0);
+      while (ring.length > 1 && n - ring[0].byteLength / 2 >= PREROLL_SAMPLES) n -= ring.shift().byteLength / 2;
+      return;
+    }
     if (speaking && loud(levelOf(f), now())) {           // you talked over the reply: stop it where it is
       const ms = played();
       dropping = true;
@@ -86,7 +106,7 @@ export function liveVoice({ thread, voice = 'female', language, pauseMs = 1200, 
     ws = new WebSocketImpl(url);
     ws.binaryType = 'arraybuffer';
     ws.onopen = () => send({ type: 'start', voice, pause_ms: pauseMs, sample_rate: 16000, save,
-      ...(thread ? { thread } : {}), ...(language ? { language } : {}), ...(quant ? { quant } : {}), ...(answers ? { answers } : {}), ...(muted ? { muted } : {}) });
+      ...(thread ? { thread } : {}), ...(language ? { language } : {}), ...(quant ? { quant } : {}), ...(answers ? { answers } : {}), ...(muted ? { muted } : {}), ...(talkMode === 'push' ? { talk: 'push' } : {}) });
     ws.onmessage = e => {
       if (typeof e.data !== 'string') {
         if (dropping || stopped) return;
@@ -115,6 +135,15 @@ export function liveVoice({ thread, voice = 'female', language, pauseMs = 1200, 
       muted = !!on;
       if (muted) loud = bargeTracker();
       send({ type: 'mute', on: muted });
+    },
+    talk(on) {
+      if (talkMode !== 'push' || muted || !!on === held) return;
+      held = !!on;
+      if (!held) { send({ type: 'talk', on: false }); return; }
+      let ms = null;
+      if (speaking) { ms = played(); dropping = true; endPlayer(); }      // a press over the reply stops it where it is
+      send({ type: 'talk', on: true, ...(ms != null ? { played_ms: Math.round(ms) } : {}) });
+      ring.splice(0).forEach(send);
     },
     stop() {
       if (stopped) return;

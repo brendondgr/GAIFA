@@ -60,6 +60,9 @@ export const VOICE_SIZES = [{ value: 'q4_k_m', label: 'Q4_K_M (smaller, faster)'
 /** Tools the speech model may be given (plan voice-speech-model 5.1): read-only ones, plus the web search. */
 export const VOICE_TOOLS = [{ value: 'calendar_agenda', label: 'Calendar: your day' }, { value: 'calendar_search', label: 'Calendar: find' },
   { value: 'calendar_free', label: 'Calendar: free time' }, { value: 'web_search', label: 'Web search' }, { value: 'time_now', label: 'The time' }];
+/** Push to talk's keys (plan voice-mute 2.2): `KeyboardEvent.code`s that type nothing in the page's shortcuts. */
+export const PUSH_KEYS = [{ value: 'Space', label: 'Space' }, { value: 'Backquote', label: '` (backquote)' }, { value: 'F2', label: 'F2' },
+  { value: 'F8', label: 'F8' }, { value: 'ControlRight', label: 'Right Ctrl' }];
 export function voiceModeGroup(d, ctx) {
   const speech = () => d.voice_mode?.engine === 'speech', own = () => speech() && d.voice_mode?.answers === 'speech', has = c => !c.services || hasMod(c, 'voice');
   const kw = ['voice mode', 'speech to speech', 'LFM3', 'omni', 'local'];
@@ -80,7 +83,12 @@ export function voiceModeGroup(d, ctx) {
         hint: 'Off by default. A call runs only when this chat’s permissions allow it without asking; anything that would show a card is refused, and it says so. It is a small model: it won’t always call the right tool.' }),
       field('vmAskChat', 'voice_mode.ask_chat', { label: 'Let it ask the chat’s model', control: 'toggle', when: own, keywords: [...kw, 'hand off', 'ask chat'],
         hint: 'For questions it can’t answer itself (a file, a long task), it sends your words to the chat’s own model and tells you the answer. That turn runs like a typed message, with its tools and cards.' }),
-      field('vmStartMuted', 'voice_mode.start_muted', { label: 'Start muted', control: 'toggle', keywords: [...kw, 'mute', 'microphone', 'background noise'],
+      field('vmTalk', 'voice_mode.talk', { label: 'Microphone', control: 'segmented', keywords: [...kw, 'push to talk', 'hold to talk', 'walkie', 'microphone', 'background noise'],
+        hint: 'Always listening: it hears you whenever you talk and finds the end of your turn by the pause. Push to talk: it hears you only while you hold the key below or the bar’s Hold to talk button, and letting go sends what you said at once, so noise in the room can’t start a turn or stop a reply. The voice bar has the same switch.',
+        choices: [{ value: 'open', label: 'Always listening' }, { value: 'push', label: 'Push to talk' }] }),
+      field('vmPushKey', 'voice_mode.push_key', { label: 'Key', control: 'select', choices: PUSH_KEYS, when: () => d.voice_mode?.talk === 'push', keywords: [...kw, 'push to talk', 'key', 'shortcut'],
+        hint: 'Hold it to talk while voice mode is on. It does nothing while you are typing in a text field (Space types a space there).' }),
+      field('vmStartMuted', 'voice_mode.start_muted', { label: 'Start muted', control: 'toggle', when: () => d.voice_mode?.talk !== 'push', keywords: [...kw, 'mute', 'microphone', 'background noise'],
         hint: 'Voice mode starts with the microphone muted: nothing is heard until you unmute with the bar’s microphone button or M. Muted, noise in the room can’t start a turn or stop a reply.' }),
       block('vmStatus', 'VoiceModelStatus', { label: 'The speech model', when: speech, keywords: kw }),
     ] };

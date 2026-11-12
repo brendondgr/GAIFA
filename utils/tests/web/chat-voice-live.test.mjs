@@ -193,3 +193,43 @@ test('voice-mute 1.2: the state and the words, muted', () => {
   assert.deepEqual([s.muted, s.mode, s.you], [true, 'listening', '']);
   assert.equal(run([{ type: 'start' }], s).muted, true);     // a new session (after a pause) keeps it
 });
+
+test('voice-mute 2.2: push to talk sends frames only while held, with the 400 ms before the press', async () => {
+  const r = rig({ talk: 'push' });
+  await tick();
+  const ws = r.sockets[0];
+  ws.open();
+  assert.equal(ws.texts[0].talk, 'push');
+  ws.json({ type: 'ready', sample_rate_out: 24000, talk: 'push' }); ws.json({ type: 'listening' });
+  for (let i = 0; i < 10; i++) r.speak(0.9);                // a second of loud noise, not held
+  assert.equal(ws.frames.length, 0);
+  r.talk.talk(true);
+  assert.deepEqual(ws.texts.at(-1), { type: 'talk', on: true });
+  assert.equal(ws.frames.length, 4);                        // the pre-roll: 4 frames of 100 ms
+  r.speak(0.3); r.speak(0.3);
+  assert.equal(ws.frames.length, 6);
+  r.talk.talk(false);
+  assert.deepEqual(ws.texts.at(-1), { type: 'talk', on: false });
+  r.speak(0.3);
+  assert.equal(ws.frames.length, 6);
+  ws.json({ type: 'thinking' }); ws.json({ type: 'speaking' }); ws.audio();
+  r.advance(800);
+  for (let i = 0; i < 8; i++) r.speak(0.9);                 // loud while it speaks: nothing in push to talk
+  assert.equal(ws.texts.some(t => t.type === 'interrupt'), false); assert.equal(r.players[0].stopped, false);
+  r.talk.talk(true);                                         // the press stops the reply and says how much played
+  const press = ws.texts.at(-1);
+  assert.equal(press.type, 'talk'); assert.ok(press.played_ms >= 700, String(press.played_ms));
+  assert.ok(r.players[0].stopped);
+  r.talk.talk(false);
+  const words = run([{ type: 'start' }, { type: 'ready', talk: 'push' }, { type: 'listening' }]);
+  assert.equal(words.talk, 'push');
+  assert.equal(L.liveWords('listening', false, { key: 'Space', held: false }), 'Hold Space to talk');
+  assert.equal(L.liveWords('hearing', false, { key: 'Space', held: true }), 'Listening… (let go to send)');
+  assert.equal(L.liveWords('speaking', false, { key: 'F8', held: false }), 'Speaking (hold F8 to interrupt)');
+  const open = rig();                                        // always listening: talk() does nothing
+  await tick();
+  open.sockets[0].open(); open.sockets[0].json({ type: 'ready' });
+  open.talk.talk(true);
+  assert.equal(open.sockets[0].texts.some(t => t.type === 'talk'), false);
+  open.talk.stop(); r.talk.stop();
+});

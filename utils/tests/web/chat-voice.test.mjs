@@ -90,3 +90,18 @@ test('voice-mute 1.3: M toggles the mute, except while you type or with a modifi
   for (const t of [{ tagName: 'TEXTAREA' }, { tagName: 'INPUT' }, { tagName: 'SELECT' }, { tagName: 'DIV', isContentEditable: true }]) assert.equal(v.isMuteKey(key('m', { target: t })), false);
   assert.equal(v.typingIn(null), false);
 });
+
+test('voice-mute 2.2: the push-to-talk key, pressed and let go, but not while typing', () => {
+  const ev = (type, code, o = {}) => ({ type, code, repeat: false, ctrlKey: false, metaKey: false, altKey: false, target: { tagName: 'BODY' }, ...o });
+  assert.equal(v.pushKeyOf(ev('keydown', 'Space'), 'Space'), true);
+  assert.equal(v.pushKeyOf(ev('keyup', 'Space'), 'Space'), false);
+  assert.equal(v.pushKeyOf(ev('keydown', 'Space', { repeat: true }), 'Space'), null);     // held down: one press
+  assert.equal(v.pushKeyOf(ev('keydown', 'KeyM'), 'Space'), null);
+  assert.equal(v.pushKeyOf(ev('keydown', 'Space', { target: { tagName: 'TEXTAREA' } }), 'Space'), null);
+  assert.equal(v.pushKeyOf(ev('keydown', 'Space', { ctrlKey: true }), 'Space'), null);
+  assert.equal(v.pushKeyOf(ev('keydown', 'ControlRight', { ctrlKey: true }), 'ControlRight'), true);
+  assert.equal(v.chatPushWords('listening', false, 'Space'), 'Hold Space to talk');
+  assert.equal(v.chatPushWords('listening', true, 'Space'), 'Listening… (let go to send)');
+  assert.equal(v.chatPushWords('speaking', false, 'F8'), 'Speaking (hold F8 to interrupt)');
+  assert.equal(v.KEY_NAMES.ControlRight, 'Right Ctrl');
+});

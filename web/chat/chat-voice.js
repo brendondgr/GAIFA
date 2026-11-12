@@ -13,6 +13,8 @@
 //
 // Both bars have a mute button (plan voice-mute 1.3; M toggles it when no text field has the focus): muted, nothing
 // the microphone picks up starts a turn or stops a reply, which goes on. `[voice_mode] start_muted` starts muted.
+// Push to talk (2.2, `[voice_mode] talk = "push"`; the bar's switch): heard only while `push_key` (Space by default)
+// or the bar's Hold to talk button is held; letting go sends the turn, and a press during a reply stops it.
 
 import { h, T, Icon, boxBtn } from './chat-ui.js';
 import { dictate, dictated, levelOf, speechSettings, useSttUp } from './chat-mic.js';
@@ -62,6 +64,9 @@ export const lastAnswer = events => {
 export const turnEnded = (running, answer, sentSeq) => !running && answer.seq > sentSeq;
 
 const MUTED_WORDS = { listening: 'Muted', speaking: 'Speaking (muted)' };
+/** The chat-model loop's words with push to talk. */
+export const chatPushWords = (mode, held, key) => mode === 'listening' ? (held ? 'Listening… (let go to send)' : `Hold ${key} to talk`)
+  : mode === 'speaking' ? `Speaking (hold ${key} to interrupt)` : WORDS[mode] || '';
 const WORDS = { listening: 'Listening…', sending: 'Sending…', thinking: 'Thinking…', speaking: 'Speaking (talk to interrupt)', paused: 'Waiting for you on screen' };
 
 /** Which engine a start uses: {engine: 'speech' | 'chat', note?}. `vm`: settings.voice_mode; `voiceUp`: the voice
@@ -80,6 +85,40 @@ export function pickEngine(vm, voiceUp, chatOk) {
 export const typingIn = el => !!el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
 /** M (no modifier keys, not while typing) toggles the mute. */
 export const isMuteKey = e => (e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat && !typingIn(e.target);
+
+/** Push to talk's key names, for the bar's words. */
+export const KEY_NAMES = { Space: 'Space', Backquote: '`', F2: 'F2', F8: 'F8', ControlRight: 'Right Ctrl' };
+/** The push-to-talk key, pressed or let go: true, false, or null for any other key (or while typing). */
+export const pushKeyOf = (e, code) => (e.code !== code || typingIn(e.target) || e.ctrlKey && code !== 'ControlRight' || e.metaKey || e.altKey) ? null
+  : e.type === 'keydown' ? (e.repeat ? null : true) : e.type === 'keyup' ? false : null;
+/** Holds the push-to-talk key and button for a bar: `press(on)` is called when either is pressed or let go. */
+function usePushKey(on, code, press) {
+  const React = R(), cur = React.useRef({ code, press });
+  cur.current = { code, press };
+  React.useEffect(() => {
+    if (!on) return undefined;
+    const el = globalThis.document?.activeElement;
+    if (typingIn(el)) el.blur();                      // the composer has the focus: the key would type there
+    const key = e => { const p = pushKeyOf(e, cur.current.code); if (p == null) return; e.preventDefault(); cur.current.press(p); };
+    const blur = () => cur.current.press(false);
+    globalThis.addEventListener('keydown', key); globalThis.addEventListener('keyup', key); globalThis.addEventListener('blur', blur);
+    return () => { globalThis.removeEventListener('keydown', key); globalThis.removeEventListener('keyup', key); globalThis.removeEventListener('blur', blur); };
+  }, [on]);
+}
+const pill = (on, color) => ({ display: 'inline-flex', alignItems: 'center', gap: 4, border: '1px solid ' + (on ? color : T.bds), borderRadius: 6, background: 'none',
+  color: on ? color : T.tx, font: 'inherit', fontSize: 11.5, padding: '2px 7px', cursor: 'pointer', whiteSpace: 'nowrap', touchAction: 'none', userSelect: 'none' });
+const holdBtn = (held, press, key) => h('button', { type: 'button', 'aria-pressed': held ? 'true' : 'false', 'aria-label': 'Hold to talk',
+  title: `Hold this or ${key} to talk; let go to send. A press while it speaks stops the reply.`,
+  onPointerDown: e => { e.preventDefault(); e.currentTarget.setPointerCapture?.(e.pointerId); press(true); },
+  onPointerUp: () => press(false), onPointerCancel: () => press(false), onLostPointerCapture: () => press(false),
+  onKeyDown: e => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) { e.preventDefault(); e.stopPropagation(); press(true); } },
+  onKeyUp: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); press(false); } },
+  style: { ...pill(held, T.gr), background: held ? T.gr : 'none', color: held ? T.bg : T.tx } },
+  h(Icon, { d: 'mic', size: 12 }), held ? 'Talking…' : 'Hold to talk');
+const talkSwitch = (talk, onClick, disabled) => h('button', { type: 'button', onClick, disabled,
+  'aria-label': 'Microphone: ' + (talk === 'push' ? 'push to talk' : 'always listening') + '. Switch',
+  title: talk === 'push' ? 'Push to talk: heard only while held. Click to have it always listen.' : 'Always listening. Click for push to talk: heard only while you hold a key or the button.',
+  style: { ...pill(false), cursor: disabled ? 'default' : 'pointer' } }, talk === 'push' ? 'Push to talk' : 'Always listening');
 
 const muteBtn = (muted, onClick) => h('button', { type: 'button', onClick, 'aria-pressed': muted ? 'true' : 'false',
   'aria-label': muted ? 'Unmute the microphone' : 'Mute the microphone',
@@ -125,7 +164,14 @@ export function LiveVoice({ cfg, thread, running, waiting, disabled, onOff, onMo
   const talk = React.useRef(null), ended = React.useRef(false), asking = React.useRef(false), agent = React.useRef(false);
   const [answers, setAnswers] = React.useState(cfg.answers === 'speech' ? 'speech' : 'agent');
   const [muted, setMuted] = React.useState(!!cfg.startMuted), mutedRef = React.useRef(!!cfg.startMuted);
-  const toggleMute = () => { const n = !mutedRef.current; mutedRef.current = n; setMuted(n); talk.current?.mute(n); };
+  const toggleMute = () => { if (talkMode === 'push') return; const n = !mutedRef.current; mutedRef.current = n; setMuted(n); talk.current?.mute(n); };
+  const [talkMode, setTalkMode] = React.useState(cfg.talk === 'push' ? 'push' : 'open'), pushKey = cfg.pushKey || 'Space';
+  const [held, setHeld] = React.useState(false), heldRef = React.useRef(false);
+  const press = on => { if (heldRef.current === on) return; heldRef.current = on; setHeld(on); talk.current?.talk(on); };
+  usePushKey(talkMode === 'push', pushKey, press);
+  const talkRef = React.useRef(talkMode);
+  talkRef.current = talkMode;
+  const flipTalk = () => { const n = talkMode === 'push' ? 'open' : 'push'; press(false); setTalkMode(n); cfg.onTalk?.(n); };
   const hold = (running || waiting) && !asking.current && !s.asking;     // not during the chat's turn this conversation started itself
   const end = fb => { if (ended.current) return; ended.current = true; talk.current?.stop(); talk.current = null; onOff(fb); };
   React.useEffect(() => { onMode?.('listening'); return () => { talk.current?.stop(); talk.current = null; onMode?.('off'); }; }, []);
@@ -135,7 +181,8 @@ export function LiveVoice({ cfg, thread, running, waiting, disabled, onOff, onMo
     setS(p => liveStep(p, { type: 'start' }));
     Promise.resolve().then(thread).then(tid => {
       if (!live || ended.current) return;
-      talk.current = start({ thread: tid, answers, muted: mutedRef.current, voice: cfg.voice, quant: cfg.quant, pauseMs: cfg.pauseMs, language: cfg.language, mics: cfg.mics, onEvent: ev => {
+      heldRef.current = false; setHeld(false);
+      talk.current = start({ thread: tid, answers, talk: talkMode, muted: talkMode === 'push' ? false : mutedRef.current, voice: cfg.voice, quant: cfg.quant, pauseMs: cfg.pauseMs, language: cfg.language, mics: cfg.mics, onEvent: ev => {
         if (!live) return;
         if (ev.type === 'done') { if (!ended.current && talk.current) end(); return; }
         if (ev.type === 'ready') agent.current = ev.answers === 'agent';
@@ -146,23 +193,24 @@ export function LiveVoice({ cfg, thread, running, waiting, disabled, onOff, onMo
       } });
     }, e => end({ note: e?.detail || e?.message || 'The chat could not be started' }));
     return () => { live = false; talk.current?.stop(); talk.current = null; };
-  }, [hold, answers]);
+  }, [hold, answers, talkMode]);
   React.useEffect(() => {
-    const keys = e => { if (e.key === 'Escape') end(); else if (isMuteKey(e)) { e.preventDefault(); toggleMute(); } };
+    const keys = e => { if (e.key === 'Escape') end(); else if (isMuteKey(e) && talkRef.current !== 'push') { e.preventDefault(); toggleMute(); } };
     globalThis.addEventListener('keydown', keys);
     return () => globalThis.removeEventListener('keydown', keys);
   }, []);
-  const mode = hold ? 'paused' : waiting && s.asking ? 'card' : s.mode, words = (mode !== 'card' && s.note) || liveWords(mode, muted);
+  const push = talkMode === 'push' ? { key: KEY_NAMES[pushKey] || pushKey, held } : null, shownMuted = !push && muted;
+  const mode = hold ? 'paused' : waiting && s.asking ? 'card' : s.mode, words = (mode !== 'card' && s.note) || liveWords(mode, shownMuted, push);
   const flip = () => { const n = answers === 'agent' ? 'speech' : 'agent'; asking.current = false; setAnswers(n); cfg.onAnswers?.(n); };
   const sw = h('button', { type: 'button', onClick: flip, disabled: hold, 'aria-label': 'Who answers: ' + (answers === 'agent' ? 'the chat’s agent' : 'the speech model itself') + '. Switch',
     title: answers === 'agent' ? 'The chat’s agent answers, with its tools and apps. Click to talk to the speech model itself.' : 'The speech model answers by itself. Click to have the chat’s agent answer, with its tools and apps.',
     style: { border: '1px solid ' + T.bds, borderRadius: 6, background: 'none', color: T.tx, font: 'inherit', fontSize: 11.5, padding: '2px 7px', cursor: hold ? 'default' : 'pointer', whiteSpace: 'nowrap' } },
     answers === 'agent' ? 'Agent answers' : 'Speech model answers');
-  const quietDot = muted && (mode === 'listening' || mode === 'hearing');
+  const quietDot = (shownMuted || (push && !held)) && (mode === 'listening' || mode === 'hearing');
   const text = mode === 'speaking' || (mode === 'thinking' && s.reply) ? s.reply : s.you ? '“' + s.you + '”' : cfg.note || '';
   return h(R().Fragment, null,
     bar(mode === 'paused' || mode === 'card' ? T.pu : quietDot ? T.dim : mode === 'listening' || mode === 'hearing' ? T.gr : T.acc, words, text,
-      s.model ? '· ' + s.model.replace(/ Q\d.*$/, '') : '· speech model', h(R().Fragment, null, muteBtn(muted, toggleMute), sw)),
+      s.model ? '· ' + s.model.replace(/ Q\d.*$/, '') : '· speech model', h(R().Fragment, null, push ? holdBtn(held, press, push.key) : muteBtn(muted, toggleMute), talkSwitch(talkMode, flipTalk, hold), sw)),
     voiceBtn(true, disabled, () => end()));
 }
 
@@ -174,33 +222,54 @@ export function VoiceButton(props) {
     const st = await api?.getSettings?.().catch(() => null);
     const pick = pickEngine(st?.voice_mode, voiceUp, chatOk);
     if (pick.engine === 'speech') {
-      setLive({ answers: st?.voice_mode?.answers || 'agent', startMuted: !!st?.voice_mode?.start_muted, onAnswers: n => api?.saveSettings?.({ voice_mode: { answers: n } }).catch(() => {}),
+      setLive({ answers: st?.voice_mode?.answers || 'agent', startMuted: !!st?.voice_mode?.start_muted,
+        talk: st?.voice_mode?.talk || 'open', pushKey: st?.voice_mode?.push_key || 'Space', onTalk: n => api?.saveSettings?.({ voice_mode: { talk: n } }).catch(() => {}), onAnswers: n => api?.saveSettings?.({ voice_mode: { answers: n } }).catch(() => {}),
         voice: st?.voice_mode?.voice || 'female', quant: st?.voice_mode?.quant || 'q4_k_m', pauseMs: st?.speech_output?.pause_ms || 1200,
         language: st?.speech_input?.language || undefined, mics: st?.speech_input?.mics || [], note: pick.note });
       return { taken: true };
     }
-    return { taken: false, note: pick.note, error: pick.error, startMuted: !!st?.voice_mode?.start_muted };
+    return { taken: false, note: pick.note, error: pick.error, startMuted: !!st?.voice_mode?.start_muted, talk: st?.voice_mode?.talk || 'open',
+      pushKey: st?.voice_mode?.push_key || 'Space' };
   };
   if (live) return h(LiveVoice, { cfg: live, thread: thread || (() => null), running, waiting, disabled, onMode,
     onOff: fallback => { setLive(null); if (fallback) setFb(f => ({ n: f.n + 1, note: `The speech model isn’t available (${fallback.note}): using the chat’s model`, error: fallback.fix ? `${fallback.note} Fix: ${fallback.fix}` : fallback.note })); } });
-  return h(ChatVoiceButton, { ...props, intercept, show: voiceUp, autoStart: fb });
+  return h(ChatVoiceButton, { ...props, intercept, show: voiceUp, autoStart: fb, onTalk: n => api?.saveSettings?.({ voice_mode: { talk: n } }).catch(() => {}) });
 }
 
-export function ChatVoiceButton({ api, onSend, running, waiting, answer = { seq: 0, text: '' }, speechOutput, disabled, onMode, intercept, show, autoStart }) {
+export function ChatVoiceButton({ api, onSend, running, waiting, answer = { seq: 0, text: '' }, speechOutput, disabled, onMode, intercept, show, autoStart, onTalk }) {
   const React = R(), up = useSttUp(api), [s, setS] = React.useState({ mode: 'off', text: '', error: null });
   const st = React.useRef(s), sentSeq = React.useRef(0), dict = React.useRef(null), reading = React.useRef(null), timers = React.useRef({});
   const go = ev => setS(prev => { const n = voiceStep(prev, ev); st.current = n; return n; });
   const pause = speechOutput?.pause_ms || 1200, [note, setNote] = React.useState(null), chatOk = !!(up && speechOutput);
   const [muted, setMuted] = React.useState(false), mutedRef = React.useRef(false);
+  const [talkMode, setTalkMode] = React.useState('open'), talkRef = React.useRef('open'), [pushKey, setPushKey] = React.useState('Space');
+  const [held, setHeld] = React.useState(false), heldRef = React.useRef(false);
+  const press = on => {              // push to talk: dictate while held; letting go sends what was heard
+    if (talkRef.current !== 'push' || heldRef.current === on) return;
+    heldRef.current = on; setHeld(on);
+    const m = st.current.mode;
+    if (on) {
+      if (m === 'speaking') { stopReading(); go({ type: 'barge' }); } else if (m !== 'listening') return;
+      if (!dict.current) listen();
+      return;
+    }
+    if (!dict.current) return;
+    stopListening().then(() => setTimeout(() => go({ type: 'quiet', ms: Infinity, pause }), 300));    // the last words come in, then send
+  };
+  usePushKey(talkMode === 'push' && s.mode !== 'off', pushKey, press);
+  const flipTalk = () => { const n = talkRef.current === 'push' ? 'open' : 'push'; heldRef.current = false; setHeld(false); talkRef.current = n; setTalkMode(n);
+    onTalk?.(n); if (n === 'push') { stopListening(); go({ type: 'heard', text: '' }); } else if (st.current.mode === 'listening' && !dict.current) listen(); };
   const begin = async () => {        // the button: which engine? (the speech engine takes it over in VoiceButton)
     const r = intercept ? await intercept(chatOk) : { taken: false };
     if (r.taken) return;
     if (!chatOk) { setS(p => ({ ...p, error: r.error || 'Voice mode needs the Speech to Text and Speech mods' })); return; }
     setNote(r.note || null);
-    mutedRef.current = !!r.startMuted; setMuted(!!r.startMuted);
+    mutedRef.current = !!r.startMuted && r.talk !== 'push'; setMuted(mutedRef.current);
+    talkRef.current = r.talk === 'push' ? 'push' : 'open'; setTalkMode(talkRef.current); setPushKey(r.pushKey || 'Space'); heldRef.current = false; setHeld(false);
     go({ type: 'start' });
   };
   const toggleMute = () => {         // muted: dictation stops (what it had is dropped) and nothing stops the reading
+    if (talkRef.current === 'push') return;
     const n = !mutedRef.current;
     mutedRef.current = n; setMuted(n);
     if (n) { stopListening(); go({ type: 'heard', text: '' }); } else if (st.current.mode === 'listening' && !dict.current) listen();
@@ -222,16 +291,16 @@ export function ChatVoiceButton({ api, onSend, running, waiting, answer = { seq:
         if (text !== last || (d.level || 0) > 0.2) heardAt = Date.now();
         if (text !== last) { last = text; go({ type: 'heard', text }); }
         if (d.error) go({ type: 'error', error: d.error });
-        else if (d.done && dict.current && st.current.mode === 'listening') { clearInterval(timers.current.quiet); dict.current = null; setTimeout(() => { if (st.current.mode === 'listening' && !dict.current) listen(); }, 300); }   // the stream ended: listen again
+        else if (d.done && dict.current && st.current.mode === 'listening' && (talkRef.current !== 'push' || heldRef.current)) { clearInterval(timers.current.quiet); dict.current = null; setTimeout(() => { if (st.current.mode === 'listening' && !dict.current) listen(); }, 300); }   // the stream ended: listen again
       } });
-      timers.current.quiet = setInterval(() => go({ type: 'quiet', ms: Date.now() - heardAt, pause }), 200);
+      if (talkRef.current !== 'push') timers.current.quiet = setInterval(() => go({ type: 'quiet', ms: Date.now() - heardAt, pause }), 200);
     } catch (e) { go({ type: 'error', error: e?.name === 'NotAllowedError' ? 'Microphone access was refused' : (e?.message || String(e)) }); }
   };
 
   React.useEffect(() => {     // each state's work
     const m = s.mode;
     onMode?.(m);
-    if (m === 'listening' && !dict.current && !mutedRef.current) listen();
+    if (m === 'listening' && !dict.current && !mutedRef.current && (talkRef.current !== 'push' || heldRef.current)) listen();
     if (m === 'sending') {
       const text = s.text.trim();
       stopListening().then(() => { sentSeq.current = answer.seq; onSend(text); go({ type: 'sent' }); });
@@ -253,7 +322,7 @@ export function ChatVoiceButton({ api, onSend, running, waiting, answer = { seq:
       const an = ctx.createAnalyser(), buf = new Float32Array(1024), loud = bargeTracker();
       ctx.createMediaStreamSource(stream).connect(an);
       timers.current.bargeMic = { stop: () => { stream.getTracks().forEach(t => t.stop()); ctx.close().catch(() => {}); } };
-      timers.current.barge = setInterval(() => { an.getFloatTimeDomainData(buf); if (!mutedRef.current && loud(levelOf(buf), Date.now())) { stopReading(); go({ type: 'barge' }); } }, 60);
+      timers.current.barge = setInterval(() => { an.getFloatTimeDomainData(buf); if (!mutedRef.current && talkRef.current !== 'push' && loud(levelOf(buf), Date.now())) { stopReading(); go({ type: 'barge' }); } }, 60);
     } catch { /* no mic for barge-in: it reads to the end */ }
   };
 
@@ -266,7 +335,7 @@ export function ChatVoiceButton({ api, onSend, running, waiting, answer = { seq:
   React.useEffect(() => { go({ type: waiting ? 'card' : 'card_done', running }); }, [waiting]);
   React.useEffect(() => {
     if (s.mode === 'off') return undefined;
-    const keys = e => { if (e.key === 'Escape') go({ type: 'stop' }); else if (isMuteKey(e)) { e.preventDefault(); toggleMute(); } };
+    const keys = e => { if (e.key === 'Escape') go({ type: 'stop' }); else if (isMuteKey(e) && talkRef.current !== 'push') { e.preventDefault(); toggleMute(); } };
     globalThis.addEventListener('keydown', keys);
     return () => globalThis.removeEventListener('keydown', keys);
   }, [s.mode === 'off']);
@@ -275,8 +344,10 @@ export function ChatVoiceButton({ api, onSend, running, waiting, answer = { seq:
   const on = s.mode !== 'off';
   if (!chatOk && !on && !show) return null;     // needs the stt mod (listening) and the tts mod (speech_output's voices), or the voice mod
   return h(R().Fragment, null,
-    on ? bar(s.mode === 'paused' ? T.pu : s.mode === 'listening' ? (muted ? T.dim : T.gr) : T.acc, muted ? MUTED_WORDS[s.mode] || WORDS[s.mode] || '' : WORDS[s.mode] || '',
-      s.text ? '“' + s.text + '”' : note || '', null, muteBtn(muted, toggleMute)) : null,
+    on ? bar(s.mode === 'paused' ? T.pu : s.mode === 'listening' ? (muted || (talkMode === 'push' && !held) ? T.dim : T.gr) : T.acc,
+      talkMode === 'push' ? chatPushWords(s.mode, held, KEY_NAMES[pushKey] || pushKey) : muted ? MUTED_WORDS[s.mode] || WORDS[s.mode] || '' : WORDS[s.mode] || '',
+      s.text ? '“' + s.text + '”' : note || '', null,
+      h(R().Fragment, null, talkMode === 'push' ? holdBtn(held, press, KEY_NAMES[pushKey] || pushKey) : muteBtn(muted, toggleMute), talkSwitch(talkMode, flipTalk))) : null,
     s.error && !on ? h('span', { role: 'alert', style: { fontSize: 11.5, color: T.rd } }, s.error) : null,
     voiceBtn(on, disabled, () => (on ? go({ type: 'stop' }) : begin())));
 }

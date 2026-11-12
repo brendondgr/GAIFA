@@ -352,6 +352,8 @@ class VoiceModeCfg(_Strict):
     tools: list[str] = Field([], max_length=6)       # tools the speech model may call (5.1); what would ask is refused
     ask_chat: bool = False                           # it may hand a hard question to the chat's own model (5.2)
     start_muted: bool = False                        # voice mode starts muted; the bar's button and M unmute (plan voice-mute 1.3)
+    talk: Literal["open", "push"] = "open"           # open: always listening | push: heard only while a key or the button is held (2.2)
+    push_key: Literal["Space", "Backquote", "F2", "F8", "ControlRight"] = "Space"   # push to talk's key (KeyboardEvent.code)
 
     @field_validator("tools")
     @classmethod

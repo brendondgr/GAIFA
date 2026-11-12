@@ -12,7 +12,7 @@ from utils.tests.settings.test_settings import _file
 
 def test_defaults():
     assert VoiceModeCfg().model_dump() == {"engine": "chat", "quant": "q4_k_m", "voice": "female", "answers": "agent", "tools": [],
-                                             "ask_chat": False, "start_muted": False}
+                                             "ask_chat": False, "start_muted": False, "talk": "open", "push_key": "Space"}
 
 
 async def test_saved_in_config_toml(rig, serve):
@@ -22,7 +22,7 @@ async def test_saved_in_config_toml(rig, serve):
         r = await c.put("/api/settings", json={"voice_mode": {"engine": "speech", "quant": "q8_0"}})
         assert r.status_code == 200, r.text
         assert r.json()["settings"]["voice_mode"] == {"engine": "speech", "quant": "q8_0", "voice": "female", "answers": "agent",
-                                                      "tools": [], "ask_chat": False, "start_muted": False}
+                                                      "tools": [], "ask_chat": False, "start_muted": False, "talk": "open", "push_key": "Space"}
         assert tomllib.loads(_file(served))["voice_mode"] == {"engine": "speech", "quant": "q8_0"}
         assert served.hub.config.voice_mode.engine == "speech"
         for bad in ({"engine": "robot"}, {"answers": "nobody"}, {"quant": "q2"}, {"voice": "alto"}, {"tools": ["Bad Name"]},
@@ -33,7 +33,7 @@ async def test_saved_in_config_toml(rig, serve):
         r = await c.put("/api/settings", json={"voice_mode": {"start_muted": True}})           # voice-mute 1.3
         assert r.json()["settings"]["voice_mode"]["start_muted"] is True and tomllib.loads(_file(served))["voice_mode"]["start_muted"] is True
         assert (await c.put("/api/settings", json={"voice_mode": {"start_muted": "loud"}})).status_code == 422
-        await c.put("/api/settings", json={"voice_mode": {"start_muted": False}})
+        await c.put("/api/settings", json={"voice_mode": {"start_muted": False, "talk": "open", "push_key": "Space"}})
         r = await c.put("/api/settings", json={"voice_mode": {"answers": "speech"}})          # 6.1: who answers
         assert r.json()["settings"]["voice_mode"]["answers"] == "speech" and tomllib.loads(_file(served))["voice_mode"]["answers"] == "speech"
         await c.put("/api/settings", json={"voice_mode": {"engine": "chat", "quant": "q4_k_m", "voice": "female", "tools": [], "answers": "agent"}})

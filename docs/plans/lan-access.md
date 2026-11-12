@@ -64,9 +64,10 @@ The three questions above were answered with the recommendations on 2026-11-11.
 
 ## Phase 2 — Turning it on, and seeing who is in (M)
 
-- [ ] **2.1 The command: `utils/cli.py` (`gaifa lan`).**
+- [x] **2.1 The command: `utils/cli.py` (`gaifa lan`).**
   - `gaifa lan status` (on or off, the URLs, devices signed in, whether the port answers from the network address), `gaifa lan on` (asks for a password when none is set, saves `enabled`, restarts the hub, prints the URL, a QR code of it as text, and the firewall command with what it does), `gaifa lan off`, `gaifa lan password`, `gaifa lan devices`, `gaifa lan signout <id> | --all`. Standard library only.
   *Done when:* `utils/tests/cli/test_lan.py` against a fake hub; `gaifa lan on` and `off` on a scratch root.
+  *As built:* no QR code in the terminal (a QR encoder isn't worth a dependency in the standard-library CLI); the address is printed. The tests are `utils/tests/lan/test_cli.py`; `status` and `devices` ran against the scratch hub, `on` and `off` (which restart the installed hub's service) only against the fake one.
 - [ ] **2.2 Settings → General → Network: `web/settings/schema.js`, `web/settings/blocks-lan.js`.**
   - Rows: Open to my network (off by default; turning it on shows what it means in two sentences and needs a password), the address to open and a QR code, the firewall command with Copy, Password (change), Devices (label, address, last used, Sign out; Sign out everyone), Also allow (CIDRs), Names. On a network device the section is read-only and says so. A banner in the header on this machine while it is on ("Open to your network"), linking here.
   - Saving `enabled` restarts only the listener (`POST /api/lan/apply`), not the hub.

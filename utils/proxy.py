@@ -54,12 +54,20 @@ def make_client() -> httpx.AsyncClient:
     )
 
 
+def _without_session(cookie: str) -> str:
+    from utils.lan.auth import COOKIE
+
+    return "; ".join(p.strip() for p in cookie.split(";") if p.strip() and p.strip().split("=", 1)[0].strip() != COOKIE)
+
+
 def _forward_headers(request: Request, prefix: str) -> list[tuple[bytes, bytes]]:
     drop = HOP_BY_HOP | {"host"}
     # Headers named in `Connection:` are hop-by-hop too.
     for token in request.headers.get("connection", "").split(","):
         drop.add(token.strip().lower())
-    out = [(k, v) for k, v in request.headers.raw if k.decode("latin-1").lower() not in drop]
+    out = [(k, v) for k, v in request.headers.raw if k.decode("latin-1").lower() not in drop | {"cookie"}]
+    if cookie := _without_session(request.headers.get("cookie", "")):     # a device's sign-in stays with the hub
+        out.append((b"cookie", cookie.encode("latin-1")))
     host = request.headers.get("host", "")
     out += [
         (b"x-forwarded-prefix", prefix.encode()),
@@ -178,6 +186,8 @@ async def proxy(request: Request, service_id: str, path: str = "") -> StreamingR
 def _own_origin(ws: WebSocket) -> bool:
     """No Origin (not a browser page), or the hub's own page (`utils/origin.py`; the middleware checks it too)."""
     hub = ws.app.state.hub
+    if (ws.scope.get("state") or {}).get("lan") is not None:
+        return True                              # a signed-in device: the network guard checked its Origin (utils/lan/guard.py)
     return origin.refusal({k.lower(): v for k, v in ws.headers.items()}, hub.allowed_hosts, hub.port) is None
 
 

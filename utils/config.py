@@ -30,10 +30,43 @@ class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class LanCfg(_Strict):
+    """Plan lan-access: other devices on this machine's own network may sign in. Off by default; with it on and a
+    password set the hub also listens on the network (bind) and `utils/lan/guard.py` lets in only devices on this
+    machine's network that signed in. Loopback (this machine, the mods) is unchanged."""
+    enabled: bool = False
+    bind: str = "all"                                 # all: every address (a new Wi-Fi address is followed) | one of this machine's
+    allow: list[str] = Field([], max_length=16)       # more networks that count as yours (a VPN: Tailscale's 100.64.0.0/10)
+    names: list[str] = Field([], max_length=16)       # more host names devices may use (this machine's name and .local always)
+    session_days: int = Field(30, ge=1, le=365)       # how long a device stays signed in without being used
+    https: Literal["off", "also", "only"] = "also"    # Phase 3: HTTPS on https_port too (the microphone needs it) | only (http redirects)
+    https_port: int = Field(7443, ge=1, le=65535)
+
+    @field_validator("allow")
+    @classmethod
+    def _allow(cls, v: list[str]) -> list[str]:
+        from utils.lan.addresses import check_cidr
+
+        return list(dict.fromkeys(check_cidr(c) for c in v))
+
+    @field_validator("bind")
+    @classmethod
+    def _bind(cls, v: str) -> str:
+        import ipaddress
+
+        if v == "all":
+            return v
+        ip = ipaddress.ip_address(v.strip("[]"))
+        if not (ip.is_private or ip.is_link_local) or ip.is_loopback:
+            raise ValueError(f"{v!r}: bind is 'all' or one of this machine's private addresses, never a public one")
+        return str(ip)
+
+
 class HubCfg(_Strict):
     host: str = "127.0.0.1"
     port: int = Field(7000, ge=1, le=65535)
     backend: Literal["auto", "systemd", "detached", "subprocess"] = "auto"   # how mods run (plan 37.1)
+    lan: LanCfg = LanCfg()                            # [hub.lan]: other devices on your network (plan lan-access)
 
     @field_validator("host")
     @classmethod

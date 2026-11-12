@@ -8,6 +8,15 @@ host = "127.0.0.1"          # loopback only; anything else is refused at startup
 port = 7000
 backend = "auto"            # how mods run: auto (systemd units where there's a user manager, else detached processes), systemd, detached, subprocess
 
+# [hub.lan]                 # plan lan-access: other devices on your own network sign in (Settings → General → Network; gaifa lan)
+# enabled = false           # needs a password (gaifa lan password) and a restart; this machine (127.0.0.1) never signs in
+# bind = "all"              # all: every address, so a new Wi-Fi address is followed | one of this machine's private addresses
+# allow = []                # more networks that count as yours, such as Tailscale's "100.64.0.0/10"; never the internet
+# names = []                # more host names devices may use (this machine's name and <name>.local always work)
+# session_days = 30         # a device stays signed in this long without being used
+# https = "also"            # off | also (HTTPS on https_port as well: the microphone needs it) | only (http redirects there)
+# https_port = 7443
+
 [paths]                     # relative to this file; must stay inside the project
 models = "data/models"
 databases = "data/databases"

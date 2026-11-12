@@ -15,6 +15,11 @@ server-sent events and WebSockets pass through untouched) refuses both:
   (curl, the mods' clients, MCP clients) aren't browser pages and stay allowed.
 
 `/mcp` answers its own refusals as JSON-RPC errors with the same check (`utils/tools/mcp.py`).
+
+A connection from anywhere but loopback (its address, never a header) is another device on the network: with
+GAIFA opened to the network (plan lan-access) it goes through `utils/lan/guard.py` (its own Host and Origin rules,
+a signed-in device, what stays on this machine), and is refused otherwise. A connection without an address (a
+test client) counts as this machine.
 """
 
 from __future__ import annotations
@@ -89,6 +94,15 @@ class RequestGuard:
             await self.app(scope, receive, send)
             return
         headers = _headers(scope)
+        client = (scope.get("client") or ("",))[0] or ""
+        from utils.lan import addresses
+
+        ip = addresses.parse_ip(client)
+        if ip is not None and not ip.is_loopback:          # another device: the network's rules (plan lan-access)
+            from utils.lan.guard import gate
+
+            await gate(getattr(self.hub, "lan", None), scope, receive, send, headers, client, self._refuse, self.app)
+            return
         hosts, port = self.hub.allowed_hosts, self.hub.port
         if not host_ok(headers.get("host"), hosts):
             await self._refuse(scope, receive, send, 421, "bad_host",
@@ -106,7 +120,7 @@ class RequestGuard:
     async def _refuse(scope: dict[str, Any], receive: Any, send: Any, status: int, code: str, detail: str, fix: str) -> None:
         if scope["type"] == "websocket":
             await receive()                      # websocket.connect
-            await send({"type": "websocket.close", "code": 1008})     # before accept: the handshake gets HTTP 403
+            await send({"type": "websocket.close", "code": 4401 if code == "sign_in" else 1008})   # before accept: HTTP 403
             return
         body = json.dumps({"detail": detail, "code": code, "data": {"fix": fix}}).encode()
         await send({"type": "http.response.start", "status": status, "headers": [

@@ -1,6 +1,6 @@
 # Plan: GAIFA from other devices on your network
 
-**Asked for:** 2026-11-11 · **Status:** Planned
+**Asked for:** 2026-11-11 · **Status:** In progress
 
 ## 1. Introduction
 
@@ -28,29 +28,31 @@ The three questions above were answered with the recommendations on 2026-11-11.
 
 ## Phase 1 — A second way in, with a sign-in (L)
 
-- [ ] **1.1 Settings: `utils/config.py`, `config.example.toml`.**
+- [x] **1.1 Settings: `utils/config.py`, `config.example.toml`.**
   - **`[hub.lan]`** (`LanCfg`): `enabled = false`, `bind = "auto"` (the address of the default route's interface; or an address, never a public one), `port = 7000`, `allow = []` (extra CIDRs), `names = []`, `session_days = 30`. `hub.host` stays loopback and its check stays.
   - **`utils/lan/addresses.py`:** `local_addresses()` (the interfaces' addresses and subnets, standard library plus `/proc/net` or `psutil`, which the hub already has), `is_local(ip, cfg)`, `urls(cfg)` for what to show the user.
   *Done when:* `utils/tests/lan/test_addresses.py` (ranges, a public `bind` refused with a fix, `allow`), `utils/tests/settings/test_lan.py` (defaults, a save, a bad value 422).
-- [ ] **1.2 The password and sessions: `utils/lan/auth.py`.**
+- [x] **1.2 The password and sessions: `utils/lan/auth.py`.**
   - **Password:** set with `gaifa lan password` (prompted, never an argument) or in Settings on this machine; stored as scrypt (`hashlib.scrypt`, a salt per password) in `data/state/lan/auth.json` (0600; in `gaifa backup`). At least 12 characters. No password → the network listener doesn't start.
   - **Sessions:** a random token per device in an `HttpOnly`, `SameSite=Strict` cookie (`gaifa_session`; `Secure` over HTTPS), kept hashed in `data/state/lan/sessions.json` with the device's label (from its User-Agent), address, first and last use; `session_days` to expire.
   - **Attempts:** five wrong passwords from an address → 30 s, doubling to 15 min; a toast on this machine (`POST /api/notify`) for a new device and for a lockout.
   *Done when:* `utils/tests/lan/test_auth.py` (hashing, a session's life, expiry, revoke, lockout with a fake clock).
-- [ ] **1.3 The guard: `utils/origin.py`, `utils/lan/guard.py`.**
+- [x] **1.3 The guard: `utils/origin.py`, `utils/lan/guard.py`.**
   - **Who is asking:** from the connection's address, never a header (`X-Forwarded-For` is ignored). Loopback → today's rules, unchanged. Not local (`is_local` false) → 403 `not_local`, no body. Local → `Host` must be the bind address or one of `names` (421 `bad_host` otherwise, so DNS rebinding stays closed), `same_origin` accepts that origin with `http` or `https`, and everything except the sign-in routes and its page needs a valid session: 401 `sign_in` for the API, a redirect to `/signin` for a page, close code 4401 for a WebSocket.
   - **Pure ASGI**, as `RequestGuard` is, so streams, SSE and WebSockets pass through; `request.state.remote = True` for a signed-in network device (1.5 reads it).
   - **Routes** (`utils/routes/lan.py`): `GET /signin` (a small page of its own, no app code before sign-in), `POST /api/lan/signin`, `POST /api/lan/signout`, `GET /api/lan/status` (loopback: enabled, URLs, devices; a network device: its own session only), `DELETE /api/lan/sessions/{id}` and `PUT /api/lan/password` (loopback only).
   *Done when:* `utils/tests/lan/test_guard.py` over the ASGI app with fake client addresses: loopback unchanged (the existing origin tests pass untouched), a public address refused, a local one without a cookie gets only `/signin`, a foreign `Host` 421, a cross-site POST 403, SSE and a WebSocket with and without a session, `/mcp` and `/api/lan/password` refused from the network.
-- [ ] **1.4 Listening: `app.py`, and the page's addresses.**
+- [x] **1.4 Listening: `app.py`, and the page's addresses.**
   - **Sockets:** `sockets()` already returns a list; with `lan.enabled` and a password it adds the network address. A bind that fails (the address is gone, the port is taken) is a warning and an alert, not a failed start. An address that changes (DHCP, another Wi-Fi) is followed: `utils/lan/watch.py` rebinds when the interface's address changes.
   - **Mods:** untouched; `GAIFA_URL` stays `http://127.0.0.1:7000`. `gaifa doctor` gains a check that no mod listens on anything but loopback.
   - **The page:** audit `web/` for `127.0.0.1` / `localhost` (the files in §2): API and stream addresses come from `location`; links to a mod's own port go through the proxy or show "on the GAIFA machine only" when `config.js` says `remote`.
   *Done when:* `utils/tests/lan/test_listen.py` (the socket list per config; a failed bind doesn't stop the hub); a scratch hub bound to this machine's address, opened from the toolbox's or a container's address: sign in, Overview, a chat turn with its stream, a mod page through the proxy; `gaifa doctor` passes.
-- [ ] **1.5 What a network device may not do: `utils/lan/limits.py`.**
+- [x] **1.5 What a network device may not do: `utils/lan/limits.py`.**
   - A short list checked in one place (a dependency on the routes it names): `PUT /api/settings` for `[hub.lan]`, the `/api/lan` admin routes, a chat's mode set to Bypass (the agent is told through the origin: `origin.remote`), raising a workspace folder's level. Refused with 403 `this_machine_only` and a sentence saying where to do it. The page hides or disables those controls when `remote`.
   - The list follows the answer to §2's third question.
   *Done when:* `utils/tests/lan/test_limits.py` (each refused from the network, allowed from loopback); the contract test with the new error code; brief §6 and §11.7.
+
+*As built (2026-11-12):* the hub listens on every address (`bind = "all"`: 0.0.0.0 and ::) rather than one, so a new Wi-Fi address needs no rebinding (`watch.py` isn't needed: `Lan` finds the interfaces again every 30 s); `bind` can still name one address. Only real network interfaces count as local: container bridges (docker, br-, veth, podman) and VPNs (tailscale, wg) don't unless `allow` names them. The WebSocket proxy trusts the guard for a signed-in device. Checked on a scratch hub reached at this machine's Wi-Fi address (192.168.1.19:7079, so the requests came from the network, not loopback) with curl and a WebSocket client: no cookie 401 and the page redirected to `/signin`, a wrong password 401, signed in the API, the page, Overview, the event stream, the agent through the proxy and voice mode's WebSocket worked; a foreign Host 421, `/mcp` 403, Bypass 403, another site's Origin 403; this machine still needed nothing; `gaifa doctor` said it is open. The sign-in page seen at phone width. The sign-in in a browser is the user's to try (a password typed on a non-localhost address).
 
 **Wire — Phase 1:** nothing visible yet beyond the sign-in page; the switch is Phase 2.
 

@@ -160,6 +160,40 @@ async def _ports_units(hub: Any) -> list[dict[str, Any]]:
     return out
 
 
+def _listen_addrs(port: int) -> set[str]:
+    import psutil
+
+    try:
+        return {c.laddr.ip for c in psutil.net_connections(kind="inet") if c.status == psutil.CONN_LISTEN and c.laddr and c.laddr.port == port}
+    except (psutil.Error, OSError):
+        return set()
+
+
+def _network(hub: Any) -> list[dict[str, Any]]:
+    """Plan lan-access 1.4: the hub on the network only when opened to it, and mods never beyond loopback."""
+    from utils.lan.addresses import is_loopback
+
+    out = []
+    lan = getattr(hub, "lan", None)
+    if lan is not None and lan.cfg.enabled:
+        if not lan.auth.has_password():
+            out.append(check("network", "warn", "opened to the network, but no password is set", "devices can't sign in", "gaifa lan password"))
+        elif not lan.listening:
+            out.append(check("network", "warn", "opened to the network, but not listening on it yet", "", "gaifa restart"))
+        else:
+            out.append(check("network", "note", "open to your network", f"{', '.join(lan.urls()[:2])}; {len(lan.auth.devices())} device(s) signed in",
+                             "gaifa lan off"))
+    else:
+        out.append(check("network", "ok", "GAIFA answers this machine only"))
+    for s in hub.services.list() if hub.services else []:
+        if s.up and not s.external:
+            wide = sorted(ip for ip in _listen_addrs(s.port) if not is_loopback(ip))
+            if wide:
+                out.append(check("network", "warn", f"{s.id}: listens beyond this machine ({', '.join(wide)}:{s.port})",
+                                 "a mod should listen on 127.0.0.1 only; other devices reach it through the hub", f"fix {s.id}'s server to bind 127.0.0.1"))
+    return out
+
+
 def _installed(hub: Any, s: Any) -> bool:
     mgr = getattr(hub, "services", None)
     return mgr.installed(s) if mgr is not None and hasattr(mgr, "installed") else True
@@ -244,6 +278,6 @@ def _repos(hub: Any) -> list[dict[str, Any]]:
 async def run(hub: Any) -> dict[str, Any]:
     models, views = await asyncio.to_thread(_models, hub)
     checks = (models + _manifests(hub) + _paths(hub) + _stage_d(hub) + await _ports_units(hub)
-              + _disk(hub) + _judge(hub) + _offline(hub, views) + await asyncio.to_thread(_repos, hub))
+              + await asyncio.to_thread(_network, hub) + _disk(hub) + _judge(hub) + _offline(hub, views) + await asyncio.to_thread(_repos, hub))
     counts = {k: sum(c["level"] == k for c in checks) for k in ("ok", "note", "warn", "fail")}
     return {"ts": time.time(), "ok": counts["fail"] == 0, "counts": counts, "checks": checks}

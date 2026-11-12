@@ -1,4 +1,4 @@
-"""`python app.py`: start the GAIFA hub on 127.0.0.1 and [::1].
+"""`python app.py`: start the GAIFA hub on 127.0.0.1 and [::1] (and, opened to the network, on it: plan lan-access).
 
 Ctrl+C stops only the hub; mods keep running (architecture §5).
 """
@@ -47,6 +47,30 @@ def sockets(host: str, port: int) -> list[socket.socket]:
     return socks
 
 
+def lan_sockets(lan_cfg, port: int, has_password: bool) -> list[socket.socket] | None:
+    """Opened to the network (`[hub.lan] enabled` and a password): every address (`bind = "all"`: 0.0.0.0 and ::,
+    which take in loopback too) or loopback and one address. None when it isn't, or can't be bound (a warning:
+    this machine still gets GAIFA on loopback). Who gets in is the guard's business (utils/lan/guard.py)."""
+    if not lan_cfg.enabled:
+        return None
+    if not has_password:
+        log.warning("[hub.lan] is on but no password is set (gaifa lan password): GAIFA stays on this machine only")
+        return None
+    try:
+        if lan_cfg.bind == "all":
+            socks = [_listen("0.0.0.0", port, socket.AF_INET)]
+            try:
+                socks.append(_listen("::", port, socket.AF_INET6))
+            except OSError as exc:
+                log.warning("not listening on [::]:%s (%s)", port, exc)
+            return socks
+        family = socket.AF_INET6 if ":" in lan_cfg.bind else socket.AF_INET
+        return [*sockets("127.0.0.1", port), _listen(lan_cfg.bind, port, family)]
+    except OSError as exc:
+        log.warning("can't listen on the network (%s): GAIFA stays on this machine only", exc.strerror or exc)
+        return None
+
+
 class Server(uvicorn.Server):
     def handle_exit(self, sig, frame) -> None:
         # End the SSE streams first so the graceful shutdown doesn't wait on them.
@@ -79,11 +103,17 @@ def main(argv: list[str] | None = None) -> int:
     opts = Options(port=args.port, dev=args.dev, autostart=not args.no_autostart, demo_mods=args.demo_mods)
     app = create_app(paths, cfg, backend=None, options=opts)
     port = opts.port or cfg.hub.port
-    try:
-        socks = sockets(cfg.hub.host, port)
-    except OSError as e:
-        print(f"gaifa: can't listen on {cfg.hub.host}:{port}: {e.strerror}", file=sys.stderr)
-        return 1
+    hub = app.state.hub
+    socks = lan_sockets(cfg.hub.lan, port, hub.lan.auth.has_password())
+    hub.lan.listening = socks is not None
+    if socks is None:
+        try:
+            socks = sockets(cfg.hub.host, port)
+        except OSError as e:
+            print(f"gaifa: can't listen on {cfg.hub.host}:{port}: {e.strerror}", file=sys.stderr)
+            return 1
+    else:
+        log.info("open to the network: devices sign in at %s", ", ".join(hub.lan.urls()[:2]) or f"this machine's address, port {port}")
     server = Server(
         uvicorn.Config(
             app,

@@ -105,6 +105,7 @@ class Hub:
 
     listen_port: int | None = None  # fixed when the app is built: a saved hub.port applies at the next start
     allowed_hosts: frozenset[str] = LOOPBACK_HOSTS  # Host header names the hub answers (utils/origin.py)
+    lan: Any = None  # utils.lan.Lan: other devices on the network (plan lan-access)
 
     @property
     def port(self) -> int:
@@ -144,12 +145,14 @@ def default_backend(options: Options, config: Config | None = None, paths: Paths
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
-    from utils.routes import events, gpu, llm, mcp, memory, mentions, metrics, models, notify, outputs, overview, prefs, repos, services, sessions, settings, skills, system, tools, ui_store, web, webpages, widgets
+    from utils.lan import Lan
+    from utils.routes import events, gpu, lan, llm, mcp, memory, mentions, metrics, models, notify, outputs, overview, prefs, repos, services, sessions, settings, skills, system, tools, ui_store, web, webpages, widgets
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options, config, paths), options=options, version=hub_version())
     hub.listen_port = hub.port
     hub.allowed_hosts = LOOPBACK_HOSTS | {h.lower() for h in options.extra_hosts}
+    hub.lan = Lan(config.hub.lan, paths.state, hub.port)          # other devices on the network (plan lan-access)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -322,6 +325,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(llm.router)  # /api/llm (llm-servers 3.4)
     app.include_router(ui_store.router)  # /api/ui/store (settings-that-stick 4.1)
     app.include_router(notify.router)  # /api/notify (calendar 2.1)
+    app.include_router(lan.router)  # /signin, /api/lan (lan-access 1.3)
     for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets",
                  "overview", "settings", "tools", "sessions", "prefs", "webpages", "gpu", "mentions", "repos", "llm", "ui_store", "notify"):
         hub.mark_live(area)

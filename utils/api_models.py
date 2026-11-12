@@ -606,7 +606,7 @@ class Hardware(_Model):
 
 
 class DoctorCheck(_Model):
-    area: Literal["models", "manifests", "paths", "ports", "units", "disk", "offline", "repos"]
+    area: Literal["models", "manifests", "paths", "ports", "network", "units", "disk", "offline", "repos"]
     level: Literal["ok", "note", "warn", "fail"]
     title: str
     detail: str
@@ -948,3 +948,38 @@ class Grant(_Model):
     granted: bool
     freed: list[str] = Field(description="Mods unloaded to make room")
     plan: MakeRoomPlan
+
+
+# ---- plan lan-access: other devices on your network
+
+
+class LanDevice(_Model):
+    id: str
+    label: str = Field(description="Its browser and system, from its User-Agent: \"Safari on iPhone\"")
+    addr: str = Field(description="The address it last came from")
+    first: float
+    last: float
+
+
+class LanStatus(_Model):
+    """`GET /api/lan/status`: this machine's view; a device on the network gets `remote`, `me` and `on` only."""
+    remote: bool
+    on: bool = Field(description="Devices on the network can sign in now: turned on, a password set, and listening")
+    me: LanDevice | None = None
+    enabled: bool | None = None
+    listening: bool | None = None
+    has_password: bool | None = None
+    urls: list[str] | None = Field(None, description="What to open on another device, the most likely first")
+    port: int | None = None
+    https: Literal["off", "also", "only"] | None = None
+    https_port: int | None = None
+    allow: list[str] | None = None
+    names: list[str] | None = None
+    session_days: int | None = None
+    devices: list[LanDevice] | None = None
+    restart_required: bool | None = Field(None, description="After a save: turning it on or off applies once GAIFA restarts")
+
+
+class LanOk(_Model):
+    ok: bool
+    has_password: bool | None = None

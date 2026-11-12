@@ -28,7 +28,7 @@ It is built so that **anyone can add a service ("mod") by dropping a folder into
 | Location | `/home/bdgr/Agents/GAIFA`, one git repo | requested |
 | Shape | A **hub in front of mods**. Each mod is its own process. | The apps' torch/Python stacks conflict: Kokoro and Breeze need different ROCm torch builds, gen3d runs in a Python 3.13 container, and lcpp and relay use 3.14. Stopping a process is how GPU memory is freed. relay's event loop is tuned for concurrency, and lcpp's model instances must survive restarts. |
 | Hub stack | Python ≥ 3.12, FastAPI + uvicorn + httpx, SQLite, uv | same as all four apps |
-| Hub address | `127.0.0.1:7000`, no auth | only reachable from this machine |
+| Hub address | `127.0.0.1:7000`, no auth | only reachable from this machine; other devices on your own network only when you open it to them (`[hub.lan]`, plan lan-access), behind a password and their own rules, never the internet |
 | Running mods | Each mod runs as a **temporary systemd user service** (`gaifa-<id>.service`), started with `systemd-run`; where there's no systemd user manager (macOS), a **detached process** with a pidfile in `data/state/hub/pids/` that is adopted after a hub restart (`[hub] backend`, plan 37.1) | the pattern lcpp already uses for models: survives hub restarts, logs go to journald, no unit files per mod |
 | Installed services | Only `gaifa.service` (runs `app.py`) | today there are four separate ones |
 | Mod contract | `service.toml` + an HTTP server on 127.0.0.1 + a health check | any language; all four apps already fit with small changes |
@@ -391,6 +391,8 @@ gaifa-decide.service                 decide (d3-lite)         :5107  (+ its mode
 
 **Who may call the hub.** There is no login; `utils/origin.py` keeps other websites out. A request whose `Host` isn't `127.0.0.1`, `localhost` or `[::1]` (any port) gets 421 `bad_host`, which stops DNS rebinding. POST, PUT, PATCH, DELETE and WebSocket handshakes that carry an `Origin` must come from the hub's own page (`http://<loopback name>:<hub port>`), and `Sec-Fetch-Site: cross-site` is refused: 403 `cross_origin`. Requests without an `Origin` (curl, the mods, MCP clients) are allowed. Proxied mod responses get `X-Content-Type-Options: nosniff`, and documents (HTML, SVG, XML, untyped) get `Content-Security-Policy: sandbox`. (Added overnight 2026-10-21: before, a website rebinding its name to 127.0.0.1 could read chats and call tools in Bypass mode.)
 
+**Devices on your network (plan lan-access).** Off by default. With `[hub.lan] enabled`, a password (`data/state/lan/auth.json`, scrypt) and a restart, `app.py` listens on every address (`bind = "all"`) instead of loopback alone. Who a request is from is its connection's address, never a header: loopback is this machine, with the rules above and no sign-in. Anything else goes through `utils/lan/guard.py`: an address outside this machine's own network interfaces (container bridges and VPNs don't count unless `allow` names them) gets 403 `not_local`; a `Host` that isn't this machine's name, `<name>.local`, one of its network addresses or `names` gets 421; an unsafe method or WebSocket with another site's `Origin` 403 `cross_origin`; then, except for `/signin` and `POST /api/lan/signin`, a signed-in device's cookie (`gaifa_session`, HttpOnly, SameSite=Strict, a session per device in `data/state/lan/sessions.json`) or 401 `sign_in` (a page redirects to `/signin`; a WebSocket closes with 4401). What stays on this machine is refused with 403 `this_machine_only` (`utils/lan/limits.py`): `/mcp`, the `/api/lan` writes, the hub's own settings, Bypass anywhere in the agent, and a folder's level above Read or its Bypass. Mods stay on loopback (`gaifa doctor` warns otherwise) and never see the cookie (the proxy drops it). Five wrong passwords lock an address out for 30 s, doubling to 15 minutes.
+
 ## 6. Hub API
 
 The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md)**. These routes are backend-only additions:
@@ -401,6 +403,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `GET /` | `web/Hub.dc.html`, with `vendor/react*.js` and `/config.js` script tags added before `support.js` as it's served, so a fresh export works unchanged |
 | `GET /ui/services/{id}/{path}`, `GET /Mod_<id>.dc.html` | a mod's `ui/` folder (page modules), and its `Page.dc.html` under a name `dc-import` can find |
 | `GET /api/metrics`, `/api/metrics/series`, `/api/timeline`, `/api/outputs/stats`, `/api/activity/stats`, `/api/jobs/stats`, `/api/widgets`, `/api/widgets/{service}/{id}` | chart data; shapes in UI brief §11.7 |
+| `GET /signin`, `POST /api/lan/signin {password}`, `POST /api/lan/signout`, `GET /api/lan/status`, `PUT /api/lan/settings`, `PUT /api/lan/password`, `DELETE /api/lan/sessions/{id|all}` | other devices on your network (plan lan-access, `utils/routes/lan.py`): the sign-in page and its cookie (401 `wrong_password`, 429 `locked`), this machine's view (on, the addresses to open, devices) or a device's own session, and the this-machine-only writes (`restart_required` when turning it on or off) |
 | `POST /api/outputs/upload?name=` | a file sent as the body (image, video, audio, text or document, ≤ 64 MB) saved to `outputs/uploads/<date>/` and indexed; returns the `Output` (Chat's Upload, plan chat-uploads U.4) |
 | `GET /api/outputs/{id}/file` | an output's main file (supports Range, for audio/video seeking); a symlink that leads out of `outputs/` is never indexed or served, here or by `/files`, `/text`, `/preview` |
 | `GET /api/outputs/{id}/files/{path}` | a file inside a folder output |
@@ -552,6 +555,15 @@ Sizes in GB (`reserve_gb`, a manifest's `estimate_gb`, a status's `memory_estima
 host = "127.0.0.1"          # loopback only; anything else is refused at startup
 port = 7000
 backend = "auto"            # plan 37.1: auto (systemd where there's a user manager, else detached), systemd, detached, subprocess
+
+[hub.lan]                   # plan lan-access: other devices on your own network sign in; off by default
+enabled = false             # with a password set (gaifa lan password) and a restart: the hub listens on the network too
+bind = "all"                # all (0.0.0.0 and ::, so a new Wi-Fi address is followed) | one of this machine's private addresses
+allow = []                  # more networks that count as yours (a VPN: "100.64.0.0/10"); private or CGNAT only
+names = []                  # more host names devices may use (this machine's name and <name>.local always)
+session_days = 30           # a device stays signed in this long without being used
+https = "also"              # Phase 3: off | also (HTTPS on https_port: the microphone needs it) | only
+https_port = 7443
 
 [paths]                     # relative to this file; must stay inside the project
 models = "data/models"
@@ -715,6 +727,8 @@ After each save that changed something, the hub publishes `{type: "settings", ch
 **Chat, agent and save states:** §14, built last.
 
 ## 12. Risks and gotchas
+
+- **Opened to the network, the password is all that stands between the Wi-Fi and the sandbox** (plan lan-access): a signed-in device can do almost everything this machine can. Plain HTTP shows the password and the chats to anyone who can read the network's traffic; HTTPS (`[hub.lan] https`) closes that. Bypass, folder levels, the hub's settings and the network settings stay on this machine. Any device on a private network interface counts as local, so a guest Wi-Fi shared with strangers is a reason to keep it closed.
 
 1. **Python venvs aren't relocatable.** Recreate them (`uv venv` + install) instead of moving them. The speech engine venvs are rebuilt in `services/tts/runtime/` from pinned package lists (`services/tts/locks/`); CubeArt's venv is rebuilt inside the ROCm image in `services/gen3d/runtime/CubeArt/` (`services/gen3d/locks/cubeart.txt`).
 2. **`git subtree` brings tracked files only.** Each app's ignored-but-needed state has to be copied separately, and `backend-plan.md` lists it for every app.

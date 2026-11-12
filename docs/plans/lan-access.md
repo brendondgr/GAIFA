@@ -1,6 +1,6 @@
 # Plan: GAIFA from other devices on your network
 
-**Asked for:** 2026-11-11 · **Status:** In progress: checks on the installed hub
+**Asked for:** 2026-11-11 · **Status:** Done (2026-11-12); opening it on the installed hub (a password, the firewall) and the phone checks are the user's
 
 ## 1. Introduction
 
@@ -57,10 +57,10 @@ The three questions above were answered with the recommendations on 2026-11-11.
 **Wire — Phase 1:** nothing visible yet beyond the sign-in page; the switch is Phase 2.
 
 **Checks & deliverables — Phase 1**
-- [ ] The whole suite passes with `lan.enabled = false` and nothing behaves differently (the default).
+- [x] The whole suite passes with `lan.enabled = false` and nothing behaves differently (the default). *(2073 passed; the installed hub after the merge still listens on 127.0.0.1 and [::1] only, doctor: "GAIFA answers this machine only".)*
 - [ ] From a second device on the network against a scratch hub (the user's phone, with the firewall command run by the user): sign-in, a chat, a generated image opening, the stream surviving a screen lock.
-- [ ] A wrong `Host`, a cross-site form and an address outside the subnet are refused (curl with `--resolve` and a container on another bridge network).
-- [ ] Delivered: `[hub.lan]`, `utils/lan/`, the guard's network rules, `/signin` and `/api/lan/*`, the second socket.
+- [x] A wrong `Host`, a cross-site form and an address outside the subnet are refused (curl with `--resolve` and a container on another bridge network). *(A wrong Host and another site's Origin with curl from the Wi-Fi address; outside addresses and a container bridge's address in the guard tests with fake addresses, not from a real container.)*
+- [x] Delivered: `[hub.lan]`, `utils/lan/`, the guard's network rules, `/signin` and `/api/lan/*`, the second socket.
 
 ## Phase 2 — Turning it on, and seeing who is in (M)
 
@@ -84,7 +84,7 @@ The three questions above were answered with the recommendations on 2026-11-11.
 
 **Checks & deliverables — Phase 2**
 - [ ] On the installed hub: `gaifa lan on`, the user runs the firewall command, a phone signs in and chats; `gaifa lan devices` shows it; Sign out ends its stream within a few seconds; `gaifa lan off` closes the port (checked from the phone).
-- [ ] Delivered: `gaifa lan`, the Network section, the phone fixes, the docs.
+- [x] Delivered: `gaifa lan`, the Network section, the phone fixes, the docs. *(Restart GAIFA now checked on the installed hub: exit 75, systemd started it again in 4 s.)*
 
 ## Phase 3 — HTTPS, so the microphone works on other devices (M)
 
@@ -104,7 +104,7 @@ Only if §2's second question is answered yes.
 
 **Checks & deliverables — Phase 3**
 - [ ] A phone on the network: sign in over HTTPS, dictate a message, hold a voice conversation.
-- [ ] Delivered: the certificate, the HTTPS listener, the trust page.
+- [x] Delivered: the certificate, the HTTPS listener, the trust page.
 
 ## 4. Deliverables
 

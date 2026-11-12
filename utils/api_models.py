@@ -978,6 +978,8 @@ class LanStatus(_Model):
     session_days: int | None = None
     devices: list[LanDevice] | None = None
     restart_required: bool | None = Field(None, description="After a save: turning it on or off applies once GAIFA restarts")
+    https_listening: bool | None = Field(None, description="HTTPS is served on https_port (plan lan-access 3.2)")
+    ca_fingerprint: str | None = Field(None, description="GAIFA's certificate authority's SHA-256 fingerprint, to compare on a device (/lan/trust)")
 
 
 class LanOk(_Model):

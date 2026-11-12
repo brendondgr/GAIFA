@@ -92,6 +92,15 @@ async def gate(lan: Any, scope: dict[str, Any], receive: Any, send: Any, headers
     if not host_ok(headers.get("host"), hosts):
         return await refuse(scope, receive, send, 421, "bad_host", "GAIFA only answers requests addressed to this machine.",
                             f"open {lan.urls()[0] if lan.urls() else 'GAIFA by its address'}")
+    if lan.cfg.https == "only" and lan.https_listening and scope.get("scheme") == "http" and not ws:
+        from utils.origin import split_host
+
+        name = split_host(headers.get("host", ""))[0]
+        name = f"[{name}]" if ":" in name else name
+        target = f"https://{name}:{lan.https_port}{path}" + (("?" + scope["query_string"].decode("latin-1")) if scope.get("query_string") else "")
+        await send({"type": "http.response.start", "status": 308, "headers": [(b"location", target.encode()), (b"content-length", b"0")]})
+        await send({"type": "http.response.body", "body": b""})
+        return None
     origin = headers.get("origin")
     if (ws or method in limits.UNSAFE) and ((origin is not None and not origin_ok(origin, hosts, lan.ports(), lan.https_port))
                                             or headers.get("sec-fetch-site", "").strip().lower() == "cross-site"):

@@ -1,6 +1,6 @@
 # Plan: GAIFA from other devices on your network
 
-**Asked for:** 2026-11-11 · **Status:** In progress
+**Asked for:** 2026-11-11 · **Status:** In progress: checks on the installed hub
 
 ## 1. Introduction
 
@@ -90,15 +90,17 @@ The three questions above were answered with the recommendations on 2026-11-11.
 
 Only if §2's second question is answered yes.
 
-- [ ] **3.1 A certificate of its own: `utils/lan/cert.py`.**
+- [x] **3.1 A certificate of its own: `utils/lan/cert.py`.**
   - `gaifa lan cert`: a small certificate authority and a server certificate for the bind address, the hostname and `names`, made with the `openssl` command when present (else the `cryptography` package as an optional dependency), in `data/state/lan/tls/` (keys 0600, never in `gaifa backup`'s default set without a flag). Renewed when the address changes or 30 days before it expires.
   *Done when:* `utils/tests/lan/test_cert.py` (the names in the certificate, renewal on a new address), skipped where `openssl` is missing.
-- [ ] **3.2 The HTTPS listener: `app.py`.**
+- [x] **3.2 The HTTPS listener: `app.py`.**
   - A second `uvicorn.Server` on the same app (`lifespan="off"`, one event loop) with TLS on `[hub.lan] https_port = 7443`; loopback stays plain HTTP so mods and the CLI are untouched. `[hub.lan] https = "also" | "only" | "off"`: `only` turns the network's plain-HTTP port into a redirect.
   *Done when:* `utils/tests/lan/test_https.py` (both listeners serve one app, the redirect, the `Secure` cookie); voice mode from a scratch hub over HTTPS in a browser on another address, with the fake microphone.
-- [ ] **3.3 Trusting it on a device.**
+- [x] **3.3 Trusting it on a device.**
   - `GET /lan/ca.crt` (the authority's public certificate only) with a page at `/lan/trust` of steps per system (iOS, Android, Windows, macOS, Linux), linked from the sign-in page and Settings → Network. Without it the device's browser warns once and goes on.
   *Done when:* the user's phone uses voice mode over the network; the steps are in `docs/setup/README.md`.
+
+*As built (2026-11-12):* openssl only (it is on this machine; without it HTTPS is skipped with a warning and Settings says so). The certificate covers this machine's name, `<name>.local`, `names` and its own network interfaces' addresses (IPv6 included). The HTTPS server's signals are the main server's: stopping one stops both. Checked on the scratch hub from this machine's Wi-Fi address: the certificate verified against GAIFA's authority by address and by `bdgr.local`, a client that doesn't trust it is stopped (as a browser warns), sign-in over HTTPS set a Secure cookie, the API, the page and voice mode's WebSocket (`wss://`) worked signed in and the WebSocket was refused without; `only` redirected plain HTTP from the network with 308 and left this machine alone; a restart kept the certificate. The microphone in a real browser on a phone is the user's to try (signing in there means typing the password on a non-localhost address).
 
 **Checks & deliverables — Phase 3**
 - [ ] A phone on the network: sign in over HTTPS, dictate a message, hold a voice conversation.

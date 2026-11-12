@@ -71,6 +71,37 @@ def lan_sockets(lan_cfg, port: int, has_password: bool) -> list[socket.socket] |
         return None
 
 
+def https_server(app, cfg, paths, port_http: int):
+    """Plan lan-access 3.2: HTTPS on `[hub.lan] https_port` for devices on the network (the microphone needs it),
+    the same app on the same event loop, with GAIFA's own certificate (utils/lan/cert.py). None when it's off or
+    can't start (a warning: plain HTTP still works)."""
+    import contextlib
+
+    from utils.lan import addresses, cert
+
+    lan = cfg.hub.lan
+    if lan.https == "off":
+        return None
+    try:
+        ifaces = addresses.interfaces()
+        crt, key = cert.ensure(paths.state, addresses.names(lan.names), [str(i.address) for i in ifaces], socket.gethostname().split(".")[0])
+        socks = lan_sockets(lan, lan.https_port, True)
+    except (cert.CertError, OSError) as e:
+        log.warning("no HTTPS for other devices (%s): plain HTTP only", e)
+        return None
+    if not socks:
+        return None
+
+    class Tls(uvicorn.Server):
+        @contextlib.contextmanager
+        def capture_signals(self):            # the main server handles Ctrl+C and SIGTERM, and stops this one
+            yield
+
+    tls = Tls(uvicorn.Config(app, lifespan="off", log_level="info", timeout_keep_alive=75, timeout_graceful_shutdown=10,
+                             ssl_certfile=str(crt), ssl_keyfile=str(key)))
+    return tls, socks
+
+
 class Server(uvicorn.Server):
     def handle_exit(self, sig, frame) -> None:
         # End the SSE streams first so the graceful shutdown doesn't wait on them.
@@ -78,6 +109,28 @@ class Server(uvicorn.Server):
         if hub is not None:
             hub.bus.close()
         super().handle_exit(sig, frame)
+        if self.tls is not None:
+            self.tls.should_exit = True
+
+    tls = None
+
+    def run_with(self, tls, tls_socks, sockets) -> None:
+        """This server and the HTTPS one (plan lan-access 3.2) on one event loop; stopping this stops both."""
+        import asyncio
+
+        self.tls = tls
+
+        async def both() -> None:
+            t = asyncio.create_task(tls.serve(sockets=tls_socks))
+            try:
+                await self.serve(sockets=sockets)
+            finally:
+                tls.should_exit = True
+                await t
+
+        from uvicorn._compat import asyncio_run
+
+        asyncio_run(both(), loop_factory=self.config.get_loop_factory())
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -103,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
     opts = Options(port=args.port, dev=args.dev, autostart=not args.no_autostart, demo_mods=args.demo_mods)
     app = create_app(paths, cfg, backend=None, options=opts)
     port = opts.port or cfg.hub.port
-    hub = app.state.hub
+    hub, tls = app.state.hub, None
     socks = lan_sockets(cfg.hub.lan, port, hub.lan.auth.has_password())
     hub.lan.listening = socks is not None
     if socks is None:
@@ -113,6 +166,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"gaifa: can't listen on {cfg.hub.host}:{port}: {e.strerror}", file=sys.stderr)
             return 1
     else:
+        tls = https_server(app, cfg, paths, port)
+        if tls:
+            hub.lan.https_listening = True
         log.info("open to the network: devices sign in at %s", ", ".join(hub.lan.urls()[:2]) or f"this machine's address, port {port}")
     server = Server(
         uvicorn.Config(
@@ -132,7 +188,10 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     try:
-        server.run(sockets=socks)
+        if tls:
+            server.run_with(*tls, sockets=socks)
+        else:
+            server.run(sockets=socks)
     except KeyboardInterrupt:  # uvicorn re-raises Ctrl+C after its clean shutdown
         pass
     return int(getattr(hub, "exit_code", 0) or 0)   # 75: POST /api/system/restart asked systemd to start it again

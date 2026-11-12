@@ -23,7 +23,7 @@ export function lanSummary(st) {
 
 /** The command that opens the ports on Fedora's firewall (GAIFA never runs sudo; it is the user's to run). */
 export const firewallCommand = st => {
-  const ports = [st?.port || 7000, ...(st?.https && st.https !== 'off' ? [st.https_port || 7443] : [])];
+  const ports = [st?.port || 7000, ...(st?.https && st.https !== 'off' ? [st.https_port || 7443] : [])];   // HTTPS too, unless turned off
   return `sudo firewall-cmd --permanent ${ports.map(p => `--add-port=${p}/tcp`).join(' ')} && sudo firewall-cmd --reload`;
 };
 
@@ -99,6 +99,10 @@ export function NetworkCard({ ctx }) {
     st.enabled && st.listening ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
       h('div', { style: { fontSize: 12.5, fontWeight: 600 } }, 'On another device, open'),
       ...(st.urls || []).slice(0, 3).map(u => codeBox(u, copy))) : null,
+    st.enabled && st.listening ? h('div', { style: { fontSize: 12.5, color: T.mut } }, st.https_listening
+      ? ['Voice mode and dictation need the HTTPS address. Its browser warns once about GAIFA’s own certificate, or trust it there (',
+        h('code', { key: 'c' }, '/lan/trust'), ' on that device). Certificate fingerprint: ', h('code', { key: 'f', style: { fontFamily: MONO, overflowWrap: 'anywhere' } }, st.ca_fingerprint || '—')]
+      : 'No HTTPS (Settings → [hub.lan] https, or openssl is missing): voice mode and dictation won’t work on other devices.') : null,
     pwForm,
     st.enabled ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
       h('div', { style: { fontSize: 12.5, fontWeight: 600 } }, 'If other devices can’t reach it'),

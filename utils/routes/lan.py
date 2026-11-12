@@ -163,7 +163,7 @@ input{font:inherit;padding:10px 12px;border-radius:8px;border:1px solid var(--bd
 input:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 button{font:inherit;font-weight:600;padding:10px 12px;border:0;border-radius:8px;background:var(--acc);color:#fff;cursor:pointer}
 button:disabled{opacity:.6;cursor:default}#err{color:var(--rd);min-height:1.2em}</style></head><body>
-<form id="f"><h1>GAIFA</h1><p>This is __HOST__. Sign in with the password set on the GAIFA machine (Settings → General → Network).</p>
+<form id="f"><h1>GAIFA</h1><p>This is __HOST__. Sign in with the password set on the GAIFA machine (Settings → General → Network). For the microphone, use its HTTPS address; <a href="/lan/trust" style="color:var(--acc)">trusting it on this device</a> stops the warning.</p>
 <label>Password<input id="pw" type="password" autocomplete="current-password" required autofocus></label>
 <div id="err" role="alert"></div><button id="go">Sign in</button></form>
 <script>
@@ -188,3 +188,44 @@ async def signin_page(request: Request) -> HTMLResponse:
     return HTMLResponse(PAGE.replace("__HOST__", escape(socket.gethostname())), headers={
         "cache-control": "no-store", "x-frame-options": "DENY",
         "content-security-policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'"})
+
+
+TRUST = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trust GAIFA · GAIFA</title><style>
+:root{color-scheme:light dark;--bg:#f5f6f8;--card:#fff;--tx:#151a22;--mut:#5b6474;--bd:#d6dbe3;--acc:#3563e9}
+@media (prefers-color-scheme:dark){:root{--bg:#0b0e14;--card:#11151d;--tx:#e6eaf2;--mut:#8a94a6;--bd:#2a3547;--acc:#5b8cff}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px}
+main{max-width:640px;margin:0 auto;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:20px 22px}
+h1{font-size:20px;margin:0 0 8px}h2{font-size:15px;margin:18px 0 4px}p,li{color:var(--mut);font-size:14px}code{font-size:12.5px;overflow-wrap:anywhere}
+a.b{display:inline-block;margin:6px 0;padding:9px 14px;border-radius:8px;background:var(--acc);color:#fff;text-decoration:none;font-weight:600}</style></head><body><main>
+<h1>Trust GAIFA on this device</h1>
+<p>GAIFA makes its own certificate, so browsers warn once before they open its HTTPS address (the microphone needs HTTPS). You can go past the warning, or trust GAIFA's certificate authority on this device so it never warns. It is only good for this machine's names and addresses.</p>
+<a class="b" href="/lan/ca.crt" download="gaifa-ca.crt">Download GAIFA's certificate</a>
+<p>Its SHA-256 fingerprint, to compare with Settings → General → Network on the GAIFA machine:<br><code>__FP__</code></p>
+<h2>iPhone and iPad</h2><ol><li>Download it in Safari and allow the profile.</li><li>Settings → General → VPN &amp; Device Management → the GAIFA profile → Install.</li><li>Settings → General → About → Certificate Trust Settings → turn GAIFA on.</li></ol>
+<h2>Android</h2><ol><li>Download it.</li><li>Settings → Security → More security settings → Encryption &amp; credentials → Install a certificate → CA certificate, and pick the file.</li></ol>
+<h2>Windows</h2><ol><li>Open the file → Install Certificate → Current User → Place all certificates in → Trusted Root Certification Authorities.</li></ol>
+<h2>macOS</h2><ol><li>Open the file (Keychain Access) → double-click GAIFA's certificate → Trust → Always Trust.</li></ol>
+<h2>Linux</h2><ol><li>Firefox: Settings → Privacy &amp; Security → Certificates → View Certificates → Authorities → Import. Chrome: Settings → Privacy and security → Security → Manage certificates → Authorities → Import.</li></ol>
+<p><a href="/">Back to GAIFA</a></p></main></body></html>"""
+
+
+@router.get("/lan/ca.crt", include_in_schema=False)
+async def ca_certificate(request: Request) -> Response:
+    """GAIFA's certificate authority (its public certificate only), for a device to trust (plan lan-access 3.3)."""
+    from utils.lan import cert
+
+    p = cert.ca_file(request.app.state.hub.paths.state)
+    if not p.is_file():
+        raise HubError(404, "not_found", "GAIFA has no certificate yet: HTTPS starts when GAIFA is opened to the network")
+    return Response(p.read_bytes(), media_type="application/x-x509-ca-cert", headers={"content-disposition": 'attachment; filename="gaifa-ca.crt"'})
+
+
+@router.get("/lan/trust", include_in_schema=False)
+async def trust_page(request: Request) -> HTMLResponse:
+    from utils.lan import cert
+
+    fp = cert.fingerprint(request.app.state.hub.paths.state) or "(no certificate yet)"
+    return HTMLResponse(TRUST.replace("__FP__", escape(fp)), headers={"cache-control": "no-store",
+                        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"})
+

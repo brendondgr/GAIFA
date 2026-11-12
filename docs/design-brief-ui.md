@@ -958,7 +958,8 @@ interface WidgetInfo { service: string; id: string; title: string; kind: "line" 
 interface LanDevice { id: string; label: string; addr: string; first: number; last: number }   // plan lan-access
 interface LanStatus { remote: boolean; on: boolean; me?: LanDevice; enabled?: boolean; listening?: boolean; has_password?: boolean;
   urls?: string[]; port?: number; https?: "off" | "also" | "only"; https_port?: number; allow?: string[]; names?: string[];
-  session_days?: number; devices?: LanDevice[]; restart_required?: boolean }
+  session_days?: number; devices?: LanDevice[]; restart_required?: boolean;
+  https_listening?: boolean; ca_fingerprint?: string | null }   // HTTPS for the microphone (plan lan-access 3.2–3.3)
 interface DoctorCheck { area: "models" | "manifests" | "paths" | "ports" | "network" | "units" | "disk" | "offline" | "repos";
                        level: "ok" | "note" | "warn" | "fail"; title: string; detail: string; fix?: string }
 interface Hardware { os: "linux" | "darwin" | "windows"; arch: string; wsl: boolean; container: string;   // plan 35.2

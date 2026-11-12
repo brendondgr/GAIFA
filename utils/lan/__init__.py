@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from utils.lan import addresses
+from utils.lan import cert
 from utils.lan.auth import Auth
 
 REFRESH_S = 30.0
@@ -71,4 +72,5 @@ class Lan:
         return {"enabled": self.cfg.enabled, "listening": self.listening, "on": self.on, "has_password": self.auth.has_password(),
                 "urls": self.urls() if self.cfg.enabled else [], "port": self.hub_port, "https": self.cfg.https,
                 "https_port": self.cfg.https_port, "allow": list(self.cfg.allow), "names": list(self.cfg.names),
-                "session_days": self.cfg.session_days, "devices": self.auth.devices()}
+                "session_days": self.cfg.session_days, "devices": self.auth.devices(), "https_listening": self.https_listening,
+                "ca_fingerprint": cert.fingerprint(self.auth.folder.parent)}

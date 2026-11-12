@@ -146,6 +146,28 @@ Nothing tracked changes except the report. Work in the scratch folder `data/stat
 - [x] Live: "what's on my calendar tomorrow" answered from the calendar; a write ("add a meeting") refused aloud with why. *(2026-11-11, installed hub: the five tool prompts called their tools at both sizes, `docs/voice-eval.md`. The refusal is covered by `test_what_would_ask_is_refused_aloud`; no write tool is among the choices.)*
 - [x] Delivered: `services/voice/voice/tools.py`, the settings rows, the eval's tool column.
 
+## Phase 6 — The chat's agent answers (M; asked for on 2026-11-11, after the switch-over)
+
+The user's report: with the speech model, voice mode no longer followed the agent's harness (its model, tools, apps and cards), which the chat-model loop did; and they want the choice to talk to the speech model itself.
+
+- [x] **6.1 The agent's side: `services/agent/agent/api_voice.py`, `agent/context.py`.**
+  - **Steps as they come:** `GET /v1/threads/{tid}/voice-answer` takes `step`: it answers at the first new assistant text while the turn still runs, with `seq` to ask from next.
+  - **A spoken message:** a user message `by: "voice"` carries `VOICE_NOTE` in the prompt (the reply is read aloud: short spoken sentences, tools as usual); the chat shows your words only.
+  *Done when:* `services/agent/tests/test_api_voice.py` (a turn's steps spoken as they come; the note in the prompt, not in the chat).
+- [x] **6.2 The mod: `services/voice/voice/agent_turns.py`, `voice/speak.py`, `voice/numbers.py`, `voice/bridge.py`.**
+  - **`answers`:** the start message's `answers`, else `[voice_mode] answers`; `agent` needs a chat, otherwise the speech model answers.
+  - **A turn:** the transcription session writes your words down → `/voice-ask` → each step from `/voice-answer?step=1` through llama.cpp's `/tts` (streamed PCM16, first audio in about 60 ms) → `turn` with `saved: true`. No conversation session is opened. A card waiting (`state: "waiting"`) is waited for. Talking over it cancels the speech and, when the chat's turn still runs, the turn (`POST …/cancel`).
+  - **The GPU:** `Gpu` takes the slot while you are heard and while it speaks, and gives it back in between, so the chat's local model and the apps its tools start can run.
+  - **Words:** `speakable` (markdown out, as `chat-speak.js`), `chunks` (whole sentences, ≤ 400 characters), `spoken_numbers` (English: the model garbles "105" and says "one hundred five" right; measured with its own transcription).
+  - **Found on the way:** with tools, a first response of text alone was asked again to be spoken, which llama.cpp refuses ("commit audio or create a message first") and the conversation hung; it is now said through `/tts`, and an engine error ends the reply.
+  *Done when:* `services/voice/tests/test_agent_turns.py` (a turn with a step, a card and the answer; talking over it; a busy chat; `answers: "speech"`; words and numbers), `test_tools.py` (text alone is spoken).
+- [x] **6.3 The setting and the page: `utils/config.py` (`VoiceModeCfg.answers`, default `agent`), `web/settings/schema.js` (Who answers), `web/chat/chat-voice.js`, `chat-voice-live.js`.** The bar's switch (Agent answers / Speech model answers) saves the setting and starts the conversation again; a turn the conversation started itself doesn't pause it; a waiting card reads "Waiting for you on screen". Tools it may use and Let it ask the chat's model show only when the speech model itself answers.
+  *Done when:* `utils/tests/settings/test_voice_mode.py`, `utils/tests/web/settings-schema.test.mjs`, `chat-voice-live.test.mjs`.
+
+**Checks & deliverables — Phase 6**
+- [x] Live on a scratch hub (2026-11-11): spoken "Which services are running?" and "How much memory is free?" ran the agent's own `hub_list_services` and `hub_memory_status` and were answered aloud (first audio 2–3 s after the end of the question, the model's turn included); a turn asking to stop a service waited for its card and said the refusal; an interrupted story; the same chat then answered by the speech model itself. In the page: a spoken turn through the real client drew the agent's activity and tool card; the bar's switch.
+- [x] Delivered: `agent_turns.py`, `speak.py`, `numbers.py`, the `step` answers, `[voice_mode] answers`, the Settings row and the bar's switch.
+
 ## Deliverables
 
 | Deliverable | Description | Location |
@@ -158,4 +180,5 @@ Nothing tracked changes except the report. Work in the scratch folder `data/stat
 | The live client | Microphone to the mod, replies to the speakers, barge-in | `web/chat/chat-voice-live.js`, `web/chat/chat-voice.js` |
 | The comparison | Q4_K_M against Q8_0: latency, memory, accuracy, WAV pairs | `services/voice/evals/`, `docs/voice-eval.md` |
 | Tools and hand-off (optional) | A few read-only tools and `ask_chat` | `services/voice/voice/tools.py` |
+| The chat's agent answers | Spoken turns run through the chat's own model and harness; the speech model hears and speaks | `services/voice/voice/agent_turns.py`, `voice/speak.py`, `voice/numbers.py`, `services/agent/agent/api_voice.py` |
 | Tests | Fake llama-server, fake realtime server, fake hub; the state machine and settings | `services/voice/tests/`, `services/agent/tests/test_api_voice.py`, `utils/tests/settings/test_voice_mode.py`, `utils/tests/web/chat-voice-live.test.mjs`, `settings-schema.test.mjs` |

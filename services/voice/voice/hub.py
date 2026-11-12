@@ -87,6 +87,26 @@ class _More:
         return out
 
 
+    async def voice_step(self, thread: str, after: int, wait: float = 25) -> dict[str, Any]:
+        """The chat's turn so far (6.2): answers at its next spoken step or its end: {state, text, seq}."""
+        try:
+            async with self._client(read=wait + 15) as c:
+                r = await c.get(f"/api/s/agent/v1/threads/{thread}/voice-answer", params={"after": after, "wait": wait, "step": "true"})
+        except httpx.HTTPError as e:
+            raise HubError(502, f"the chat didn't answer ({e})", "hub_unreachable") from e
+        if r.status_code >= 400:
+            raise HubError(r.status_code, _detail(r), "ask_failed")
+        return r.json()
+
+    async def voice_stop(self, thread: str) -> None:
+        """Stop the chat's running turn (you talked over it)."""
+        try:
+            async with self._client() as c:
+                await c.post(f"/api/s/agent/v1/threads/{thread}/cancel")
+        except httpx.HTTPError as e:
+            raise HubError(502, f"the chat didn't answer ({e})", "hub_unreachable") from e
+
+
 class Hub(_More):
     def __init__(self, url: str, service: str = "voice") -> None:
         self.url, self.service = url.rstrip("/"), service

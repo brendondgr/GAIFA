@@ -39,7 +39,7 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
             "learning": {"enabled": True, "nightly_at": "03:00", "idle_min": 60, "infer_after": 2, "fade_days": 60},
             "speech_input": {"mics": [], "language": "", "preset": "balanced", "mode": "both"},
             "speech_output": {"voice": "", "engine": "auto", "speed": 1.0, "auto_read": False, "pause_ms": 1200},
-            "voice_mode": {"engine": "chat", "quant": "q4_k_m", "voice": "female", "tools": [], "ask_chat": False},
+            "voice_mode": {"engine": "chat", "quant": "q4_k_m", "voice": "female", "answers": "agent", "tools": [], "ask_chat": False},
             "judge": {"backend": "decide", "model": "d3-lite", "url": "http://127.0.0.1:7000/api/s/decide", "threshold": 0.35, "timeout_s": 3.0, "context": "none",
                       "allow_commands": [], "ask_commands": []},
             "screen": {"pages": True, "documents": False, "transcripts": False, "timeout_s": 30.0, "window_chars": 800,

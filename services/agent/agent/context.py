@@ -124,6 +124,12 @@ def mentions_line(payload: dict[str, Any] | None) -> str:
     return "(Named in this message: " + "; ".join(parts) + ". Use them for those tool fields.)"
 
 
+#: Under a message that was spoken in voice mode (the voice mod's /voice-ask): everything else is as for a typed one.
+VOICE_NOTE = ("(Spoken in voice mode: your reply is read aloud. Answer in a few short sentences, as you would say them: "
+              "no lists, tables, code or markdown, unless more detail is asked for. Use your tools as usual; what you "
+              "make or show still appears in the chat.)")
+
+
 def said(payload: dict[str, Any] | None) -> str:
     """The user's own words in a message: each quote-reply's reply, then the text. Never the quoted parts:
     they are the model's words (the Auto judge and `named_files` read only what the user wrote)."""
@@ -372,6 +378,8 @@ def rebuild(events: list[dict[str, Any]], images: dict[int, dict[str, Any]] | No
             text = with_quotes(p.get("text") or "", quotes_of(p))
             if line := mentions_line(p):
                 text += "\n\n" + line                 # plan 48.3: the @-mentions, plainly
+            if p.get("by") == "voice":
+                text += "\n\n" + VOICE_NOTE             # voice-speech-model 6.1: the reply will be said aloud
             if mem := p.get("memory") or recalled.get(e["seq"]):   # structured-memory 3.3: what was recalled when it came
                 from .memory.profile import block                     # (a `recall` event since chat-responsive 1.1)
                 text += "\n\n" + block(mem)

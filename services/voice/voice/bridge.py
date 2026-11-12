@@ -2,14 +2,14 @@
 
 The page speaks a small protocol of this mod's own, so it never depends on llama.cpp's schema.
 
-    page → mod   {"type":"start", "thread"?, "voice"?, "language"?, "pause_ms"?, "sample_rate"?, "quant"?, "save"?}
+    page → mod   {"type":"start", "thread"?, "voice"?, "language"?, "pause_ms"?, "sample_rate"?, "quant"?, "save"?, "answers"?}
                  binary frames: PCM16 mono at sample_rate (16000 unless said)
                  {"type":"text", "text"}            a typed turn (the mod's page, the eval)
                  {"type":"interrupt", "played_ms"}  you started talking over the reply
                  {"type":"played"}                  the reply finished playing
                  {"type":"stop"}
     mod → page   {"type":"waiting", "text"}         the GPU is busy with something else
-                 {"type":"ready", "sample_rate_out", "model", "voice"}
+                 {"type":"ready", "sample_rate_out", "model", "voice", "answers"}
                  {"type":"listening"} · {"type":"hearing"} · {"type":"thinking"} · {"type":"speaking"}
                  binary frames: the reply, PCM16 mono at sample_rate_out
                  {"type":"said", "text", "final", "audio_ms"?}     the reply's text as it comes
@@ -23,6 +23,10 @@ The page speaks a small protocol of this mod's own, so it never depends on llama
 One conversation at a time. Beside it runs a second llama.cpp session of type "transcription", fed the same
 audio, which writes your words down (a conversation session doesn't). A turn is written into the chat (the
 agent's /voice-turn, through the hub) once its reply has played, or as far as it played when you interrupt.
+
+Who answers (`answers`, else `[voice_mode] answers`): `speech` is the above. `agent`, for a conversation in a chat,
+is agent_turns.py: your words go to the chat as a message, the chat's own model answers with its tools and cards,
+and the speech model says each step. No conversation session is opened then, only the transcription one.
 """
 
 from __future__ import annotations
@@ -41,8 +45,10 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field, ValidationError
 
 from . import config, tools, vad
+from .speak import speakable, tts_stream
+from .agent_turns import AgentTurns, Gpu
 from .engine import EngineError
-from .gpu_slot import GpuCancelled, gpu_slot
+from .gpu_slot import GpuCancelled
 from .hub import HubError
 
 log = logging.getLogger(__name__)
@@ -51,7 +57,8 @@ BASE_INSTRUCTIONS = "Respond with interleaved text and audio."
 TOOLS_INSTRUCTIONS = "Respond with function calls, and interleaved text and audio."     # the model card's, with tools
 #: With tools, the session doesn't force speech: forced, the model says "let me check" and calls nothing (measured,
 #: docs/voice-eval.md). The reply's first response may then be calls, speech, or text alone; after the calls' results
-#: (or text alone) a second response is forced to speak and may call nothing.
+#: a second response is forced to speak and may call nothing. Text alone is said through /tts: llama.cpp
+#: refuses a second response with nothing new to answer ("commit audio or create a message first").
 SPEAK = {"output_modalities": ["text", "audio"], "tool_choice": "none"}
 SPOKEN_STYLE = ("You are talking with the user out loud. Keep answers short and natural, as in a conversation; "
                 "no lists, markdown or code.")
@@ -71,6 +78,7 @@ class Start(BaseModel):
     sample_rate: int = Field(16000, ge=8000, le=48000)
     quant: str | None = Field(None, pattern=r"^(q4_k_m|q8_0)$")     # the size to talk to; the loaded or default one when left out
     save: bool = True                      # False: nothing is written into the chat (a test of the microphone)
+    answers: str | None = Field(None, pattern=r"^(agent|speech)$")     # who answers; [voice_mode] answers when left out
 
 
 def vad_kind(settings) -> str:
@@ -149,6 +157,9 @@ class Session:
         self.tool_task: asyncio.Task | None = None
         self.closed = False
         self.start_tools: dict[str, Any] | None = app.state.voice_mode      # tests: [voice_mode] without a hub
+        self.agent: AgentTurns | None = None           # the chat's agent answers (agent_turns.py)
+        self.gpu = Gpu("Voice conversation")
+        self._conv_task: asyncio.Task | None = None
 
     # ---- to the page
 
@@ -230,16 +241,21 @@ class Session:
     async def on_detected(self, events: list[tuple[str, bytes | None]]) -> None:
         for kind, data in events:
             if kind == "speech":
+                if self.agent:
+                    await self.agent.hearing()
                 await self.set_mode("hearing")
                 self.spoke_s += len(data) / 2 / self.start.sample_rate
                 ev = {"type": "input_audio_buffer.append", "audio": base64.b64encode(data).decode()}
-                await self.up(self.conv, ev)
+                if self.conv is not None:
+                    await self.up(self.conv, ev)
                 await self.up(self.asr, ev)
             elif kind == "end":
                 await self.end_turn()
 
     async def end_turn(self, typed: str | None = None) -> None:
         """Your turn is over: ask for the reply, and for your words as text."""
+        if self.agent:
+            return await self.agent.end_turn(typed)
         self.reply, self.skip, self.typed = Reply(), False, typed
         self.t_end = time.monotonic()
         self.heard = asyncio.get_running_loop().create_future()
@@ -257,6 +273,8 @@ class Session:
         await self.set_mode("thinking")
 
     async def on_interrupt(self, played_ms: float) -> None:
+        if self.agent:
+            return await self.agent.interrupt()
         reply = self.reply
         if reply is None or self.mode not in ("thinking", "speaking"):
             return
@@ -268,6 +286,8 @@ class Session:
         await self.on_detected(self.detector.begin(held))
 
     async def on_played(self) -> None:
+        if self.agent:
+            return self.agent.played.set()
         if self.reply is not None and self.mode in ("thinking", "speaking"):
             await self.finish_turn(interrupted=False)
 
@@ -333,8 +353,8 @@ class Session:
                         self.tool_task = asyncio.create_task(self.run_tools(reply, calls))
                         continue
                     if self.toolbox and self.toolbox.defs and not reply.rounds and not reply.audio_bytes:
-                        reply.rounds, reply.text, reply.generating = 1, "", True      # text alone: say it
-                        await self.up(self.conv, {"type": "response.create", "response": SPEAK})
+                        reply.rounds = 1                                              # text alone: say it
+                        self.tool_task = asyncio.create_task(self.say_text(reply))
                         continue
                     reply.status = (ev.get("response") or {}).get("status") or ""
                     reply.done.set()
@@ -356,7 +376,35 @@ class Session:
                 detail = (ev.get("error") or {}).get("message") or "llama.cpp reported an error"
                 log.warning("llama.cpp: %s", detail)
                 await self.emit("error", code="engine_error", detail=detail)
-                reply.done.set()
+                if not reply.done.is_set():                   # the reply is over: let the turn end, not hang
+                    reply.generating = False
+                    reply.done.set()
+                    await self.emit("said", text=reply.text, final=True,
+                                    audio_ms=round(reply.audio_bytes / 2 / self.out_rate * 1000))
+
+    async def say_text(self, reply: Reply) -> None:
+        """A first response of text alone (with tools the output mode is open): the model says it through /tts."""
+        text, reply.text = speakable(reply.text), ""
+        try:
+            async for kind, data in tts_stream(self.engine.port, text, self.start.voice, self.start.language):
+                if self.reply is not reply or self.closed:
+                    break
+                if kind == "text":
+                    reply.text = f"{reply.text} {data.decode()}".strip()
+                    await self.emit("said", text=reply.text, final=False)
+                    continue
+                if reply.first_audio_ms is None:
+                    reply.first_audio_ms = round((time.monotonic() - self.t_end) * 1000)
+                    await self.set_mode("speaking")
+                reply.audio_bytes += len(data)
+                await self.audio_out(data)
+        except Exception as e:  # noqa: BLE001
+            log.warning("the text reply wasn't spoken: %r", e)
+            reply.text = reply.text or text
+        reply.status = "completed"
+        reply.done.set()
+        if self.reply is reply:
+            await self.emit("said", text=reply.text, final=True, audio_ms=round(reply.audio_bytes / 2 / self.out_rate * 1000))
 
     async def run_tools(self, reply: Reply, calls: list[dict[str, Any]]) -> None:
         """The reply asked for tools: run them, give the results back, and let it go on (unless you interrupted)."""
@@ -449,66 +497,79 @@ class Session:
             return await self.fail(4409, "busy", "Another voice conversation is open.")
         self.engine.sessions += 1
         tasks: list[asyncio.Task] = []
-        try:
-            async def waiting(lease) -> None:
-                await self.emit("waiting", text=lease.waiting_text())
 
-            async with gpu_slot("Voice conversation", est_s=120, on_wait=waiting):
-                try:
-                    port = await self.engine.ensure(self.start.quant)
+        async def waiting(lease) -> None:
+            await self.emit("waiting", text=lease.waiting_text())
+
+        self.gpu = Gpu("Voice conversation", waiting)
+        try:
+            await self.gpu.on()
+            try:
+                port = await self.engine.ensure(self.start.quant)
+                vm: dict[str, Any] = {}
+                if self.settings.hub_url or self.start_tools is not None:
+                    vm = self.start_tools if self.start_tools is not None else await self.hub.voice_mode()
+                if self.start.thread and (self.start.answers or vm.get("answers")) == "agent":
+                    self.agent = AgentTurns(self, port)
+                else:
                     if self.start.thread:
                         self.context = await self.hub.voice_context(self.start.thread)
                         if not self.start.language and self.context.get("language"):
                             self.start.language = self.context["language"]
-                    if self.settings.hub_url or self.start_tools is not None:
-                        vm = self.start_tools if self.start_tools is not None else await self.hub.voice_mode()
-                        names = [n for n in vm.get("tools") or [] if isinstance(n, str)]
-                        if names or vm.get("ask_chat"):
-                            self.toolbox = tools.ToolBox(self.hub, self.start.thread, names, bool(vm.get("ask_chat")))
-                            await self.toolbox.load()
+                    names = [n for n in vm.get("tools") or [] if isinstance(n, str)]
+                    if names or vm.get("ask_chat"):
+                        self.toolbox = tools.ToolBox(self.hub, self.start.thread, names, bool(vm.get("ask_chat")))
+                        await self.toolbox.load()
                     await self.open_conv(port)
-                    await self.open_asr(port)
-                except (EngineError, HubError) as e:
-                    return await self.fail(4409 if e.code in ("needs_room", "busy") else 4500, e.code, e.detail,
-                                           getattr(e, "fix", None))
-                except (OSError, websockets.WebSocketException, TimeoutError) as e:
-                    return await self.fail(4500, "engine_failed", f"llama.cpp didn't open a session ({e})")
-                self.detector = vad.TurnDetector(vad.make_vad(self.settings.vad_model), rate=self.start.sample_rate,
-                                                 pause_ms=self.start.pause_ms)
-                await self.emit("ready", sample_rate_out=self.out_rate, model=self.engine.status()["label"],
-                                voice=self.start.voice, vad=self.detector.vad.kind)
-                await self.emit("listening")
+                await self.open_asr(port)
+            except (EngineError, HubError) as e:
+                return await self.fail(4409 if e.code in ("needs_room", "busy") else 4500, e.code, e.detail,
+                                       getattr(e, "fix", None))
+            except (OSError, websockets.WebSocketException, TimeoutError) as e:
+                return await self.fail(4500, "engine_failed", f"llama.cpp didn't open a session ({e})")
+            self.detector = vad.TurnDetector(vad.make_vad(self.settings.vad_model), rate=self.start.sample_rate,
+                                             pause_ms=self.start.pause_ms)
+            await self.emit("ready", sample_rate_out=self.out_rate, model=self.engine.status()["label"],
+                            voice=self.start.voice, vad=self.detector.vad.kind, answers="agent" if self.agent else "speech")
+            await self.emit("listening")
+            if self.agent:
+                await self.gpu.off()                      # held again while you are heard and while it speaks
+            else:
                 self._conv_task = asyncio.create_task(self.read_conv())
-                page = asyncio.create_task(self.read_page())
-                tasks = [page, asyncio.create_task(self.read_asr()), asyncio.create_task(self.watchdog())]
-                while True:
-                    done, _ = await asyncio.wait([*tasks, self._conv_task], return_when=asyncio.FIRST_COMPLETED)
-                    if page in done:
-                        self.engine.closing = True
-                        with contextlib.suppress(WebSocketDisconnect, RuntimeError):
-                            page.result()
-                        break
-                    if self._conv_task in done and self._conv_task.cancelled():
-                        continue                              # renewed: a new reader took over
-                    for t in done:
-                        if not t.cancelled() and t.exception():
-                            log.warning("voice session ended: %r", t.exception())
-                    await self.emit("error", code="engine_failed", detail="The speech model stopped. Start voice mode again.")
+            page = asyncio.create_task(self.read_page())
+            tasks = [page, asyncio.create_task(self.read_asr()), asyncio.create_task(self.watchdog())]
+            while True:
+                done, _ = await asyncio.wait([*tasks, *([self._conv_task] if self._conv_task else [])],
+                                             return_when=asyncio.FIRST_COMPLETED)
+                if page in done:
                     self.engine.closing = True
+                    with contextlib.suppress(WebSocketDisconnect, RuntimeError):
+                        page.result()
                     break
-                if self.reply is not None:                    # you left mid-reply: keep what was said
-                    with contextlib.suppress(Exception):
-                        await asyncio.wait_for(self.finish_turn(interrupted=not self.reply.done.is_set(), played_ms=1e12), 8)
-                await self.emit("done")
+                if self._conv_task in done and self._conv_task.cancelled():
+                    continue                              # renewed: a new reader took over
+                for t in done:
+                    if not t.cancelled() and t.exception():
+                        log.warning("voice session ended: %r", t.exception())
+                await self.emit("error", code="engine_failed", detail="The speech model stopped. Start voice mode again.")
+                self.engine.closing = True
+                break
+            if self.agent:                                # you left mid-turn: the chat's turn goes on, unspoken
+                await self.agent.close()
+            elif self.reply is not None:                  # you left mid-reply: keep what was said
+                with contextlib.suppress(Exception):
+                    await asyncio.wait_for(self.finish_turn(interrupted=not self.reply.done.is_set(), played_ms=1e12), 8)
+            await self.emit("done")
         except GpuCancelled:
             await self.fail(4409, "gpu_cancelled", "The wait for the GPU was cancelled.")
         finally:
             self.engine.sessions -= 1
             self.engine.closing = False
             self.engine.touch()
-            for t in [*tasks, getattr(self, "_conv_task", None), self.tool_task]:
+            for t in [*tasks, self._conv_task, self.tool_task]:
                 if t is not None:
                     t.cancel()
+            await self.gpu.off()
             for sock in (self.conv, self.asr):
                 if sock is not None:
                     with contextlib.suppress(Exception):

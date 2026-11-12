@@ -1,5 +1,8 @@
-"""Voice mode on a speech-to-speech model (plan voice-speech-model 2.3): the voice mod answers by itself, so the
-agent only gives it what the chat knows and writes each spoken turn into the chat.
+"""Voice mode on a speech-to-speech model (plan voice-speech-model 2.3, 6.1). The voice mod hears you and speaks.
+Who answers is `[voice_mode] answers`: `agent` sends your words to this chat as a message (/voice-ask), so the chat's
+own model answers with its tools, cards and apps, and each step's text is spoken as it comes (/voice-answer?step=1);
+`speech` lets the speech model answer by itself, and the agent only gives it what the chat knows (/voice-context)
+and writes each spoken turn into the chat (/voice-turn).
 
     GET  /v1/threads/{tid}/voice-context   the profile, the calendar, a short project, and the last turns as text
     POST /v1/threads/{tid}/voice-turn      a `user` and an `assistant` event, with no model call
@@ -155,18 +158,21 @@ def add_routes(app: FastAPI) -> None:
         return {"seq": ev["seq"]}
 
     @app.get("/v1/threads/{tid}/voice-answer", summary="The chat's answer to a voice-ask, waiting up to `wait` seconds for its "
-             "turn to end: state done (with the answer's text), running, or waiting (a card is on screen)")
-    async def voice_answer(tid: str, request: Request, after: int = Query(..., ge=0, description="The seq voice-ask returned"),
-                           wait: float = Query(25, ge=0, le=60)) -> dict[str, Any]:
+             "turn to end: state done (with the answer's text), running, or waiting (a card is on screen). With `step`, "
+             "it answers as soon as the turn has said something new, so each step can be spoken while the turn goes on")
+    async def voice_answer(tid: str, request: Request, after: int = Query(..., ge=0, description="The seq voice-ask returned, "
+                           "or the `seq` of the last answer"),
+                           wait: float = Query(25, ge=0, le=60),
+                           step: bool = Query(False, description="Answer at the first new text, while the turn still runs")) -> dict[str, Any]:
         agent = agent_of(request)
         thread_or_404(agent, tid)
         deadline = time.monotonic() + wait
         while True:
             state = (agent.store.thread(tid) or {}).get("state")
-            running = agent.running(tid)
-            if not running and state != "waiting":
-                texts = [str(e["payload"].get("text") or "").strip() for e in agent.store.events(tid, after=after, types=("assistant",))]
-                return {"state": "done", "text": " ".join(t for t in texts if t)}
-            if time.monotonic() >= deadline:
-                return {"state": "waiting" if state == "waiting" else "running", "text": ""}
+            ended = not agent.running(tid) and state != "waiting"
+            said = [e for e in agent.store.events(tid, after=after, types=("assistant",)) if e["payload"].get("via") != "voice"]
+            texts = [t for e in said if (t := str(e["payload"].get("text") or "").strip())]
+            if ended or (step and texts) or time.monotonic() >= deadline:
+                return {"state": "done" if ended else "waiting" if state == "waiting" else "running",
+                        "text": " ".join(texts) if ended or step else "", "seq": said[-1]["seq"] if said and (ended or step) else after}
             await asyncio.sleep(0.1)

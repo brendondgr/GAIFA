@@ -28,6 +28,13 @@ test('the state machine: a round, the words, an error that ends it and one that 
   assert.deepEqual([tool.note, tool.asking], ['Asking the chat’s model…', true]);
   assert.deepEqual([run([{ type: 'tool', name: 'ask_chat', state: 'done' }], tool).note, run([{ type: 'tool', name: 'ask_chat', state: 'done' }], tool).asking], [null, false]);
   assert.match(run([{ type: 'tool', name: 'calendar_add', state: 'refused' }], tool).note, /needs your approval/);
+  // 6.3: the chat's agent answers: the turn that follows `thinking` is this conversation's own, until it listens again
+  let ag = run([{ type: 'start' }, { type: 'ready', model: 'm', answers: 'agent' }, { type: 'listening' }, { type: 'hearing' }, { type: 'thinking' }]);
+  assert.deepEqual([ag.answers, ag.asking], ['agent', true]);
+  ag = run([{ type: 'speaking' }, { type: 'said', text: 'Done.' }, { type: 'turn' }, { type: 'listening' }], ag);
+  assert.equal(ag.asking, false);
+  assert.equal(run([{ type: 'start' }, { type: 'ready', model: 'm', answers: 'speech' }, { type: 'listening' }, { type: 'thinking' }]).asking, false);
+  assert.equal(L.LIVE_WORDS.card, 'Waiting for you on screen');
   assert.equal(run([{ type: 'stop' }], s).mode, 'off');
   assert.equal(run([{ type: 'listening' }], { mode: 'off' }).mode, 'off');     // a late event after it ended changes nothing
   assert.equal(L.liveUrl({ protocol: 'https:', host: 'h:1' }), 'wss://h:1/api/s/voice/v1/realtime');
@@ -137,6 +144,11 @@ test('one conversation per page, and a refused microphone', async () => {
   await tick();
   assert.ok(a.mic.stopped); assert.equal(b.mic.stopped, false);     // starting another ended the first
   b.talk.stop();
+  const c = rig({ answers: 'agent' });                                // 6.3: who answers goes up with the start
+  await tick();
+  c.sockets[0].open();
+  assert.equal(c.sockets[0].texts[0].answers, 'agent');
+  c.talk.stop();
   const events = [];
   L.liveVoice({ url: 'ws://x', WebSocketImpl: class {}, onEvent: e => events.push(e), frames: async () => { const e = new Error('no'); e.name = 'NotAllowedError'; throw e; } });
   await tick();

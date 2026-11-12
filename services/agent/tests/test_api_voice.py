@@ -84,9 +84,30 @@ async def test_asking_the_chats_model(env):
     seq = r.json()["seq"]
     assert env.payloads(tid, "user")[-1]["by"] == "voice"
     early = (await env.client.get(f"/v1/threads/{tid}/voice-answer", params={"after": seq, "wait": 0})).json()
-    assert early == {"state": "running", "text": ""}
+    assert early == {"state": "running", "text": "", "seq": seq}
     again = await env.client.post(f"/v1/threads/{tid}/voice-ask", json={"text": "And costs?"})
     assert again.status_code == 409
     done = (await env.client.get(f"/v1/threads/{tid}/voice-answer", params={"after": seq, "wait": 10})).json()
-    assert done == {"state": "done", "text": "The report says sales rose nine percent."}
+    assert done["state"] == "done" and done["text"] == "The report says sales rose nine percent." and done["seq"] > seq
     assert (await env.client.get("/v1/threads/t_nope/voice-answer", params={"after": 0})).status_code == 404
+
+
+async def test_a_turns_steps_can_be_spoken_as_they_come(env):
+    """6.1: with `step`, the answer route returns at the first new text while the turn still runs, then the rest."""
+    tid = await env.thread()
+    env.model.queue({"text": "Let me look at the services.", "tool_calls": [{"name": "hub_list_services", "arguments": {}}]},
+                    {"text": "Everything is running.", "delay": 0.4})
+    seq = (await env.client.post(f"/v1/threads/{tid}/voice-ask", json={"text": "Is everything up?"})).json()["seq"]
+    first = (await env.client.get(f"/v1/threads/{tid}/voice-answer", params={"after": seq, "wait": 10, "step": True})).json()
+    assert first["text"] == "Let me look at the services." and first["seq"] > seq
+    said, after = [first["text"]], first["seq"]
+    while first["state"] != "done":
+        first = (await env.client.get(f"/v1/threads/{tid}/voice-answer", params={"after": after, "wait": 10, "step": True})).json()
+        after = first["seq"]
+        if first["text"]:
+            said.append(first["text"])
+    assert said == ["Let me look at the services.", "Everything is running."]
+    assert [m["role"] for m in env.model.received[-1]["messages"]].count("tool") == 1          # the agent's own loop ran the tool
+    asked = next(m["content"] for m in env.model.received[-1]["messages"] if m["role"] == "user")
+    assert asked.startswith("Is everything up?") and "read aloud" in asked                      # it knows the reply is spoken
+    assert env.payloads(tid, "user")[-1]["text"] == "Is everything up?"                         # the chat shows your words only

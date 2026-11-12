@@ -6,8 +6,8 @@ FAKE_LLAMA_MODE: "ok" (default), "die" (exit 3 at once), "slow" (ready after 1 s
 import asyncio, base64, json, os, struct, sys, time
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse, Response
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 MODE = os.environ.get("FAKE_LLAMA_MODE", "ok")
 REPLY = os.environ.get("FAKE_LLAMA_REPLY", "Paris is the capital of France.")
@@ -32,8 +32,18 @@ def health():
 
 
 @app.post("/tts")
-def tts():
-    return Response(wav(), media_type="audio/wav")
+async def tts(request: Request):
+    body = await request.json()
+    if body.get("response_format") != "pcm16":
+        return Response(wav(), media_type="audio/wav")
+    print("TTS " + json.dumps(body), flush=True)
+
+    async def pcm():                                   # 100 ms pieces, as the model streams them
+        for _ in range(CHUNKS or 3):
+            await asyncio.sleep(DELAY)
+            yield b"\x00\x01" * (RATE // 10)
+
+    return StreamingResponse(pcm(), media_type=f"audio/pcm;rate={RATE};encoding=signed-int;bits=16")
 
 
 class Sock:
@@ -73,6 +83,7 @@ async def realtime(ws, transcription=False):
                          "output": {"format": {"type": "audio/pcm", "rate": RATE}, "voice": None, "language": None}}}
     await ws.send(json.dumps({"type": "session.created", "session": session}))
     heard = 0
+    fresh = False                          # something new to answer since the last response (as llama.cpp requires)
     answered = False
     outputs = []
     cancel = asyncio.Event()
@@ -123,14 +134,17 @@ async def realtime(ws, transcription=False):
             await ws.send(json.dumps({"type": "session.updated", "session": session}))
         elif t == "input_audio_buffer.append":
             heard += len(base64.b64decode(ev["audio"])) // 2
+            fresh = True
         elif t == "input_audio_buffer.commit":
             await ws.send(json.dumps({"type": "input_audio_buffer.committed", "item_id": "i1"}))
             if session["type"] == "transcription":
                 await ws.send(json.dumps({"type": "conversation.item.input_audio_transcription.completed", "item_id": "i1",
                                           "transcript": f"heard {heard} samples" if heard else ""}))
                 heard = 0
+        elif t == "response.create" and not fresh:
+            await ws.send(json.dumps({"type": "error", "error": {"message": "response.create: commit audio or create a message first"}}))
         elif t == "response.create":
-            heard = 0
+            heard, fresh = 0, False
             cancel.clear()
             task = asyncio.create_task(respond())
         elif t == "response.cancel":
@@ -142,6 +156,7 @@ async def realtime(ws, transcription=False):
             if ev["item"].get("type") == "function_call_output":
                 answered = True
                 print("TOOL_OUTPUT " + ev["item"]["output"], flush=True)
+            fresh = True
             await ws.send(json.dumps({"type": "conversation.item.added"}))
         if MODE == "drop" and t == "response.create":
             await asyncio.sleep(0.05)

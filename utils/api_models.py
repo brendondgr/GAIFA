@@ -845,6 +845,8 @@ class VoiceModeSettings(_Model):
                                               "speech: the voice mod's speech-to-speech model, by itself")
     quant: Literal["q4_k_m", "q8_0"] = Field(description="The speech model's size")
     voice: Literal["female", "male"] = Field(description="The speech model's voice")
+    answers: Literal["agent", "speech"] = Field(description="With the speech engine, who answers. agent: the chat's own model, "
+                                                "with its tools, apps and cards (your words go in as a message); speech: the speech model itself")
     tools: list[str] = Field(max_length=6, description="Tools the speech model may call; what would ask is refused")
     ask_chat: bool = Field(description="The speech model may hand a hard question to the chat's own model")
 

@@ -5,8 +5,10 @@
 // pauses it: the bar says so, and it carries on once you've answered on screen. Escape or the button ends it.
 //
 // Two engines (plan voice-speech-model 3.4; Settings → Speech → Voice mode, `[voice_mode] engine`): `chat` is the
-// loop above (ChatVoiceButton); `speech` is the voice mod's speech-to-speech model answering by itself (LiveVoice,
-// over chat-voice-live.js), its turns written into the chat by the mod. VoiceButton reads the setting each time
+// loop above (ChatVoiceButton); `speech` is the voice mod's speech-to-speech model (LiveVoice, over
+// chat-voice-live.js). With it, `[voice_mode] answers` says who answers (6.3): `agent`, the chat's own model with its
+// tools, apps and cards (your words go in as a message; the speech model hears and speaks), or `speech`, the speech
+// model by itself. The bar has the switch. VoiceButton reads the setting each time
 // voice mode starts, and falls back to the chat engine when the speech model can't run.
 
 import { h, T, Icon, boxBtn } from './chat-ui.js';
@@ -70,11 +72,12 @@ export function pickEngine(vm, voiceUp, chatOk) {
     : { engine: null, error: 'Voice mode needs the Speech to Text and Speech mods, or the Voice mod' };
 }
 
-const bar = (dot, words, text, extra) => h('div', { role: 'status', style: { position: 'absolute', left: 0, right: 0, bottom: 'calc(100% + 6px)', zIndex: 25, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+const bar = (dot, words, text, extra, sw) => h('div', { role: 'status', style: { position: 'absolute', left: 0, right: 0, bottom: 'calc(100% + 6px)', zIndex: 25, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
   background: T.card, border: '1px solid ' + T.bds, borderRadius: 9, boxShadow: '0 12px 30px rgba(0,0,0,.3)', fontSize: 12.5 } },
   h('span', { 'aria-hidden': 'true', style: { width: 8, height: 8, borderRadius: '50%', flex: 'none', background: dot } }),
   h('span', { style: { fontWeight: 600, whiteSpace: 'nowrap' } }, 'Voice mode'),
   extra ? h('span', { style: { color: T.dim, whiteSpace: 'nowrap' } }, extra) : null,
+  sw || null,
   h('span', { style: { color: T.mut, whiteSpace: 'nowrap' } }, words),
   text ? h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: T.tx } }, text) : h('span', { style: { flex: 1 } }),
   h('span', { style: { color: T.dim, fontSize: 11.5, whiteSpace: 'nowrap' } }, 'Esc ends'));
@@ -96,14 +99,16 @@ export function useModUp(api, id) {
   return up;
 }
 
-/** The speech engine while it is on: the bar and the pressed button. `cfg`: {voice, quant, pauseMs, language, mics, note};
+/** The speech engine while it is on: the bar and the pressed button. `cfg`: {voice, quant, pauseMs, language, mics, note,
+ * answers, onAnswers(next)}: who answers, and the bar's switch saving it;
  * `thread()`: the chat's id (made when the chat is new); `onOff(fallback?)`: it ended (fallback: {note} to carry on
  * with the chat engine). A turn of the chat's own (a typed message, a card) pauses it; it starts again afterwards
  * as a new session, which then knows that turn. */
 export function LiveVoice({ cfg, thread, running, waiting, disabled, onOff, onMode, start = liveVoice }) {
   const React = R(), [s, setS] = React.useState(() => liveStep({ mode: 'off' }, { type: 'start' }));
-  const talk = React.useRef(null), ended = React.useRef(false), asking = React.useRef(false);
-  const hold = (running || waiting) && !asking.current && !s.asking;     // not while the speech model asked the chat's model itself
+  const talk = React.useRef(null), ended = React.useRef(false), asking = React.useRef(false), agent = React.useRef(false);
+  const [answers, setAnswers] = React.useState(cfg.answers === 'speech' ? 'speech' : 'agent');
+  const hold = (running || waiting) && !asking.current && !s.asking;     // not during the chat's turn this conversation started itself
   const end = fb => { if (ended.current) return; ended.current = true; talk.current?.stop(); talk.current = null; onOff(fb); };
   React.useEffect(() => { onMode?.('listening'); return () => { talk.current?.stop(); talk.current = null; onMode?.('off'); }; }, []);
   React.useEffect(() => {
@@ -112,25 +117,32 @@ export function LiveVoice({ cfg, thread, running, waiting, disabled, onOff, onMo
     setS(p => liveStep(p, { type: 'start' }));
     Promise.resolve().then(thread).then(tid => {
       if (!live || ended.current) return;
-      talk.current = start({ thread: tid, voice: cfg.voice, quant: cfg.quant, pauseMs: cfg.pauseMs, language: cfg.language, mics: cfg.mics, onEvent: ev => {
+      talk.current = start({ thread: tid, answers, voice: cfg.voice, quant: cfg.quant, pauseMs: cfg.pauseMs, language: cfg.language, mics: cfg.mics, onEvent: ev => {
         if (!live) return;
         if (ev.type === 'done') { if (!ended.current && talk.current) end(); return; }
+        if (ev.type === 'ready') agent.current = ev.answers === 'agent';
+        if (ev.type === 'thinking' && agent.current) asking.current = true;       // the chat's agent answers: its turn is ours
         if (ev.type === 'tool' && ev.name === 'ask_chat') asking.current = ev.state === 'running';
         if (ev.type === 'listening') asking.current = false;
         setS(p => { const n = liveStep(p, ev); if (n.mode === 'off' && n.error) setTimeout(() => end({ note: n.error, code: n.code, fix: n.fix }), 0); return n; });
       } });
     }, e => end({ note: e?.detail || e?.message || 'The chat could not be started' }));
     return () => { live = false; talk.current?.stop(); talk.current = null; };
-  }, [hold]);
+  }, [hold, answers]);
   React.useEffect(() => {
     const esc = e => { if (e.key === 'Escape') end(); };
     globalThis.addEventListener('keydown', esc);
     return () => globalThis.removeEventListener('keydown', esc);
   }, []);
-  const mode = hold ? 'paused' : s.mode, words = s.note || LIVE_WORDS[mode] || '';
+  const mode = hold ? 'paused' : waiting && s.asking ? 'card' : s.mode, words = (mode !== 'card' && s.note) || LIVE_WORDS[mode] || '';
+  const flip = () => { const n = answers === 'agent' ? 'speech' : 'agent'; asking.current = false; setAnswers(n); cfg.onAnswers?.(n); };
+  const sw = h('button', { type: 'button', onClick: flip, disabled: hold, 'aria-label': 'Who answers: ' + (answers === 'agent' ? 'the chat’s agent' : 'the speech model itself') + '. Switch',
+    title: answers === 'agent' ? 'The chat’s agent answers, with its tools and apps. Click to talk to the speech model itself.' : 'The speech model answers by itself. Click to have the chat’s agent answer, with its tools and apps.',
+    style: { border: '1px solid ' + T.bds, borderRadius: 6, background: 'none', color: T.tx, font: 'inherit', fontSize: 11.5, padding: '2px 7px', cursor: hold ? 'default' : 'pointer', whiteSpace: 'nowrap' } },
+    answers === 'agent' ? 'Agent answers' : 'Speech model answers');
   const text = mode === 'speaking' || (mode === 'thinking' && s.reply) ? s.reply : s.you ? '“' + s.you + '”' : cfg.note || '';
   return h(R().Fragment, null,
-    bar(mode === 'paused' ? T.pu : mode === 'listening' || mode === 'hearing' ? T.gr : T.acc, words, text, s.model ? '· ' + s.model.replace(/ Q\d.*$/, '') : '· speech model'),
+    bar(mode === 'paused' || mode === 'card' ? T.pu : mode === 'listening' || mode === 'hearing' ? T.gr : T.acc, words, text, s.model ? '· ' + s.model.replace(/ Q\d.*$/, '') : '· speech model', sw),
     voiceBtn(true, disabled, () => end()));
 }
 
@@ -142,7 +154,8 @@ export function VoiceButton(props) {
     const st = await api?.getSettings?.().catch(() => null);
     const pick = pickEngine(st?.voice_mode, voiceUp, chatOk);
     if (pick.engine === 'speech') {
-      setLive({ voice: st?.voice_mode?.voice || 'female', quant: st?.voice_mode?.quant || 'q4_k_m', pauseMs: st?.speech_output?.pause_ms || 1200,
+      setLive({ answers: st?.voice_mode?.answers || 'agent', onAnswers: n => api?.saveSettings?.({ voice_mode: { answers: n } }).catch(() => {}),
+        voice: st?.voice_mode?.voice || 'female', quant: st?.voice_mode?.quant || 'q4_k_m', pauseMs: st?.speech_output?.pause_ms || 1200,
         language: st?.speech_input?.language || undefined, mics: st?.speech_input?.mics || [], note: pick.note });
       return { taken: true };
     }

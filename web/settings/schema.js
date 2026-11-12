@@ -55,27 +55,30 @@ export function subAgentRows(d) {
 }
 
 const knownMods = ctx => (ctx.services || []).filter(s => !(s.manifest_errors || []).length);
-/** Settings → Speech → Voice mode (plan voice-speech-model 3.2): which engine answers in Chat's voice mode. */
+/** Settings → Speech → Voice mode (plan voice-speech-model 3.2, 6.3): the engine of Chat's voice mode, and with the speech model, who answers. */
 export const VOICE_SIZES = [{ value: 'q4_k_m', label: 'Q4_K_M (smaller, faster)' }, { value: 'q8_0', label: 'Q8_0 (closer to the original)' }];
 /** Tools the speech model may be given (plan voice-speech-model 5.1): read-only ones, plus the web search. */
 export const VOICE_TOOLS = [{ value: 'calendar_agenda', label: 'Calendar: your day' }, { value: 'calendar_search', label: 'Calendar: find' },
   { value: 'calendar_free', label: 'Calendar: free time' }, { value: 'web_search', label: 'Web search' }, { value: 'time_now', label: 'The time' }];
 export function voiceModeGroup(d, ctx) {
-  const speech = () => d.voice_mode?.engine === 'speech', has = c => !c.services || hasMod(c, 'voice');
+  const speech = () => d.voice_mode?.engine === 'speech', own = () => speech() && d.voice_mode?.answers === 'speech', has = c => !c.services || hasMod(c, 'voice');
   const kw = ['voice mode', 'speech to speech', 'LFM3', 'omni', 'local'];
   return { id: 'voiceMode', label: 'Voice mode', when: () => !ctx.services || hasMod(ctx, 'voice', 'stt', 'tts'),
-    summary: () => (speech() ? `Speech model (LFM3-Omni-2B ${(VOICE_SIZES.find(s => s.value === d.voice_mode?.quant)?.label || 'Q4_K_M').split(' ')[0]}, ${d.voice_mode?.voice || 'female'} voice)` : 'The chat’s model, read aloud'),
+    summary: () => (speech() ? `Speech model (LFM3-Omni-2B ${(VOICE_SIZES.find(s => s.value === d.voice_mode?.quant)?.label || 'Q4_K_M').split(' ')[0]}, ${d.voice_mode?.voice || 'female'} voice) · ${own() ? 'it answers itself' : 'the chat’s agent answers'}` : 'The chat’s model, read aloud'),
     rows: [
       field('vmEngine', 'voice_mode.engine', { label: 'Voice mode uses', control: 'segmented', keywords: kw,
-        hint: 'Chat model: your words are written down, the chat’s model answers, and the answer is read aloud. Speech model: a small model that hears and speaks answers itself, on this machine, in a fraction of a second. It doesn’t use the chat’s model or its tools.',
+        hint: 'Chat model: your words are written down, the chat’s model answers, and the answer is read aloud. Speech model: a small model on this machine hears you and speaks; who answers is the next choice.',
         choices: c => [{ value: 'chat', label: 'Chat model, read aloud' },
           { value: 'speech', label: 'Speech model (local)', disabled: !has(c) && d.voice_mode?.engine !== 'speech', title: has(c) ? undefined : 'Install the Voice mod: gaifa setup voice' }] }),
+      field('vmAnswers', 'voice_mode.answers', { label: 'Who answers', control: 'segmented', when: speech, keywords: [...kw, 'agent', 'harness', 'tools', 'apps', 'talk to the speech model'],
+        hint: 'The chat’s agent: what you say is sent to the chat as a message, so the chat’s own model answers with its tools, apps, memory and cards, exactly as when you type, and the speech model says each step. The speech model itself: it answers on its own in a fraction of a second, without the chat’s model. The voice bar has the same switch.',
+        choices: [{ value: 'agent', label: 'The chat’s agent' }, { value: 'speech', label: 'The speech model itself' }] }),
       field('vmQuant', 'voice_mode.quant', { label: 'Size', hint: 'Both are compared in docs/voice-eval.md.', control: 'segmented', choices: VOICE_SIZES, when: speech, keywords: [...kw, 'quant', 'Q4', 'Q8'] }),
       field('vmVoice', 'voice_mode.voice', { label: 'Voice', hint: 'The speech model has two voices; the voices above are for reading replies aloud.', control: 'segmented',
         choices: [{ value: 'female', label: 'Female' }, { value: 'male', label: 'Male' }], when: speech, keywords: kw }),
-      field('vmTools', 'voice_mode.tools', { label: 'Tools it may use', control: 'chips', choices: VOICE_TOOLS, when: speech, keywords: [...kw, 'tools', 'calendar', 'web search'],
+      field('vmTools', 'voice_mode.tools', { label: 'Tools it may use', control: 'chips', choices: VOICE_TOOLS, when: own, keywords: [...kw, 'tools', 'calendar', 'web search'],
         hint: 'Off by default. A call runs only when this chat’s permissions allow it without asking; anything that would show a card is refused, and it says so. It is a small model: it won’t always call the right tool.' }),
-      field('vmAskChat', 'voice_mode.ask_chat', { label: 'Let it ask the chat’s model', control: 'toggle', when: speech, keywords: [...kw, 'hand off', 'ask chat'],
+      field('vmAskChat', 'voice_mode.ask_chat', { label: 'Let it ask the chat’s model', control: 'toggle', when: own, keywords: [...kw, 'hand off', 'ask chat'],
         hint: 'For questions it can’t answer itself (a file, a long task), it sends your words to the chat’s own model and tells you the answer. That turn runs like a typed message, with its tools and cards.' }),
       block('vmStatus', 'VoiceModelStatus', { label: 'The speech model', when: speech, keywords: kw }),
     ] };

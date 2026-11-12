@@ -346,6 +346,9 @@ class VoiceModeCfg(_Strict):
     engine: Literal["chat", "speech"] = "chat"
     quant: Literal["q4_k_m", "q8_0"] = "q4_k_m"      # the speech model's size (docs/voice-eval.md)
     voice: Literal["female", "male"] = "female"      # the speech model's voice
+    # With the speech engine, who answers (6.1). agent: your words go to the chat as a message, so the chat's own model
+    # answers with its tools, apps and cards, and the speech model says it. speech: the speech model answers by itself.
+    answers: Literal["agent", "speech"] = "agent"
     tools: list[str] = Field([], max_length=6)       # tools the speech model may call (5.1); what would ask is refused
     ask_chat: bool = False                           # it may hand a hard question to the chat's own model (5.2)
 

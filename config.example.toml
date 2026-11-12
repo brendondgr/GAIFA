@@ -54,7 +54,9 @@ check_on_start = true
 # Voice mode in Chat (plan voice-speech-model; Settings → Speech → Voice mode).
 # [voice_mode]
 # engine = "chat"           # chat: the chat's model, heard by the stt mod and read by the tts mod
-#                           # speech: the voice mod's speech-to-speech model answers by itself, on this machine
+#                           # speech: the voice mod's speech-to-speech model hears you and speaks, on this machine
+# answers = "agent"         # with engine = "speech": agent (the chat's own model answers, with its tools, apps and cards)
+#                           # | speech (the speech model answers by itself)
 # quant = "q4_k_m"          # the speech model's size: q4_k_m (smaller, faster) | q8_0
 # voice = "female"          # female | male
 

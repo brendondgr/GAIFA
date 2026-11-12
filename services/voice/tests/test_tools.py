@@ -103,7 +103,8 @@ def test_a_tool_call_runs_through_the_hub(client, hub):
     assert session["output_modalities"] is None            # with tools, speech isn't forced on the first response
 
 
-def test_a_first_response_of_text_alone_is_asked_again_to_be_spoken(client, hub, monkeypatch):
+def test_a_first_response_of_text_alone_is_spoken(client, hub, monkeypatch):
+    """llama.cpp refuses a second response with nothing new to answer, so the text is said through /tts."""
     monkeypatch.setenv("FAKE_LLAMA_MODE", "notool")
     monkeypatch.setenv("FAKE_LLAMA_CHUNKS", "0")           # text, no audio
     client.app_.state.voice_mode = {"tools": ["time_now"]}
@@ -112,7 +113,9 @@ def test_a_first_response_of_text_alone_is_asked_again_to_be_spoken(client, hub,
         until(ws, "listening")
         turn, events, final = talk(ws, "What is the capital of France?")
         assert final["text"] == "Paris is the capital of France." and turn["assistant"] == final["text"]      # once, not twice
+        assert final["audio_ms"] > 0 and "speaking" in [e["type"] for e in events] and not [e for e in events if e["type"] == "error"]
         ws.send_json({"type": "stop"})
+    assert [json.loads(t)["input"] for t in lines(client, "TTS ")] == ["Paris is the capital of France."]
 
 
 def test_what_would_ask_is_refused_aloud(client, hub):

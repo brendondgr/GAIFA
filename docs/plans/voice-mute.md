@@ -48,7 +48,7 @@ Phase 1 is the button: muted, nothing the microphone picks up reaches the turn d
 
 ## Phase 2 — Push to talk (S)
 
-- [ ] **2.1 The mod: `talk` on the socket, `services/voice/voice/bridge.py`, `vad.py`.**
+- [x] **2.1 The mod: `talk` on the socket, `services/voice/voice/bridge.py`, `vad.py`.**
   - **Start:** `Start.talk: "open" | "push"` (else `[voice_mode] talk`); `ready` carries it. In `push` the detector's VAD decides nothing: frames outside a hold are dropped, as when muted.
   - **Message:** `{type: "talk", on: bool}`. On: an interruption if a reply is under way (today's `on_interrupt` path, with the page's `played_ms`), then `TurnDetector.begin()` so everything after is the turn (`hearing`, the GPU slot as in 1.1). Off: `end_turn()` at once; a hold with under 250 ms of audio or an empty transcription sends nothing and goes back to `listening`. A hold is capped at the detector's `max_s`.
   *Done when:* `services/voice/tests/test_push.py`: frames outside a hold start nothing (loud noise included); a hold sends its words when released without waiting `pause_ms`; a short press sends nothing; a press during a reply interrupts it; both `answers` modes.

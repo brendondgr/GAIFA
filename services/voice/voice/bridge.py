@@ -2,15 +2,16 @@
 
 The page speaks a small protocol of this mod's own, so it never depends on llama.cpp's schema.
 
-    page → mod   {"type":"start", "thread"?, "voice"?, "language"?, "pause_ms"?, "sample_rate"?, "quant"?, "save"?, "answers"?, "muted"?}
+    page → mod   {"type":"start", "thread"?, "voice"?, "language"?, "pause_ms"?, "sample_rate"?, "quant"?, "save"?, "answers"?, "muted"?, "talk"?}
                  binary frames: PCM16 mono at sample_rate (16000 unless said)
                  {"type":"text", "text"}            a typed turn (the mod's page, the eval)
                  {"type":"interrupt", "played_ms"}  you started talking over the reply
                  {"type":"played"}                  the reply finished playing
                  {"type":"mute", "on"}              muted: nothing you say is heard (a turn being heard is dropped)
+                 {"type":"talk", "on", "played_ms"?}  push to talk: pressed (talking over a reply stops it) | let go (sent)
                  {"type":"stop"}
     mod → page   {"type":"waiting", "text"}         the GPU is busy with something else
-                 {"type":"ready", "sample_rate_out", "model", "voice", "answers", "muted"}
+                 {"type":"ready", "sample_rate_out", "model", "voice", "answers", "muted", "talk"}
                  {"type":"listening"} · {"type":"hearing"} · {"type":"thinking"} · {"type":"speaking"}
                  binary frames: the reply, PCM16 mono at sample_rate_out
                  {"type":"said", "text", "final", "audio_ms"?}     the reply's text as it comes
@@ -69,6 +70,7 @@ HISTORY_CHARS = 24000                     # about 6,000 tokens of earlier turns
 AUDIO_TOKENS_PER_S = 13                   # a rough count of what your speech costs the context
 RESPONSE_TIMEOUT_S = 60.0
 HOLD_MS = 600                             # microphone audio kept while the reply plays, for a barge-in's first words
+PUSH_MIN_MS = 250                         # push to talk: a shorter press sends nothing
 
 
 class Start(BaseModel):
@@ -82,6 +84,7 @@ class Start(BaseModel):
     save: bool = True                      # False: nothing is written into the chat (a test of the microphone)
     answers: str | None = Field(None, pattern=r"^(agent|speech)$")     # who answers; [voice_mode] answers when left out
     muted: bool = False                    # start muted (plan voice-mute 1.1)
+    talk: str | None = Field(None, pattern=r"^(open|push)$")         # open: always listening | push: only while held (2.1)
 
 
 def vad_kind(settings) -> str:
@@ -164,6 +167,9 @@ class Session:
         self.gpu = Gpu("Voice conversation")
         self._conv_task: asyncio.Task | None = None
         self.muted = False                             # nothing you say is heard; a reply goes on (plan voice-mute 1.1)
+        self.push = False                              # push to talk: heard only while held (plan voice-mute 2.1)
+        self.held = False
+        self.held_bytes = 0
 
     # ---- to the page
 
@@ -235,6 +241,10 @@ class Session:
         self.engine.touch()
         if self.muted:
             return
+        if self.push:                                  # the press decides the turn, not the VAD
+            if self.held:
+                await self.on_held(pcm)
+            return
         if self.mode in ("thinking", "speaking"):
             self.hold.append(pcm)
             self.hold_bytes += len(pcm)
@@ -286,6 +296,32 @@ class Session:
                 await self.drop_heard()
             self.detector.reset()
         await self.emit("muted", on=on)
+
+    async def on_held(self, pcm: bytes) -> None:
+        self.held_bytes += len(pcm)
+        await self.on_detected([("speech", pcm)])
+        if self.held_bytes >= self.detector.max_ms * self.start.sample_rate * 2 / 1000:
+            self.held = False                          # held too long: sent, as when let go
+            await self.end_turn()
+
+    async def set_talk(self, on: bool, played_ms: float = 0.0) -> None:
+        """Push to talk: pressed, you are heard (a reply under way is stopped); let go, the turn is sent at once."""
+        if not self.push or self.muted or on == self.held:
+            return
+        if on:
+            if self.mode in ("thinking", "speaking"):
+                self.hold.clear()
+                self.hold_bytes = 0
+                await self.on_interrupt(played_ms)
+            self.detector.reset()
+            self.held, self.held_bytes = True, 0
+            return
+        self.held = False
+        if self.mode != "hearing":
+            return
+        if self.held_bytes < PUSH_MIN_MS * self.start.sample_rate * 2 / 1000:
+            return await self.drop_heard()             # a tap: nothing is sent
+        await self.end_turn()
 
     async def drop_heard(self) -> None:
         """Forget the turn being heard: nothing goes to the chat, the GPU slot is given back, it listens again."""
@@ -487,6 +523,8 @@ class Session:
                 return
             if t == "mute":
                 await self.set_muted(bool(ev.get("on")))
+            elif t == "talk":
+                await self.set_talk(bool(ev.get("on")), float(ev.get("played_ms") or 0))
             elif t == "interrupt":
                 await self.on_interrupt(float(ev.get("played_ms") or 0))
             elif t == "played":
@@ -539,6 +577,7 @@ class Session:
                 vm: dict[str, Any] = {}
                 if self.settings.hub_url or self.start_tools is not None:
                     vm = self.start_tools if self.start_tools is not None else await self.hub.voice_mode()
+                self.push = (self.start.talk or vm.get("talk") or "open") == "push"
                 if self.start.thread and (self.start.answers or vm.get("answers")) == "agent":
                     self.agent = AgentTurns(self, port)
                 else:
@@ -560,7 +599,8 @@ class Session:
             self.detector = vad.TurnDetector(vad.make_vad(self.settings.vad_model), rate=self.start.sample_rate,
                                              pause_ms=self.start.pause_ms)
             await self.emit("ready", sample_rate_out=self.out_rate, model=self.engine.status()["label"],
-                            voice=self.start.voice, vad=self.detector.vad.kind, answers="agent" if self.agent else "speech", muted=self.muted)
+                            voice=self.start.voice, vad=self.detector.vad.kind, answers="agent" if self.agent else "speech", muted=self.muted,
+                            talk="push" if self.push else "open")
             await self.emit("listening")
             if self.agent:
                 await self.gpu.off()                      # held again while you are heard and while it speaks

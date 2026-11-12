@@ -154,3 +154,42 @@ test('one conversation per page, and a refused microphone', async () => {
   await tick();
   assert.deepEqual(events, [{ type: 'error', code: 'microphone', fatal: true, detail: 'Microphone access was refused' }]);
 });
+
+test('voice-mute 1.2: muted, no frames go up and nothing interrupts; a reconnect keeps it', async () => {
+  const r = rig({ muted: true });
+  await tick();
+  const ws = r.sockets[0];
+  ws.open();
+  assert.equal(ws.texts[0].muted, true);                     // the start says so
+  ws.json({ type: 'ready', sample_rate_out: 24000, muted: true }); ws.json({ type: 'listening' });
+  r.speak(0.5); r.speak(0.5);
+  assert.equal(ws.frames.length, 0);
+  r.talk.mute(false);
+  assert.deepEqual(ws.texts.at(-1), { type: 'mute', on: false });
+  r.speak(0.01);
+  assert.equal(ws.frames.length, 1);
+  ws.json({ type: 'thinking' }); ws.json({ type: 'speaking' }); ws.audio();
+  r.talk.mute(true);
+  r.advance(500);
+  for (let i = 0; i < 8; i++) r.speak(0.9);                  // loud for 800 ms while it speaks: muted, no interrupt
+  assert.equal(ws.texts.some(t => t.type === 'interrupt'), false);
+  assert.equal(r.players[0].stopped, false); assert.equal(ws.frames.length, 1);
+  ws.drop();                                                 // the one reconnect starts muted again
+  r.sockets[1].open();
+  assert.equal(r.sockets[1].texts[0].muted, true);
+  r.talk.stop();
+});
+
+test('voice-mute 1.2: the state and the words, muted', () => {
+  let s = run([{ type: 'start' }, { type: 'ready', model: 'm', muted: true }, { type: 'listening' }]);
+  assert.equal(s.muted, true);
+  assert.equal(L.liveWords('listening', s.muted), 'Muted');
+  assert.equal(L.liveWords('speaking', true), 'Speaking (muted)');
+  assert.equal(L.liveWords('thinking', true), 'Thinking…');
+  assert.equal(L.liveWords('listening', false), 'Listening…');
+  s = run([{ type: 'muted', on: false }, { type: 'hearing' }, { type: 'heard', text: 'half a' }], s);
+  assert.deepEqual([s.muted, s.mode], [false, 'hearing']);
+  s = run([{ type: 'muted', on: true }], s);                 // muting mid-sentence: it listens again, the words dropped
+  assert.deepEqual([s.muted, s.mode, s.you], [true, 'listening', '']);
+  assert.equal(run([{ type: 'start' }], s).muted, true);     // a new session (after a pause) keeps it
+});

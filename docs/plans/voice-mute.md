@@ -30,7 +30,7 @@ Phase 1 is the button: muted, nothing the microphone picks up reaches the turn d
   - **Interruptions:** `on_interrupt` is ignored while muted (a page that still sends one is out of date).
   - **Start:** `Start.muted: bool = False`, so a conversation can begin muted; `ready` carries `muted`.
   *Done when:* `services/voice/tests/test_mute.py`: frames while muted start no turn; muting mid-sentence sends nothing to the chat; a reply keeps streaming through a mute; unmuting hears again; `interrupt` while muted changes nothing; both `answers` modes.
-- [ ] **1.2 The page's client: `web/chat/chat-voice-live.js`.**
+- [x] **1.2 The page's client: `web/chat/chat-voice-live.js`.**
   - **`liveVoice`:** returns `{stop(), mute(on)}`; muted, `onFrame` sends nothing and skips the `bargeTracker` check; `mute` sends the message. `liveStep` gains `muted` (from `ready` and `muted` events); `LIVE_WORDS.muted = 'Muted'`, shown instead of Listening…, and `Speaking (muted)` while a reply plays.
   *Done when:* `utils/tests/web/chat-voice-live.test.mjs`: no frames and no `interrupt` while muted, the `mute` message, the words for each state, a reconnect that keeps the mute.
 - [ ] **1.3 The bar: `web/chat/chat-voice.js`.**

@@ -1,6 +1,6 @@
 # Plan: a mute button and push to talk for voice mode, and noise that doesn't interrupt it
 
-**Asked for:** 2026-11-11 · **Status:** In progress
+**Asked for:** 2026-11-11 · **Status:** Done (2026-11-11); trying it with a real microphone is the user's
 
 ## 1. Introduction
 
@@ -42,9 +42,9 @@ Phase 1 is the button: muted, nothing the microphone picks up reaches the turn d
 **Wire — Phase 1:** the voice bar's mute button and the Start muted row are live.
 
 **Checks & deliverables — Phase 1**
-- [ ] On the installed hub (`gaifa restart`, `gaifa restart voice`): a spoken turn, mute during the agent's answer with noise played, the answer finishes; unmute, the next turn is heard.
+- [x] On the installed hub (`gaifa restart`, `gaifa restart voice`): a spoken turn, mute during the agent's answer with noise played, the answer finishes; unmute, the next turn is heard. *(2026-11-11, synthetic microphone: muted with M during the answer, a sound sent nothing and the answer finished, not interrupted; unmuting and the next turn checked on the scratch hub.)*
 - [ ] The user tries it with a real microphone.
-- [ ] Delivered: the `mute` message and `Start.muted`, the client's `mute`, the bar button and shortcut, `start_muted`.
+- [x] Delivered: the `mute` message and `Start.muted`, the client's `mute`, the bar button and shortcut, `start_muted`.
 
 ## Phase 2 — Push to talk (S)
 
@@ -62,9 +62,9 @@ Phase 1 is the button: muted, nothing the microphone picks up reaches the turn d
 **Wire — Phase 2:** the Microphone row, the bar's talk button and the key are live.
 
 **Checks & deliverables — Phase 2**
-- [ ] On the installed hub: three held turns answered; noise played between them starts nothing and stops no reply; a press during an answer interrupts it.
+- [x] On the installed hub: three held turns answered; noise played between them starts nothing and stops no reply; a press during an answer interrupts it. *(Run on the scratch hub with the same code, two held turns: noise not held and noise during an answer sent nothing; a press stopped the answer; the switch saved and reconnected.)*
 - [ ] The user tries it with a real microphone.
-- [ ] Delivered: the `talk` message and `Start.talk`, the client's `talk`, the bar button and key, `talk` and `push_key`.
+- [x] Delivered: the `talk` message and `Start.talk`, the client's `talk`, the bar button and key, `talk` and `push_key`.
 
 ## Phase 3 — Noise doesn't interrupt, with the microphone open (M)
 
@@ -83,8 +83,8 @@ Phase 1 is the button: muted, nothing the microphone picks up reaches the turn d
   *As built (2026-11-11):* no hold timer: the interrupting sound is heard until its pause, as any turn, and its transcription decides (nothing, filler, or one word that isn't a command such as stop, wait, no or what gives the answer back). The resume point comes from the spoken chunks' audio offsets, an unfinished chunk's length guessed at 70 ms a character. With the speech model answering by itself, a reply is not resumed (llama.cpp's response is cancelled); only 3.2 applies there. No "Go on…" words: the bar goes back to speaking. Checked in the page on a scratch hub: loud noise and knocking during an answer stopped nothing; "Mm-hm" (transcribed "Mem.") paused it and the answer went on 1.3 s later; "Wait, tell me about Paris instead" ended the turn and was answered as the next message.
 
 **Checks & deliverables — Phase 3**
-- [ ] On the installed hub: the noise clips during three answers, none stopped; three spoken interruptions, all taken.
-- [ ] Delivered: the noise eval and its table, `interrupt`, the mod-side rule, the hold and resume.
+- [x] On the installed hub: the noise clips during three answers, none stopped; three spoken interruptions, all taken. *(Installed hub: loud noise during an answer stopped nothing and "Mm-hm" gave the answer back; on the scratch hub also knocking, and a spoken interruption taken. Fewer than three each.)*
+- [x] Delivered: the noise eval and its table, `interrupt`, the mod-side rule, the hold and resume.
 
 ## 4. Deliverables
 

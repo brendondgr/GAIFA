@@ -71,15 +71,16 @@ Phase 1 is the button: muted, nothing the microphone picks up reaches the turn d
 - [x] **3.1 Measure: `services/voice/evals/noise.py`.**
   - Play recorded noise (speech-shaped babble, a TV clip, keyboard and door sounds, a cough; a few files kept in `services/voice/evals/noise/`, small, recorded here or synthesized) and real spoken interruptions through the bridge during a reply, and count false and missed interruptions for: today's rule (the page's level over `BARGE_LEVEL` for `BARGE_MS`), Silero's speech probability over a window, and both together. Same for turns started while listening (`enter_ms`).
   *Done when:* a table in `docs/voice-eval.md` (Noise), and the rule chosen from it.
-- [ ] **3.2 Interruptions decided by the mod: `services/voice/voice/vad.py`, `bridge.py`.**
+- [x] **3.2 Interruptions decided by the mod: `services/voice/voice/vad.py`, `bridge.py`.**
   - **Rule:** while a reply plays, the mod runs the frames it already receives through the detector's VAD; an interruption is `barge_ms` of speech (3.1's numbers; a starting point: 300 ms at probability ≥ 0.6). The mod then emits `{type: "interrupted"}` and the page stops playback and answers with `played_ms`. The page's own level check stays only as a pre-filter (quiet frames aren't worth a VAD pass) and for the chat-model loop.
   - **Setting:** `[voice_mode] interrupt = "speech" | "off"`: `off` means only Stop and the mute button end a reply. Row "Talking over it" in Speech → Voice mode.
   *Done when:* `services/voice/tests/test_barge.py` (noise frames don't interrupt, speech frames do, `off`); 3.1's eval rerun shows fewer false interruptions with no more missed ones; web tests for the `interrupted` event.
-- [ ] **3.3 A false interruption gives the reply back: `services/voice/voice/agent_turns.py`.**
+- [x] **3.3 A false interruption gives the reply back: `services/voice/voice/agent_turns.py`.**
   - **Agent answers:** an interruption pauses the speech and holds the chat's turn for up to `HOLD_S` (1.5 s) instead of cancelling at once; when the transcription of what interrupted is empty or under two words, the speech resumes from the sentence it stopped in and the turn was never cancelled; with words, today's behavior (cancel, new turn).
   - **Speech model answers:** the reply can't be resumed in llama.cpp's realtime session; the rest of its text is said through `/tts` (`speak.tts_stream`).
   - **Bar:** "Go on…" for the hold.
   *Done when:* `test_agent_turns.py` (noise → resumed, the chat's turn not cancelled; words → cancelled as today); a live run on a scratch hub with a cough clip during a tool-using answer.
+  *As built (2026-11-11):* no hold timer: the interrupting sound is heard until its pause, as any turn, and its transcription decides (nothing, filler, or one word that isn't a command such as stop, wait, no or what gives the answer back). The resume point comes from the spoken chunks' audio offsets, an unfinished chunk's length guessed at 70 ms a character. With the speech model answering by itself, a reply is not resumed (llama.cpp's response is cancelled); only 3.2 applies there. No "Go on…" words: the bar goes back to speaking. Checked in the page on a scratch hub: loud noise and knocking during an answer stopped nothing; "Mm-hm" (transcribed "Mem.") paused it and the answer went on 1.3 s later; "Wait, tell me about Paris instead" ended the turn and was answered as the next message.
 
 **Checks & deliverables — Phase 3**
 - [ ] On the installed hub: the noise clips during three answers, none stopped; three spoken interruptions, all taken.

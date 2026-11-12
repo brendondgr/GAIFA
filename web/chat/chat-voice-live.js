@@ -5,7 +5,9 @@
 // reply has finished playing or you talked over it (the microphone staying loud while it plays). Muted (plan
 // voice-mute 1.2), no frames go up and nothing interrupts: the mod hears nothing, and a reply goes on. With push to
 // talk (2.2) frames go up only while held (with the 400 ms before the press, so a first syllable isn't lost), a
-// press during a reply stops it, and letting go sends the turn; loudness interrupts nothing.
+// press during a reply stops it, and letting go sends the turn; loudness interrupts nothing. A mod that decides
+// interruptions itself by speech (3.2, `ready.interrupt`: speech | off) says `interrupted`, and this page then stops
+// the reply where it is; its own loudness check is only for a mod that doesn't.
 // Written by us (web/PATCHES.md).
 
 import { micFrames, toInt16, levelOf } from './chat-mic.js';
@@ -65,7 +67,7 @@ let current = null;     // one conversation per page: starting another ends this
 export function liveVoice({ thread, voice = 'female', language, pauseMs = 1200, quant, answers, muted: startMuted = false, talk: talkMode = 'open', save = true, mics = [], onEvent,
   url = liveUrl(), WebSocketImpl = globalThis.WebSocket, Player = PcmPlayer, frames = micFrames, now = () => globalThis.performance.now() }) {
   let ws = null, mic = null, player = null, stopped = false, retried = false, ready = false, rate = 24000;
-  let speaking = false, dropping = false, playedFrom = null, loud = bargeTracker(), finalSeen = false, muted = !!startMuted, held = false;
+  let speaking = false, dropping = false, playedFrom = null, loud = bargeTracker(), finalSeen = false, muted = !!startMuted, held = false, modBarge = false;
   const ring = [];                                     // push to talk: the frames just before a press
   const send = o => { if (ws && ws.readyState === 1) ws.send(typeof o === 'string' || o instanceof ArrayBuffer ? o : JSON.stringify(o)); };
   const endPlayer = () => { player?.stop(); player = null; speaking = false; playedFrom = null; finalSeen = false; };
@@ -81,7 +83,7 @@ export function liveVoice({ thread, voice = 'female', language, pauseMs = 1200, 
       while (ring.length > 1 && n - ring[0].byteLength / 2 >= PREROLL_SAMPLES) n -= ring.shift().byteLength / 2;
       return;
     }
-    if (speaking && loud(levelOf(f), now())) {           // you talked over the reply: stop it where it is
+    if (speaking && !modBarge && loud(levelOf(f), now())) {     // you talked over the reply: stop it where it is
       const ms = played();
       dropping = true;
       endPlayer();
@@ -91,7 +93,11 @@ export function liveVoice({ thread, voice = 'female', language, pauseMs = 1200, 
   };
 
   const handle = ev => {
-    if (ev.type === 'ready') { ready = true; rate = ev.sample_rate_out || 24000; }
+    if (ev.type === 'ready') { ready = true; rate = ev.sample_rate_out || 24000; modBarge = !!ev.interrupt; }
+    else if (ev.type === 'interrupted') {               // the mod heard a voice over the reply: stop it where it is
+      if (speaking && !dropping) { const ms = played(); dropping = true; endPlayer(); send({ type: 'interrupt', played_ms: Math.round(ms) }); }
+      else send({ type: 'interrupt', played_ms: Math.round(played()) });
+    }
     else if (ev.type === 'thinking') { dropping = false; loud = bargeTracker(); }
     else if (ev.type === 'said' && ev.final && !dropping) {
       finalSeen = true;

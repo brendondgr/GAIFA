@@ -2,7 +2,7 @@
 
 The page speaks a small protocol of this mod's own, so it never depends on llama.cpp's schema.
 
-    page → mod   {"type":"start", "thread"?, "voice"?, "language"?, "pause_ms"?, "sample_rate"?, "quant"?, "save"?, "answers"?, "muted"?, "talk"?}
+    page → mod   {"type":"start", "thread"?, "voice"?, "language"?, "pause_ms"?, "sample_rate"?, "quant"?, "save"?, "answers"?, "muted"?, "talk"?, "interrupt"?}
                  binary frames: PCM16 mono at sample_rate (16000 unless said)
                  {"type":"text", "text"}            a typed turn (the mod's page, the eval)
                  {"type":"interrupt", "played_ms"}  you started talking over the reply
@@ -11,12 +11,14 @@ The page speaks a small protocol of this mod's own, so it never depends on llama
                  {"type":"talk", "on", "played_ms"?}  push to talk: pressed (talking over a reply stops it) | let go (sent)
                  {"type":"stop"}
     mod → page   {"type":"waiting", "text"}         the GPU is busy with something else
-                 {"type":"ready", "sample_rate_out", "model", "voice", "answers", "muted", "talk"}
+                 {"type":"ready", "sample_rate_out", "model", "voice", "answers", "muted", "talk", "interrupt"}
                  {"type":"listening"} · {"type":"hearing"} · {"type":"thinking"} · {"type":"speaking"}
                  binary frames: the reply, PCM16 mono at sample_rate_out
                  {"type":"said", "text", "final", "audio_ms"?}     the reply's text as it comes
                  {"type":"heard", "text"}           your turn as text
                  {"type":"muted", "on"}             the mute as the mod holds it
+                 {"type":"interrupted"}             you talked over the reply (a voice, not noise): stop playing it and
+                                                    answer with {"type":"interrupt", "played_ms"}
                  {"type":"tool", "name", "state", "text"?}   a tool the reply uses: running, then done | refused | failed
                  {"type":"turn", "user", "assistant", "first_audio_ms", "interrupted", "saved"}
                  {"type":"error", "code", "detail", "fix"?}
@@ -85,6 +87,7 @@ class Start(BaseModel):
     answers: str | None = Field(None, pattern=r"^(agent|speech)$")     # who answers; [voice_mode] answers when left out
     muted: bool = False                    # start muted (plan voice-mute 1.1)
     talk: str | None = Field(None, pattern=r"^(open|push)$")         # open: always listening | push: only while held (2.1)
+    interrupt: str | None = Field(None, pattern=r"^(speech|off)$")   # talking over the reply: a voice stops it | nothing does (3.2)
 
 
 def vad_kind(settings) -> str:
@@ -170,6 +173,9 @@ class Session:
         self.push = False                              # push to talk: heard only while held (plan voice-mute 2.1)
         self.held = False
         self.held_bytes = 0
+        self.barge: vad.BargeDetector | None = None    # talking over the reply, decided here by speech (plan voice-mute 3.2)
+        self.barged = False
+        self.interrupts = "speech"
 
     # ---- to the page
 
@@ -189,6 +195,9 @@ class Session:
 
     async def set_mode(self, mode: str) -> None:
         if mode != self.mode:
+            if mode == "speaking" and self.barge is not None:
+                self.barge.reset()
+                self.barged = False
             self.mode = mode
             await self.emit(mode)
 
@@ -251,6 +260,9 @@ class Session:
             limit = self.start.sample_rate * 2 * HOLD_MS // 1000
             while self.hold_bytes > limit and len(self.hold) > 1:
                 self.hold_bytes -= len(self.hold.popleft())
+            if self.mode == "speaking" and self.barge is not None and not self.barged and self.barge.feed(pcm):
+                self.barged = True                     # a voice over the reply: the page stops it and says how far it got
+                await self.emit("interrupted")
             return
         await self.on_detected(self.detector.feed(pcm))
 
@@ -334,10 +346,10 @@ class Session:
         await self.set_mode("listening")
 
     async def on_interrupt(self, played_ms: float) -> None:
-        if self.muted:
-            return                                    # a page that still sends one is out of date
+        if self.muted or (self.interrupts == "off" and not self.push):
+            return                                    # muted, or interruptions are off: a page that still sends one is out of date
         if self.agent:
-            return await self.agent.interrupt()
+            return await self.agent.interrupt(played_ms, pressed=self.push)
         reply = self.reply
         if reply is None or self.mode not in ("thinking", "speaking"):
             return
@@ -598,9 +610,12 @@ class Session:
                 return await self.fail(4500, "engine_failed", f"llama.cpp didn't open a session ({e})")
             self.detector = vad.TurnDetector(vad.make_vad(self.settings.vad_model), rate=self.start.sample_rate,
                                              pause_ms=self.start.pause_ms)
+            self.interrupts = interrupts = self.start.interrupt or vm.get("interrupt") or "speech"
+            if interrupts == "speech" and not self.push:
+                self.barge = vad.BargeDetector(vad.make_vad(self.settings.vad_model), rate=self.start.sample_rate)
             await self.emit("ready", sample_rate_out=self.out_rate, model=self.engine.status()["label"],
                             voice=self.start.voice, vad=self.detector.vad.kind, answers="agent" if self.agent else "speech", muted=self.muted,
-                            talk="push" if self.push else "open")
+                            talk="push" if self.push else "open", interrupt="push" if self.push else interrupts)
             await self.emit("listening")
             if self.agent:
                 await self.gpu.off()                      # held again while you are heard and while it speaks

@@ -852,6 +852,7 @@ class VoiceModeSettings(_Model):
     start_muted: bool = Field(description="Voice mode starts muted (either engine); the bar's mute button and M unmute it")
     talk: Literal["open", "push"] = Field(description="open: always listening; push: heard only while push_key or the bar's button is held")
     push_key: Literal["Space", "Backquote", "F2", "F8", "ControlRight"] = Field(description="Push to talk's key (a KeyboardEvent.code)")
+    interrupt: Literal["speech", "off"] = Field(description="Talking over a reply: speech, a voice stops it (noise doesn't); off, only Stop and the mute do")
 
 
 class Settings(_Model):

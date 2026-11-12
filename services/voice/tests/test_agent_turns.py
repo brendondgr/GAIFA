@@ -113,10 +113,11 @@ def test_talking_over_it_stops_the_speech_and_the_running_turn(client, hub, monk
         ws.send_json({"type": "text", "text": "Tidy up my notes folder"})
         until(ws, "speaking")
         ws.send_json({"type": "interrupt", "played_ms": 300})
+        until(ws, "listening")                                 # paused, hearing what interrupted (voice-mute 3.3)
+        ws.send_json({"type": "text", "text": "Never mind"})   # words: that turn ends, and this is the next
         turn, _, _ = until(ws, "turn")
         assert turn["interrupted"] is True and turn["user"] == "Tidy up my notes folder"
-        ws.send_json({"type": "text", "text": "Never mind"})   # it listens again
-        until(ws, "thinking")
+        until(ws, "turn")
         ws.send_json({"type": "stop"})
     assert hub.stops == 1 and hub.asked[0] == "Tidy up my notes folder"
 

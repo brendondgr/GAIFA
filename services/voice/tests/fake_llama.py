@@ -143,7 +143,7 @@ async def realtime(ws, transcription=False):
             await ws.send(json.dumps({"type": "input_audio_buffer.committed", "item_id": "i1"}))
             if session["type"] == "transcription":
                 await ws.send(json.dumps({"type": "conversation.item.input_audio_transcription.completed", "item_id": "i1",
-                                          "transcript": f"heard {heard} samples" if heard else ""}))
+                                          "transcript": os.environ.get("FAKE_LLAMA_HEARD", f"heard {heard} samples") if heard else ""}))
                 heard = 0
         elif t == "response.create" and not fresh:
             await ws.send(json.dumps({"type": "error", "error": {"message": "response.create: commit audio or create a message first"}}))

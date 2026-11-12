@@ -229,7 +229,7 @@ export function VoiceButton(props) {
       return { taken: true };
     }
     return { taken: false, note: pick.note, error: pick.error, startMuted: !!st?.voice_mode?.start_muted, talk: st?.voice_mode?.talk || 'open',
-      pushKey: st?.voice_mode?.push_key || 'Space' };
+      pushKey: st?.voice_mode?.push_key || 'Space', interrupt: st?.voice_mode?.interrupt || 'speech' };
   };
   if (live) return h(LiveVoice, { cfg: live, thread: thread || (() => null), running, waiting, disabled, onMode,
     onOff: fallback => { setLive(null); if (fallback) setFb(f => ({ n: f.n + 1, note: `The speech model isn’t available (${fallback.note}): using the chat’s model`, error: fallback.fix ? `${fallback.note} Fix: ${fallback.fix}` : fallback.note })); } });
@@ -243,7 +243,7 @@ export function ChatVoiceButton({ api, onSend, running, waiting, answer = { seq:
   const pause = speechOutput?.pause_ms || 1200, [note, setNote] = React.useState(null), chatOk = !!(up && speechOutput);
   const [muted, setMuted] = React.useState(false), mutedRef = React.useRef(false);
   const [talkMode, setTalkMode] = React.useState('open'), talkRef = React.useRef('open'), [pushKey, setPushKey] = React.useState('Space');
-  const [held, setHeld] = React.useState(false), heldRef = React.useRef(false);
+  const [held, setHeld] = React.useState(false), heldRef = React.useRef(false), noBarge = React.useRef(false);
   const press = on => {              // push to talk: dictate while held; letting go sends what was heard
     if (talkRef.current !== 'push' || heldRef.current === on) return;
     heldRef.current = on; setHeld(on);
@@ -265,6 +265,7 @@ export function ChatVoiceButton({ api, onSend, running, waiting, answer = { seq:
     if (!chatOk) { setS(p => ({ ...p, error: r.error || 'Voice mode needs the Speech to Text and Speech mods' })); return; }
     setNote(r.note || null);
     mutedRef.current = !!r.startMuted && r.talk !== 'push'; setMuted(mutedRef.current);
+    noBarge.current = r.interrupt === 'off';
     talkRef.current = r.talk === 'push' ? 'push' : 'open'; setTalkMode(talkRef.current); setPushKey(r.pushKey || 'Space'); heldRef.current = false; setHeld(false);
     go({ type: 'start' });
   };
@@ -310,7 +311,7 @@ export function ChatVoiceButton({ api, onSend, running, waiting, answer = { seq:
       const r = speak(words, speechOutput || {});
       reading.current = r;
       r.done.then(() => { if (reading.current === r) { reading.current = null; go({ type: 'spoken' }); } }, () => { if (reading.current === r) { reading.current = null; go({ type: 'spoken' }); } });
-      watchBarge();
+      if (!noBarge.current) watchBarge();       // [voice_mode] interrupt = "off": it reads to the end
     }
     if (m === 'paused' || m === 'off') { stopListening(); stopReading(); }
   }, [s.mode]);

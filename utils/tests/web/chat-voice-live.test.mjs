@@ -233,3 +233,22 @@ test('voice-mute 2.2: push to talk sends frames only while held, with the 400 ms
   assert.equal(open.sockets[0].texts.some(t => t.type === 'talk'), false);
   open.talk.stop(); r.talk.stop();
 });
+
+test('voice-mute 3.2: a mod that decides interruptions by speech: no loudness check here, its word stops the reply', async () => {
+  const r = rig();
+  await tick();
+  const ws = r.sockets[0];
+  ws.open(); ws.json({ type: 'ready', sample_rate_out: 24000, interrupt: 'speech' }); ws.json({ type: 'listening' });
+  ws.json({ type: 'thinking' }); ws.json({ type: 'speaking' }); ws.audio();
+  r.advance(600);
+  for (let i = 0; i < 8; i++) r.speak(0.9);                 // loud noise: the mod hears it as not a voice
+  assert.equal(ws.texts.some(t => t.type === 'interrupt'), false); assert.equal(r.players[0].stopped, false);
+  ws.json({ type: 'interrupted' });
+  const int = ws.texts.filter(t => t.type === 'interrupt');
+  assert.equal(int.length, 1); assert.ok(int[0].played_ms >= 1000, String(int[0].played_ms));
+  assert.ok(r.players[0].stopped);
+  ws.audio(); assert.equal(r.players.length, 1);             // what's still coming of it isn't played
+  ws.json({ type: 'resumed' }); ws.json({ type: 'thinking' }); ws.json({ type: 'speaking' }); ws.audio();
+  assert.equal(r.players.length, 2);                         // given back: the rest plays
+  r.talk.stop();
+});

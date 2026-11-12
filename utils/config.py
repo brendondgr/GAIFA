@@ -354,6 +354,7 @@ class VoiceModeCfg(_Strict):
     start_muted: bool = False                        # voice mode starts muted; the bar's button and M unmute (plan voice-mute 1.3)
     talk: Literal["open", "push"] = "open"           # open: always listening | push: heard only while a key or the button is held (2.2)
     push_key: Literal["Space", "Backquote", "F2", "F8", "ControlRight"] = "Space"   # push to talk's key (KeyboardEvent.code)
+    interrupt: Literal["speech", "off"] = "speech"   # talking over a reply: a voice stops it (the speech model decides by speech) | nothing does (3.2)
 
     @field_validator("tools")
     @classmethod

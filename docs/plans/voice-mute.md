@@ -68,7 +68,7 @@ Phase 1 is the button: muted, nothing the microphone picks up reaches the turn d
 
 ## Phase 3 — Noise doesn't interrupt, with the microphone open (M)
 
-- [ ] **3.1 Measure: `services/voice/evals/noise.py`.**
+- [x] **3.1 Measure: `services/voice/evals/noise.py`.**
   - Play recorded noise (speech-shaped babble, a TV clip, keyboard and door sounds, a cough; a few files kept in `services/voice/evals/noise/`, small, recorded here or synthesized) and real spoken interruptions through the bridge during a reply, and count false and missed interruptions for: today's rule (the page's level over `BARGE_LEVEL` for `BARGE_MS`), Silero's speech probability over a window, and both together. Same for turns started while listening (`enter_ms`).
   *Done when:* a table in `docs/voice-eval.md` (Noise), and the rule chosen from it.
 - [ ] **3.2 Interruptions decided by the mod: `services/voice/voice/vad.py`, `bridge.py`.**

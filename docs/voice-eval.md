@@ -150,6 +150,22 @@ Run on 2026-11-11 on the installed hub, with `[voice_mode] tools = ["calendar_ag
 
 Both sizes called the right tool on all five, and the first audio comes 0.3 to 0.6 s after you stop (the call, then a second response that speaks). What they *say* about the result is less sure: both read an empty afternoon as "no free time". With tools on, the model also sometimes calls one for a question that needs none, and once answered "I don't have that information" to "What is the capital of France?" (seen on the scratch hub). Tools stay off by default.
 
+## Noise (plan voice-mute 3.1)
+
+Which rule tells talking over a reply from noise in the room (`services/voice/evals/noise.py`, run 2026-11-11 on this machine's CPU; the spoken clips are the speech model's male voice, kept in `services/voice/evals/noise/`). Each clip sits 0.5 s into 3 s of a quiet room (−62 dBFS). Noise: white and pink noise, a fan, keyboard clicks, a door, a cough, claps and music, each at −35 and −20 dBFS, and a TV (speech) at −38 and −26. Sayings: eight short interruptions ("Stop.", "Wait, wait.", "Hold on a second.", …) at −24 and −34 dBFS. Silero frames under −45 dBFS don't count (what echo cancellation leaves of the reply).
+
+| Rule | False (of 18 noises) | Missed (of 16 sayings) | Median time to decide |
+| --- | --- | --- | --- |
+| The page's loudness, before (level 0.5 for 350 ms) | 6: white, pink, fan, keyboard, music (−20), TV (−26) | 11 | 800 ms |
+| Silero ≥ 0.5 for 200 ms | 2: the TV | 1: a quiet "Stop." | 500 ms |
+| **Silero ≥ 0.7 for 200 ms (chosen)** | **2: the TV** | **1: a quiet "Stop."** | **500 ms** |
+| Silero ≥ 0.85 for 200 ms | 2: the TV | 1 | 500 ms |
+| Silero ≥ 0.7 for 300 ms | 2: the TV | 3 (the short ones) | 600 ms |
+| Silero ≥ 0.7 for 450 ms | 2: the TV | 5 | 1000 ms |
+| Loudness and Silero 0.7/200 | 1: the TV | 11 | 800 ms |
+
+The loudness rule is what stopped replies for a fan, a keyboard or music, and it still missed most real interruptions: speech is too uneven to stay over one level for 350 ms. Silero heard none of the non-speech noise as a voice at either level and caught every saying but one quiet "Stop."; longer windows only miss the short words. A TV is a voice to any of them: with the chat's agent answering, an interruption whose words don't make it into the transcription (or are only filler) gives the answer back (3.3), and push to talk (Phase 2) is the answer for a noisy room. Times include each clip's own lead-in silence (about 300 ms).
+
 ## The choice
 
 **Q4_K_M stays the default** (2026-11-11). Over these prompts Q8_0 answered the same questions right and wrong (17 of 20 each: both add 17 and 25 to forty, both get the train time wrong, both stumble on the Italian prompt), wrote your words down no better, and spoke no more clearly to Whisper's ear (11.2 % against 12.5 %, within the noise of 27 replies). It costs about 50 ms more before the first audio, 0.8 GB more memory and makes speech a fifth slower. Nothing here measures how the two voices *sound*: that is for the user's ears, with the paired WAVs (`outputs/voice/eval/<n>-<id>-q4_k_m.wav` and `-q8_0.wav`). If Q8_0 sounds better to them, Settings → Speech → Voice mode → Size switches it; both files stay on disk until they say otherwise.

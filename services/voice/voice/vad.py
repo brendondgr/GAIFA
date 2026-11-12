@@ -152,3 +152,40 @@ class TurnDetector:
                 self.speaking, self.voiced = False, 0
                 self.vad.reset()
         return out
+
+
+class BargeDetector:
+    """Talking over a reply (plan voice-mute 3.2): `ms` of speech by the VAD (probability at or over `prob`), dips
+    under `gap_ms` forgiven. Loudness alone (a door, a cough, music) doesn't count: the model has to hear a voice.
+    Frames under `floor_db` (what echo cancellation leaves of the reply itself) don't count either. The numbers are
+    the noise eval's (evals/noise.py, docs/voice-eval.md)."""
+
+    def __init__(self, vad, rate: int = RATE, ms: int = 200, prob: float = 0.7, gap_ms: int = 100, floor_db: float = -45.0) -> None:
+        self.vad, self.rate, self.ms, self.prob, self.gap_ms = vad, rate, ms, prob, gap_ms
+        self.floor = 10 ** (floor_db / 20)
+        self.step = int(round(FRAME * rate / RATE)) * 2
+        self.reset()
+
+    def reset(self) -> None:
+        self.buf = b""
+        self.run = 0.0
+        self.gap = 0.0
+        self.vad.reset()
+
+    def feed(self, pcm: bytes) -> bool:
+        self.buf += pcm
+        while len(self.buf) >= self.step:
+            chunk, self.buf = self.buf[:self.step], self.buf[self.step:]
+            frame = resample(np.frombuffer(chunk, dtype=np.int16), self.rate)
+            frame = np.pad(frame, (0, FRAME - frame.size)) if frame.size < FRAME else frame[:FRAME]
+            loud = float(np.sqrt(np.mean(np.square(frame)))) >= self.floor
+            if self.vad.prob(frame) >= self.prob and loud:
+                self.run += FRAME_MS
+                self.gap = 0.0
+            else:
+                self.gap += FRAME_MS
+                if self.gap > self.gap_ms:
+                    self.run = 0.0
+            if self.run >= self.ms:
+                return True
+        return False

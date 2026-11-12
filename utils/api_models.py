@@ -849,6 +849,7 @@ class VoiceModeSettings(_Model):
                                                 "with its tools, apps and cards (your words go in as a message); speech: the speech model itself")
     tools: list[str] = Field(max_length=6, description="Tools the speech model may call; what would ask is refused")
     ask_chat: bool = Field(description="The speech model may hand a hard question to the chat's own model")
+    start_muted: bool = Field(description="Voice mode starts muted (either engine); the bar's mute button and M unmute it")
 
 
 class Settings(_Model):

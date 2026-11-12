@@ -80,3 +80,13 @@ test('voice-speech-model 3.4: which engine a start uses', () => {
   assert.equal(only.engine, 'speech'); assert.match(only.note, /Using the speech model/);
   assert.match(v.pickEngine({ engine: 'chat' }, false, false).error, /needs the Speech to Text and Speech mods, or the Voice mod/);
 });
+
+test('voice-mute 1.3: M toggles the mute, except while you type or with a modifier', () => {
+  const key = (k, o = {}) => ({ key: k, ctrlKey: false, metaKey: false, altKey: false, repeat: false, target: { tagName: 'DIV' }, ...o });
+  assert.equal(v.isMuteKey(key('m')), true);
+  assert.equal(v.isMuteKey(key('M')), true);
+  assert.equal(v.isMuteKey(key('n')), false);
+  for (const o of [{ ctrlKey: true }, { metaKey: true }, { altKey: true }, { repeat: true }]) assert.equal(v.isMuteKey(key('m', o)), false);
+  for (const t of [{ tagName: 'TEXTAREA' }, { tagName: 'INPUT' }, { tagName: 'SELECT' }, { tagName: 'DIV', isContentEditable: true }]) assert.equal(v.isMuteKey(key('m', { target: t })), false);
+  assert.equal(v.typingIn(null), false);
+});

@@ -33,7 +33,7 @@ Phase 1 is the button: muted, nothing the microphone picks up reaches the turn d
 - [x] **1.2 The page's client: `web/chat/chat-voice-live.js`.**
   - **`liveVoice`:** returns `{stop(), mute(on)}`; muted, `onFrame` sends nothing and skips the `bargeTracker` check; `mute` sends the message. `liveStep` gains `muted` (from `ready` and `muted` events); `LIVE_WORDS.muted = 'Muted'`, shown instead of Listening…, and `Speaking (muted)` while a reply plays.
   *Done when:* `utils/tests/web/chat-voice-live.test.mjs`: no frames and no `interrupt` while muted, the `mute` message, the words for each state, a reconnect that keeps the mute.
-- [ ] **1.3 The bar: `web/chat/chat-voice.js`.**
+- [x] **1.3 The bar: `web/chat/chat-voice.js`.**
   - **Button:** a microphone / microphone-off button in the voice bar (`bar(...)`), beside the Agent answers switch, for `LiveVoice` and for `ChatVoiceButton` (the chat-model loop: muted, `dictate` is paused and its `bargeTracker` skipped). `M` toggles it. The level meter is flat while muted.
   - **Setting:** `[voice_mode] start_muted` (`utils/config.py` `VoiceModeCfg`, `utils/api_models.py`, `config.example.toml`); row "Start muted" in `web/settings/schema.js` under Speech → Voice mode; `web/mock.js`.
   - **Docs:** architecture §9 and §10, the brief (settings type, Speech section, voice mode), `web/PATCHES.md`, `docs/structure.md`.

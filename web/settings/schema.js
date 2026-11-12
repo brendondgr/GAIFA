@@ -80,6 +80,8 @@ export function voiceModeGroup(d, ctx) {
         hint: 'Off by default. A call runs only when this chat’s permissions allow it without asking; anything that would show a card is refused, and it says so. It is a small model: it won’t always call the right tool.' }),
       field('vmAskChat', 'voice_mode.ask_chat', { label: 'Let it ask the chat’s model', control: 'toggle', when: own, keywords: [...kw, 'hand off', 'ask chat'],
         hint: 'For questions it can’t answer itself (a file, a long task), it sends your words to the chat’s own model and tells you the answer. That turn runs like a typed message, with its tools and cards.' }),
+      field('vmStartMuted', 'voice_mode.start_muted', { label: 'Start muted', control: 'toggle', keywords: [...kw, 'mute', 'microphone', 'background noise'],
+        hint: 'Voice mode starts with the microphone muted: nothing is heard until you unmute with the bar’s microphone button or M. Muted, noise in the room can’t start a turn or stop a reply.' }),
       block('vmStatus', 'VoiceModelStatus', { label: 'The speech model', when: speech, keywords: kw }),
     ] };
 }

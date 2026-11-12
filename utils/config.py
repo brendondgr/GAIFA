@@ -351,6 +351,7 @@ class VoiceModeCfg(_Strict):
     answers: Literal["agent", "speech"] = "agent"
     tools: list[str] = Field([], max_length=6)       # tools the speech model may call (5.1); what would ask is refused
     ask_chat: bool = False                           # it may hand a hard question to the chat's own model (5.2)
+    start_muted: bool = False                        # voice mode starts muted; the bar's button and M unmute (plan voice-mute 1.3)
 
     @field_validator("tools")
     @classmethod

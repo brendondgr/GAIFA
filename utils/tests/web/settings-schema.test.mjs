@@ -65,7 +65,7 @@ const FULL = {
   learning: { enabled: true, nightly_at: '03:00', idle_min: 60, infer_after: 2, fade_days: 60 },
   speech_input: { mics: ['USB mic'], language: '', preset: 'balanced', mode: 'both' },
   speech_output: { voice: 'Hope', engine: 'auto', speed: 1, auto_read: false, pause_ms: 1200 },
-  voice_mode: { engine: 'chat', quant: 'q4_k_m', voice: 'female', answers: 'agent', tools: [], ask_chat: false },
+  voice_mode: { engine: 'chat', quant: 'q4_k_m', voice: 'female', answers: 'agent', tools: [], ask_chat: false, start_muted: false },
   judge: { backend: 'decide', model: 'gemma4-26B', url: 'u', threshold: 0.35, timeout_s: 3, context: 'none', allow_commands: ['pytest *', 'ls *'], ask_commands: ['git push *'] },
   screen: { pages: true, documents: false, transcripts: false, timeout_s: 30, window_chars: 6000, backend: null, model: null, url: null, threshold: null, confirm: true, parallel: 4 },
   permissions: { deny: [], ask: ['hub_set_preference'], allow: ['hub_start_service'] },
@@ -192,7 +192,7 @@ test('voice-speech-model 3.2: Speech → Voice mode', async () => {
   const withVoice = { services: [...ALL, { id: 'voice', name: 'Voice', manifest_errors: [] }], draft };
   const rows = c => { const g = S.sections(c).find(s => s.id === 'speech').groups.find(x => x.id === 'voiceMode'); return { g, rows: g.rows.filter(r => !r.when || r.when()) }; };
   let { g, rows: shown } = rows(withVoice);
-  assert.deepEqual(shown.map(r => r.id), ['vmEngine']);                 // the chat model: only the switch
+  assert.deepEqual(shown.map(r => r.id), ['vmEngine', 'vmStartMuted']);   // the chat model: the switch, and muting (voice-mute 1.3)
   assert.equal(g.rows[0].key, 'voice_mode.engine');
   assert.deepEqual(g.rows[0].choices(withVoice).map(c => [c.value, !!c.disabled]), [['chat', false], ['speech', false]]);
   const without = { services: ALL, draft };
@@ -200,9 +200,9 @@ test('voice-speech-model 3.2: Speech → Voice mode', async () => {
   assert.ok(off.disabled && /gaifa setup voice/.test(off.title));       // no Voice mod: the speech model can't be chosen
   draft.voice_mode = { ...draft.voice_mode, engine: 'speech', quant: 'q8_0', voice: 'male' };
   ({ g, rows: shown } = rows(withVoice));
-  assert.deepEqual(shown.map(r => r.id), ['vmEngine', 'vmAnswers', 'vmQuant', 'vmVoice', 'vmStatus']);       // the chat's agent answers: no tools of its own
+  assert.deepEqual(shown.map(r => r.id), ['vmEngine', 'vmAnswers', 'vmQuant', 'vmVoice', 'vmStartMuted', 'vmStatus']);       // the chat's agent answers: no tools of its own
   draft.voice_mode = { ...draft.voice_mode, answers: 'speech' };
-  assert.deepEqual(g.rows.filter(r => !r.when || r.when(draft, ctx)).map(r => r.id), ['vmEngine', 'vmAnswers', 'vmQuant', 'vmVoice', 'vmTools', 'vmAskChat', 'vmStatus']);
+  assert.deepEqual(g.rows.filter(r => !r.when || r.when(draft, ctx)).map(r => r.id), ['vmEngine', 'vmAnswers', 'vmQuant', 'vmVoice', 'vmTools', 'vmAskChat', 'vmStartMuted', 'vmStatus']);
   assert.ok(S.VOICE_TOOLS.length <= 6 && S.VOICE_TOOLS.every(t => /^[a-z][a-z0-9_]+$/.test(t.value)));     // the setting takes six at most
   assert.equal(S.summaryOf(g, withVoice), 'Speech model (LFM3-Omni-2B Q8_0, male voice) · it answers itself');
   assert.equal(rows(without).g.rows[0].choices(without)[1].disabled, false);   // already chosen: it can be switched back

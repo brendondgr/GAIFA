@@ -2,18 +2,20 @@
 
 The page speaks a small protocol of this mod's own, so it never depends on llama.cpp's schema.
 
-    page → mod   {"type":"start", "thread"?, "voice"?, "language"?, "pause_ms"?, "sample_rate"?, "quant"?, "save"?, "answers"?}
+    page → mod   {"type":"start", "thread"?, "voice"?, "language"?, "pause_ms"?, "sample_rate"?, "quant"?, "save"?, "answers"?, "muted"?}
                  binary frames: PCM16 mono at sample_rate (16000 unless said)
                  {"type":"text", "text"}            a typed turn (the mod's page, the eval)
                  {"type":"interrupt", "played_ms"}  you started talking over the reply
                  {"type":"played"}                  the reply finished playing
+                 {"type":"mute", "on"}              muted: nothing you say is heard (a turn being heard is dropped)
                  {"type":"stop"}
     mod → page   {"type":"waiting", "text"}         the GPU is busy with something else
-                 {"type":"ready", "sample_rate_out", "model", "voice", "answers"}
+                 {"type":"ready", "sample_rate_out", "model", "voice", "answers", "muted"}
                  {"type":"listening"} · {"type":"hearing"} · {"type":"thinking"} · {"type":"speaking"}
                  binary frames: the reply, PCM16 mono at sample_rate_out
                  {"type":"said", "text", "final", "audio_ms"?}     the reply's text as it comes
                  {"type":"heard", "text"}           your turn as text
+                 {"type":"muted", "on"}             the mute as the mod holds it
                  {"type":"tool", "name", "state", "text"?}   a tool the reply uses: running, then done | refused | failed
                  {"type":"turn", "user", "assistant", "first_audio_ms", "interrupted", "saved"}
                  {"type":"error", "code", "detail", "fix"?}
@@ -79,6 +81,7 @@ class Start(BaseModel):
     quant: str | None = Field(None, pattern=r"^(q4_k_m|q8_0)$")     # the size to talk to; the loaded or default one when left out
     save: bool = True                      # False: nothing is written into the chat (a test of the microphone)
     answers: str | None = Field(None, pattern=r"^(agent|speech)$")     # who answers; [voice_mode] answers when left out
+    muted: bool = False                    # start muted (plan voice-mute 1.1)
 
 
 def vad_kind(settings) -> str:
@@ -160,6 +163,7 @@ class Session:
         self.agent: AgentTurns | None = None           # the chat's agent answers (agent_turns.py)
         self.gpu = Gpu("Voice conversation")
         self._conv_task: asyncio.Task | None = None
+        self.muted = False                             # nothing you say is heard; a reply goes on (plan voice-mute 1.1)
 
     # ---- to the page
 
@@ -229,6 +233,8 @@ class Session:
 
     async def on_audio(self, pcm: bytes) -> None:
         self.engine.touch()
+        if self.muted:
+            return
         if self.mode in ("thinking", "speaking"):
             self.hold.append(pcm)
             self.hold_bytes += len(pcm)
@@ -272,7 +278,28 @@ class Session:
         await self.up(self.conv, {"type": "response.create"})
         await self.set_mode("thinking")
 
+    async def set_muted(self, on: bool) -> None:
+        """Mute: nothing the microphone picks up starts a turn or talks over the reply; what was being heard is dropped."""
+        self.muted = on
+        if on:
+            if self.mode == "hearing":
+                await self.drop_heard()
+            self.detector.reset()
+        await self.emit("muted", on=on)
+
+    async def drop_heard(self) -> None:
+        """Forget the turn being heard: nothing goes to the chat, the GPU slot is given back, it listens again."""
+        self.detector.reset()
+        for sock in (self.conv, self.asr):
+            if sock is not None:
+                await self.up(sock, {"type": "input_audio_buffer.clear"})
+        if self.agent:
+            await self.gpu.off()
+        await self.set_mode("listening")
+
     async def on_interrupt(self, played_ms: float) -> None:
+        if self.muted:
+            return                                    # a page that still sends one is out of date
         if self.agent:
             return await self.agent.interrupt()
         reply = self.reply
@@ -458,7 +485,9 @@ class Session:
             t = ev.get("type")
             if t == "stop":
                 return
-            if t == "interrupt":
+            if t == "mute":
+                await self.set_muted(bool(ev.get("on")))
+            elif t == "interrupt":
                 await self.on_interrupt(float(ev.get("played_ms") or 0))
             elif t == "played":
                 await self.on_played()
@@ -496,6 +525,7 @@ class Session:
         if self.engine.sessions >= 1:
             return await self.fail(4409, "busy", "Another voice conversation is open.")
         self.engine.sessions += 1
+        self.muted = self.start.muted
         tasks: list[asyncio.Task] = []
 
         async def waiting(lease) -> None:
@@ -530,7 +560,7 @@ class Session:
             self.detector = vad.TurnDetector(vad.make_vad(self.settings.vad_model), rate=self.start.sample_rate,
                                              pause_ms=self.start.pause_ms)
             await self.emit("ready", sample_rate_out=self.out_rate, model=self.engine.status()["label"],
-                            voice=self.start.voice, vad=self.detector.vad.kind, answers="agent" if self.agent else "speech")
+                            voice=self.start.voice, vad=self.detector.vad.kind, answers="agent" if self.agent else "speech", muted=self.muted)
             await self.emit("listening")
             if self.agent:
                 await self.gpu.off()                      # held again while you are heard and while it speaks

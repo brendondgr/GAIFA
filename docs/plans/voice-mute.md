@@ -1,6 +1,6 @@
 # Plan: a mute button and push to talk for voice mode, and noise that doesn't interrupt it
 
-**Asked for:** 2026-11-11 · **Status:** Planned
+**Asked for:** 2026-11-11 · **Status:** In progress
 
 ## 1. Introduction
 
@@ -25,7 +25,7 @@ Phase 1 is the button: muted, nothing the microphone picks up reaches the turn d
 
 ## Phase 1 — Mute (S)
 
-- [ ] **1.1 The mod: `mute` on the socket, `services/voice/voice/bridge.py`.**
+- [x] **1.1 The mod: `mute` on the socket, `services/voice/voice/bridge.py`.**
   - **Message:** `read_page` takes `{type: "mute", on: bool}`. `Session.muted`; while set, `on_audio` drops frames. Turning it on calls `detector.reset()`, drops a turn being heard (the transcription buffer is cleared, the GPU slot given back through `AgentTurns` / `Gpu.off` when nothing is spoken), and emits `{type: "muted", on}`; the mode goes to `listening`. A reply being spoken is untouched.
   - **Interruptions:** `on_interrupt` is ignored while muted (a page that still sends one is out of date).
   - **Start:** `Start.muted: bool = False`, so a conversation can begin muted; `ready` carries `muted`.

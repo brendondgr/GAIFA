@@ -135,6 +135,10 @@ async def realtime(ws, transcription=False):
         elif t == "input_audio_buffer.append":
             heard += len(base64.b64decode(ev["audio"])) // 2
             fresh = True
+        elif t == "input_audio_buffer.clear":
+            heard, fresh = 0, False
+            print("CLEAR " + session["type"], flush=True)
+            await ws.send(json.dumps({"type": "input_audio_buffer.cleared"}))
         elif t == "input_audio_buffer.commit":
             await ws.send(json.dumps({"type": "input_audio_buffer.committed", "item_id": "i1"}))
             if session["type"] == "transcription":

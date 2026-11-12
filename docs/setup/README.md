@@ -29,6 +29,16 @@ From a fresh clone, that's the whole process, in this order: choosing mods from 
 
 Pick only the mods you need; each setup doc says what the mod gives you and what it needs. GAIFA doesn't come with a model list to copy: the models are yours to choose, per mod.
 
+## Opening GAIFA to your other devices
+
+GAIFA answers only the machine it runs on until you open it to your network (plan lan-access): then a phone or laptop on the same Wi-Fi or wired network opens it by this machine's address and signs in with a password. It's off by default.
+
+1. `bin/gaifa lan on` asks for the password (at least 12 characters), turns it on, restarts GAIFA and prints the address to open (and `<name>.local`, when your network resolves it). Settings → General → Network does the same.
+2. The firewall usually blocks the port: `gaifa lan on` prints the command for yours (Fedora's: `sudo firewall-cmd --permanent --add-port=7000/tcp --add-port=7443/tcp && sudo firewall-cmd --reload`). Run it yourself; GAIFA never runs `sudo`.
+3. On the other device, open the address and sign in. Voice mode and dictation need HTTPS there (`https://<address>:7443`); its browser warns once about GAIFA's own certificate unless you trust it (`/lan/trust` on that device has the steps).
+
+Only addresses on this machine's own network get in (a VPN such as Tailscale only when `[hub.lan] allow` names it), never the internet. Bypass, folder levels, the hub's settings and these network settings stay on this machine. `gaifa lan devices` lists who is signed in, `gaifa lan signout --all` signs everyone out, and `gaifa lan off` closes it again.
+
 ## How these docs work
 
 - **Environment docs** live in the mod they belong to, `services/<id>/setup/<env>.md`, so a mod's setup goes wherever the mod goes and disappears when it's deleted. Each one has the same sections: what it is, the versions tested, prerequisites, install, configuration, how to check it, what to look for, and known gaps. The format is in [mods.md §9](../mods.md#9-setup-docs).

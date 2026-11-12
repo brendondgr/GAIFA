@@ -135,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
         server.run(sockets=socks)
     except KeyboardInterrupt:  # uvicorn re-raises Ctrl+C after its clean shutdown
         pass
-    return 0
+    return int(getattr(hub, "exit_code", 0) or 0)   # 75: POST /api/system/restart asked systemd to start it again
 
 
 if __name__ == "__main__":

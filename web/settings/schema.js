@@ -120,10 +120,14 @@ export function sections(ctx = {}) {
   const secs = [
     { id: 'general', label: 'General', icon: 'gear', areas: SETTINGS_AREAS.general, groups: [
       { id: 'hub', label: 'Hub', summary: () => `Port ${d.hub?.port ?? '—'}${ctx.system ? ` · v${ctx.system.hub.version}` : ''}`, rows: [
-        field('port', 'hub.port', { label: 'GAIFA port', hint: 'Bound to 127.0.0.1 — this machine only. Default 7000.', control: 'number', inputMode: 'numeric',
+        field('port', 'hub.port', { label: 'GAIFA port', hint: 'On 127.0.0.1 for this machine; other devices only when you open it to your network (Network, below). Default 7000.', control: 'number', inputMode: 'numeric',
           restart: true, validate: checkPort, keywords: ['address', 'listen', 'localhost', '127.0.0.1'] }),
         block('overrides', 'OverridesCard', { label: 'Set on this machine', card: true, keywords: ['config.toml', 'overrides', 'changed', 'differs from the defaults', 'TOML'] }),
         block('process', 'ProcessCard', { label: 'GAIFA process', card: true, keywords: ['version', 'pid', 'uptime', 'rss'] }),
+      ] },
+      { id: 'network', label: 'Network', summary: () => 'Other devices on your network: off unless you open it', rows: [
+        block('lan', 'NetworkCard', { label: 'Other devices on your network', card: true,
+          keywords: ['network', 'LAN', 'wifi', 'phone', 'other devices', 'remote', 'access', 'password', 'sign in', 'firewall', '0.0.0.0', 'tailscale'] }),
       ] },
       { id: 'interface', label: 'Interface', summary: c => `${cap(c.theme || 'system')} theme · ${c.density || 'compact'} · sidebar ${c.nav?.services || 'list'}`, rows: [
         instant('theme', 'ui.theme', { label: 'Theme', hint: 'System follows your OS setting. Applied immediately.', control: 'segmented',

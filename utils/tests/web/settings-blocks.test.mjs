@@ -55,6 +55,7 @@ const B = await load('settings/blocks-hub.js');
 const A = await load('settings/blocks-agent.js');   // imports cleanly: the agent's cards, placed one by one
 const RB = await load('settings/blocks-repos.js');  // plan mod-repos 3.5
 const LB = await load('settings/blocks-llm.js');    // plan llm-servers 4.1
+const NB = await load('settings/blocks-lan.js');    // plan lan-access 2.2
 await load('settings/settings.js');
 const sys = { hub: { version: '0.1.0', pid: 31337, uptime_s: 7260, rss_bytes: 92e6 },
   paths: { root: '/gaifa', models: '/gaifa/data/models', databases: '/gaifa/data/databases', outputs: '/gaifa/outputs', logs: '/gaifa/data/logs' },
@@ -92,6 +93,6 @@ test('the hub blocks render with fixed data', () => {
 });
 
 test('every block the schema names exists', () => {
-  const names = { ...B.HUB_BLOCKS, ...A.AGENT_BLOCKS, ...RB.REPO_BLOCKS, ...LB.LLM_BLOCKS };
+  const names = { ...B.HUB_BLOCKS, ...A.AGENT_BLOCKS, ...RB.REPO_BLOCKS, ...LB.LLM_BLOCKS, ...NB.LAN_BLOCKS };
   for (const r of S.rowsOf(S.sections({ services })).filter(r => r.control === 'block')) assert.ok(names[r.block], r.block);
 });

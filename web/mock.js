@@ -263,6 +263,9 @@ const LOG_SEED = {
 const MOCK_ACCEL = { relay: 'cpu', lcpp: 'vulkan', tts: 'rocm', gen3d: 'rocm', comfy: 'rocm', embed: 'rocm', example: 'cuda' };   // plan 38.3: the variants this machine runs
 
 // ---------- the mock ----------
+const lanState = { remote: false, on: false, enabled: false, listening: false, has_password: false, urls: [], port: 7000, https: 'also', https_port: 7443,
+  allow: [], names: [], session_days: 30, devices: [] };   // plan lan-access 2.2
+
 export function createMockApi() {
   const T0 = Date.now() / 1000;
   const now = () => Date.now() / 1000;
@@ -740,6 +743,14 @@ export function createMockApi() {
     async deleteOutput(id) { await net(); const i = outputs.findIndex(x => x.id === id); if (i < 0) throw err(404, 'output_not_found', `No output "${id}"`); outputs.splice(i, 1); emit({ type: 'output_deleted', id }); return null; },
     async getSettings() { await net(); return clone(settings); },
     // settings-that-stick 4.1: the UI store, in memory (scope → key → value)
+    async getLan() { await net(); return clone(lanState); },                         // plan lan-access 2.2
+    async saveLan(patch) { await net(); if (patch.enabled && !lanState.has_password) throw err(409, 'no_password', 'Set a password first: every device on the network will need it.');
+      const was = lanState.enabled; Object.assign(lanState, patch); lanState.urls = lanState.enabled ? ['http://192.168.1.19:7000', 'http://gaifa.local:7000'] : [];
+      return { ...clone(lanState), restart_required: was !== lanState.enabled }; },
+    async setLanPassword(pw) { await net(); if (!pw || pw.length < 12) throw err(422, 'invalid', 'At least 12 characters'); lanState.has_password = true; lanState.devices = []; return { ok: true, has_password: true }; },
+    async signOutLanDevice(id) { await net(); lanState.devices = id === 'all' ? [] : lanState.devices.filter(d => d.id !== id); return { ok: true }; },
+    async restartHub() { await net(); return { restarting: true }; },
+    async signOutThisDevice() { await net(); return { ok: true }; },
     async getUiStore(scope) { await net(); if (scope !== 'hub' && !svcById(scope)) throw err(404, 'not_found', `No mod '${scope}'`); return { values: clone(uiStore[scope] || {}) }; },
     async saveUiStore(scope, { set = {}, del = [] } = {}) { await net(); if (scope !== 'hub' && !svcById(scope)) throw err(404, 'not_found', `No mod '${scope}'`);
       const cur = uiStore[scope] || {}, next = { ...Object.fromEntries(Object.entries(cur).filter(([k]) => !del.includes(k))), ...clone(set) };

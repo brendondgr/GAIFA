@@ -34,6 +34,7 @@ export const METHOD_AREA = {
   readWebPage: 'webpages', getWebReading: 'webpages',
   listMentions: 'mentions',
   getUiStore: 'ui_store', saveUiStore: 'ui_store',
+  getLan: 'lan', saveLan: 'lan', setLanPassword: 'lan', signOutLanDevice: 'lan', signOutThisDevice: 'lan', restartHub: 'system',
 };
 
 // HubEvent type → area, for merging live and mock event streams.
@@ -199,6 +200,12 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     getSettingsDefaults: () => req('GET', '/api/settings/defaults'),
     // settings-that-stick 4.1: what a page remembers (a mod id, or 'hub'): {values}; save sets and deletes keys
     getUiStore: scope => req('GET', `/api/ui/store/${enc(scope)}`),
+    getLan: () => req('GET', '/api/lan/status'),                                     // plan lan-access 2.2: devices on your network
+    saveLan: patch => req('PUT', '/api/lan/settings', { json: patch }),
+    setLanPassword: password => req('PUT', '/api/lan/password', { json: { password } }),
+    signOutLanDevice: id => req('DELETE', `/api/lan/sessions/${enc(id)}`),
+    signOutThisDevice: () => req('POST', '/api/lan/signout'),
+    restartHub: () => req('POST', '/api/system/restart'),
     saveUiStore: (scope, { set = {}, del = [] } = {}) => req('PATCH', `/api/ui/store/${enc(scope)}`, { json: { set, delete: del } }),   // plan settings-redesign 4.1: config.example.toml's values
     getMetrics: ({ series, range, step } = {}) => req('GET', `/api/metrics${qs({ series, range, step })}`),
     listMetricSeries: () => req('GET', '/api/metrics/series'),

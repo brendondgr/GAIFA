@@ -183,7 +183,7 @@ async def test_config_js_lists_the_live_areas(hub):
     async with httpx.AsyncClient(base_url=hub.url) as c:
         text = (await c.get("/config.js")).text
     areas = json.loads(text.split("GAIFA_LIVE_AREAS = ")[1].rstrip(";\n"))
-    assert set(areas) == {"system", "services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets", "overview", "settings", "tools", "sessions", "prefs", "webpages", "gpu", "mentions", "repos", "llm", "ui_store", "notify"}
+    assert set(areas) == {"system", "services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets", "overview", "settings", "tools", "sessions", "prefs", "webpages", "gpu", "mentions", "repos", "llm", "ui_store", "notify", "lan"}
 
 
 # --- PUT config ---------------------------------------------------------------------------------

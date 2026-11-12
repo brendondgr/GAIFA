@@ -40,6 +40,8 @@ def refused(method: str, path: str, body: Any = None) -> str | None:
         return "GAIFA's MCP server is for coding agents on the GAIFA machine only."
     if method not in UNSAFE:
         return None
+    if path == "/api/system/restart":
+        return f"GAIFA can only be restarted from the GAIFA machine. {WHERE}"
     if path.startswith("/api/lan/") and path not in ("/api/lan/signin", "/api/lan/signout"):
         return f"The network settings, the password and the devices signed in can only be changed on the GAIFA machine. {WHERE}"
     if path == "/api/settings" and isinstance(body, dict) and "hub" in body:

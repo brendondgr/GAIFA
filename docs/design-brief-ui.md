@@ -408,6 +408,12 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `saveSettings(s)` | `PUT /api/settings` | `{ settings: Settings, restart_required: boolean }` (send the whole form or any part; what is left out stays as it is, and only changed values are written. A bad value is `422 invalid_config` with `data.field`, e.g. `"hub.port"` for a port a mod uses; nothing is written). With `base` (`{section: {key: value}}`, what each changed key held when the page loaded), lists and tables merge with what is saved now (architecture §9, Saving); a value changed elsewhere too is `409 settings_conflict` with `data: {field, current, yours}`) |
 | `getUiStore(scope)` | `GET /api/ui/store/{scope}` | `{ values: Record<string, unknown> }`: what the pages remember for a mod (its id) or for the hub (`"hub"`) (settings-that-stick 4.1) |
 | `saveUiStore(scope, {set, del})` | `PATCH /api/ui/store/{scope}` | `{ values }` after setting and deleting those keys only (each value ≤ 16 KB: `413 payload_too_large`) |
+| `getLan()` | `GET /api/lan/status` | `LanStatus`: on this machine whether GAIFA is open to the network, the addresses to open and the devices signed in; on a device on the network `{remote: true, me, on}` (plan lan-access) |
+| `saveLan(patch)` | `PUT /api/lan/settings` | `LanStatus` with `restart_required` (turning it on or off applies at the next start); `409 no_password` before a password is set; refused from the network (`403 this_machine_only`) |
+| `setLanPassword(password)` | `PUT /api/lan/password` | `{ok, has_password}`; at least 12 characters; every device signs in again |
+| `signOutLanDevice(id)` | `DELETE /api/lan/sessions/{id}` | `{ok}`; `id` `"all"` signs every device out |
+| `signOutThisDevice()` | `POST /api/lan/signout` | `{ok}`: the device this page runs on |
+| `restartHub()` | `POST /api/system/restart` | `{restarting: true}`; `409 not_a_service` unless GAIFA runs as its systemd unit; refused from the network |
 | `getSettingsDefaults()` | `GET /api/settings/defaults` | `Settings`: the values of `config.example.toml`, what each row of the Settings page returns to with Reset (plan settings-redesign 4.1) |
 | `subscribe(onEvent)` | `EventSource /api/events` | `{ close() }`; each `data:` is a `HubEvent` |
 
@@ -949,6 +955,10 @@ interface Timeline { from: number; to: number; lanes: {
 interface OutputBucket { key: string; count: number; size_bytes: number; by_kind: Partial<Record<OutputKind, number>> }
 interface WidgetInfo { service: string; id: string; title: string; kind: "line" | "area" | "bar" | "donut" | "number" | "table";
                        ranges: string[]; span: 3 | 4 | 6 | 12 }
+interface LanDevice { id: string; label: string; addr: string; first: number; last: number }   // plan lan-access
+interface LanStatus { remote: boolean; on: boolean; me?: LanDevice; enabled?: boolean; listening?: boolean; has_password?: boolean;
+  urls?: string[]; port?: number; https?: "off" | "also" | "only"; https_port?: number; allow?: string[]; names?: string[];
+  session_days?: number; devices?: LanDevice[]; restart_required?: boolean }
 interface DoctorCheck { area: "models" | "manifests" | "paths" | "ports" | "network" | "units" | "disk" | "offline" | "repos";
                        level: "ok" | "note" | "warn" | "fail"; title: string; detail: string; fix?: string }
 interface Hardware { os: "linux" | "darwin" | "windows"; arch: string; wsl: boolean; container: string;   // plan 35.2

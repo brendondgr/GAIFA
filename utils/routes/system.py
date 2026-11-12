@@ -79,6 +79,42 @@ async def system_info(hub: Any) -> dict[str, Any]:
     }
 
 
+class Restarting(BaseModel):
+    restarting: bool
+
+
+def _in_hub_unit(cgroup: str | None = None) -> bool:
+    """This process is gaifa.service's own (its cgroup ends there), so systemd starts it again. An environment
+    variable isn't proof: INVOCATION_ID is inherited by anything a unit's children start."""
+    from pathlib import Path
+
+    try:
+        text = cgroup if cgroup is not None else Path("/proc/self/cgroup").read_text()
+    except OSError:
+        return False
+    return any(line.rstrip().endswith("/gaifa.service") for line in text.splitlines())
+
+
+@router.post("/api/system/restart", summary="Restart GAIFA (the hub; mods keep running): under its systemd unit only, from this machine only",
+             response_model=Restarting, responses={409: {"description": "not_a_service: GAIFA isn't running as its systemd unit (gaifa restart)"}})
+async def restart_hub(request: Request) -> dict:
+    """The hub stops cleanly with exit code 75 and its unit (`Restart=on-failure`) starts it again; started by hand
+    (`python app.py`) it would only stop, so that is refused."""
+    import os
+    import signal
+
+    if not _in_hub_unit():
+        from utils.server import HubError
+
+        raise HubError(409, "not_a_service", "GAIFA isn't running as its systemd unit, so it can't start itself again: restart it where you started it.")
+    hub = request.app.state.hub
+    hub.exit_code = 75
+    if hub.activity:
+        await hub.activity.add("GAIFA restarting (asked from Settings)")
+    asyncio.get_running_loop().call_later(0.3, os.kill, os.getpid(), signal.SIGTERM)
+    return {"restarting": True}
+
+
 @router.get("/api/system/hardware", summary="What this machine has: OS, GPUs, their memory and runtimes, the usable accelerators", response_model=Hardware)
 async def get_hardware(refresh: bool = False) -> dict:
     """Read once and cached; `?refresh=true` reads the machine again (plan 35.2)."""

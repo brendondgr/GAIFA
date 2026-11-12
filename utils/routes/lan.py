@@ -16,7 +16,8 @@ from __future__ import annotations
 from html import escape
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from utils.server import HubError
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
@@ -46,7 +47,7 @@ class LanSettings(BaseModel):
 def _lan(request: Request):
     lan = getattr(request.app.state.hub, "lan", None)
     if lan is None:
-        raise HTTPException(503, {"detail": "the network settings aren't loaded", "code": "lan_off"})
+        raise HubError(503, "lan_off", "the network settings aren't loaded")
     return lan
 
 
@@ -115,14 +116,14 @@ async def save_settings(body: LanSettings, request: Request) -> dict[str, Any]:
         if "names" in changes:
             changes["names"] = config_mod.Replace([n.strip().lower() for n in changes["names"] if n.strip()] or None)
     except ValueError as e:
-        raise HTTPException(422, {"detail": str(e), "code": "invalid_settings"}) from None
+        raise HubError(422, "invalid_settings", str(e)) from None
     if changes.get("enabled") and not lan.auth.has_password():
-        raise HTTPException(409, {"detail": "Set a password first: every device on the network will need it.", "code": "no_password"})
+        raise HubError(409, "no_password", "Set a password first: every device on the network will need it.")
     was = lan.cfg.enabled
     try:
         cfg = config_mod.save(hub.paths.config_file, {"hub": {"lan": changes}}) if changes else hub.config
     except config_mod.ConfigError as e:
-        raise HTTPException(422, {"detail": str(e), "code": "invalid_settings"}) from None
+        raise HubError(422, "invalid_settings", str(e)) from None
     hub.config = cfg
     lan.reconfigure(cfg.hub.lan)
     restart = cfg.hub.lan.enabled != lan.listening and (cfg.hub.lan.enabled or was)
@@ -146,7 +147,7 @@ async def drop_session(sid: str, request: Request) -> dict[str, Any]:
         lan.auth.sign_out_all()
         return {"ok": True}
     if not lan.auth.sign_out(sid):
-        raise HTTPException(404, {"detail": f"no device {sid!r}", "code": "not_found"})
+        raise HubError(404, "not_found", f"no device {sid!r}")
     return {"ok": True}
 
 

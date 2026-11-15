@@ -85,6 +85,7 @@ class FakeHub:
     def __init__(self) -> None:
         self.tools = {t["name"]: t for t in TOOLS}
         self.more_services: list[dict[str, Any]] = []
+        self.refuse: dict[str, dict[str, Any]] = {}       # tool → the error the hub answers it with at once
         self.calls: list[dict[str, Any]] = []         # every executed call: {name, arguments, mode}
         self.attempts: list[dict[str, Any]] = []      # every call request
         self.approvals: dict[str, dict[str, Any]] = {}
@@ -304,6 +305,12 @@ class FakeHub:
             t = self.tools.get(name)
             if t is None:
                 return {"status": "error", "tool": name, "error": {"code": "unknown_tool", "detail": f"no tool {name}"}}
+            if name in self.refuse:                         # capability-enablement 2.3: a tool the hub refuses at once
+                return {"status": "error", "tool": name, "error": dict(self.refuse[name])}
+            if name == "hub_enable_service":                # turns a mod on: its tools stop being refused
+                for n in [n for n, tt in self.tools.items() if tt["mod"] == args.get("id")]:
+                    self.refuse.pop(n, None)
+                return {"status": "done", "tool": name, "call_id": "call_en", "result": {"id": args.get("id"), "enabled": True, "state": "ready"}}
             filled = []
             for k, p in t["parameters"]["properties"].items():     # x-options defaults, as the hub fills them (plan 20.1)
                 o = p.get("x-options") or {}

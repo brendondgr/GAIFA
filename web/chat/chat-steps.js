@@ -162,6 +162,8 @@ export function errorText(result) {
   const status = result?.status;
   const raw = e.detail || (status === 'denied' ? 'You said no.' : status === 'cancelled' ? 'Stopped.' : status === 'skipped' ? 'Skipped.' : 'It failed.');
   // "3D Generate refused it (HTTP 422): : Value error, TRELLIS.2 …" → "TRELLIS.2 …" (the mod's own words)
-  const text = String(raw).replace(/^.*?\(HTTP \d{3}\):[\s:]*/, '').replace(/^(Value|Assertion|Type) error,\s*/i, '').trim() || String(raw);
+  let text = String(raw).replace(/^.*?\(HTTP \d{3}\):[\s:]*/, '').replace(/^(Value|Assertion|Type) error,\s*/i, '').trim() || String(raw);
+  // capability-enablement 2.3: "I can't search the web and read pages: Web isn't set up on this machine" → the plain reason
+  if (e.code === 'capability_unavailable' || (e.code === 'service_not_running' && /didn't start/.test(text))) text = text.split(': ').slice(e.code === 'capability_unavailable' ? -1 : 0).join(': ');
   return { text: text.replace(/^./, c => c.toUpperCase()), fix: e.fix || null, code: e.code || null };
 }

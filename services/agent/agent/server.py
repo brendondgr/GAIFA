@@ -2,7 +2,7 @@
 fork, cancel, compaction, the context meter, models, settings, status and the widget.
 
 Environment: AGENT_DB, AGENT_DATA, AGENT_LLM_URL, AGENT_MODEL, AGENT_FALLBACK_MODEL,
-AGENT_MAX_STEPS, GAIFA_URL, GAIFA_PORT.
+AGENT_MAX_STEPS, AGENT_MAX_FAILS (capability-enablement 2.3), GAIFA_URL, GAIFA_PORT.
 """
 
 from __future__ import annotations
@@ -145,7 +145,7 @@ class AgentFiles(BaseModel):
 def config_from_env() -> Config:
     data = Path(os.environ.get("AGENT_DATA") or "data/agent")
     return Config(model=os.environ.get("AGENT_MODEL", "skynet"), fallback=os.environ.get("AGENT_FALLBACK_MODEL") or None,
-                  max_steps=int(os.environ.get("AGENT_MAX_STEPS", "25")), data=data,
+                  max_steps=int(os.environ.get("AGENT_MAX_STEPS", "25")), max_fails=int(os.environ.get("AGENT_MAX_FAILS", "4")), data=data,
                   default_window=int(os.environ.get("AGENT_DEFAULT_WINDOW", "32768")),
                   inline_tokens=int(os.environ.get("AGENT_INLINE_TOKENS", "6000")),
                   reply_reserve=int(os.environ.get("AGENT_REPLY_RESERVE", "4096")),

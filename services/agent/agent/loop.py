@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import context as ctx
+from . import guard
 from .compaction import Compaction
 from .prompting import Prompting, thread_settings
 from .queue import Queue, Queueing
@@ -46,6 +47,7 @@ class Config:
     model: str = "skynet"
     fallback: str | None = None
     max_steps: int = 25
+    max_fails: int = 4          # capability-enablement 2.3: error results in a row before the turn is told to wrap up
     default_window: int = 32768
     data: Any = None   # Path of data/agent
     all_tools_models: tuple[str, ...] = ()
@@ -412,7 +414,9 @@ class Agent(Compaction, Queueing, Prompting):
                 if stop:
                     final = "error"
                     return
-                stuck = self._stuck(tid)
+                evs = self.store.events(tid)
+                failed = guard.failing(evs, self.cfg.max_fails)      # capability-enablement 2.3: failures in a row
+                stuck = guard.stuck(evs) or (guard.wrap_note(failed) if failed else False)
                 reply, model = await self._model(tid, tools, model, wrap_up=stuck)
                 self._title_soon(tid)
                 steps += 1
@@ -576,14 +580,19 @@ class Agent(Compaction, Queueing, Prompting):
                 "code": "invalid_arguments", "detail": p["bad_arguments"],
                 "fix": "send the arguments as one JSON object matching the schema" + (f": {json.dumps(schema)[:1500]}" if schema else "")}})
             return "ok"
-        stop = self.hooks_of(tid).before(name, args if isinstance(args, dict) else {}, self._turn_calls(tid, cid))
+        evs = self.store.events(tid)
+        stop = self.hooks_of(tid).before(name, args if isinstance(args, dict) else {}, guard.turn_calls(evs, cid))
         if stop:                                    # a harness hook refused it (plan 22.2)
             self.emit(tid, "note", {"text": f"hook: {stop['detail']}", "level": "info"})
             self._result(tid, cid, name, {"status": "error", "error": stop})
             return "ok"
-        if self._repeated(tid, e) >= 3:
+        mod = (tools.by_name(name) or {}).get("mod")
+        if mod and mod != "hub" and name not in guard.TURN_ON and (err := guard.out_for_turn(evs, lambda n: (tools.by_name(n) or {}).get("mod")).get(mod)):
+            self._result(tid, cid, name, guard.answer_out(name, err))   # capability-enablement 2.3: its mod is out for this turn
+            return "ok"
+        if (n := guard.repeated(evs, e)) >= 3:
             self._result(tid, cid, name, {"status": "error", "error": {
-                "code": "repeated_call", "detail": f"{name} was already called with these same arguments {self._repeated(tid, e) - 1} "
+                "code": "repeated_call", "detail": f"{name} was already called with these same arguments {n - 1} "
                 "times in this turn; its result won't change",
                 "fix": "use the result you already have and move on to the next step (load_tools if the tool you need isn't loaded)"}})
             return "ok"
@@ -726,27 +735,6 @@ class Agent(Compaction, Queueing, Prompting):
         parts are the user's words and count), each cut at 2,000 characters."""
         evs = self.store.events(tid, types=("user",))[-n:]
         return [w[:2000] for w in (ctx.said(e.get("payload")) for e in evs) if w]
-
-    def _turn_calls(self, tid: str, cid: str) -> list[str]:
-        """Tool names called so far in this turn (since the last user message), not counting `cid`."""
-        evs = self.store.events(tid)
-        last = max((e["seq"] for e in evs if e["type"] == "user"), default=0)
-        return [e["payload"]["name"] for e in evs if e["seq"] > last and e["type"] == "tool_call" and e["payload"].get("id") != cid]
-
-    def _repeated(self, tid: str, e: dict[str, Any]) -> int:
-        """How many calls of this tool with these arguments since the last user message (this one included)."""
-        evs = self.store.events(tid)
-        start = max((x["seq"] for x in evs if x["type"] == "user"), default=0)
-        key = (e["payload"]["name"], json.dumps(e["payload"].get("arguments") or {}, sort_keys=True))
-        return sum(1 for x in evs if x["type"] == "tool_call" and x["seq"] > start and x["seq"] <= e["seq"]
-                   and (x["payload"]["name"], json.dumps(x["payload"].get("arguments") or {}, sort_keys=True)) == key)
-
-    def _stuck(self, tid: str) -> bool:
-        """The turn only repeats itself: the last result was a refused repeat, and not the first one since the user spoke."""
-        evs = self.store.events(tid)
-        start = max((x["seq"] for x in evs if x["type"] == "user"), default=0)
-        codes = [((x["payload"].get("error") or {}).get("code")) for x in evs if x["type"] == "tool_result" and x["seq"] > start]
-        return bool(codes) and codes[-1] == "repeated_call" and codes.count("repeated_call") >= 2
 
     def _save_loaded(self, tid: str, tools: ToolSet) -> None:
         t = self.store.thread(tid) or {}

@@ -165,7 +165,7 @@ class Prompting:
         m["model"] = model
         return m
 
-    async def _model(self, tid: str, tools: ToolSet, model: str, wrap_up: bool = False) -> tuple[Reply, str]:
+    async def _model(self, tid: str, tools: ToolSet, model: str, wrap_up: bool | str = False) -> tuple[Reply, str]:
         """One model call (`_call_model`), with the chat named on its GPU lease and its wait shown (plan 31.4)."""
         token, waiting = THREAD.set(tid), GpuWait()
         wait_token = GPU_WAIT.set(waiting)          # the model client's stall limit skips the GPU wait
@@ -181,15 +181,17 @@ class Prompting:
             GPU_WAIT.reset(wait_token)
             THREAD.reset(token)
 
-    async def _call_model(self, tid: str, tools: ToolSet, model: str, wrap_up: bool = False) -> tuple[Reply, str]:
+    async def _call_model(self, tid: str, tools: ToolSet, model: str, wrap_up: bool | str = False) -> tuple[Reply, str]:
+        """`wrap_up`: True for the repeat guard, or the failure guard's note (capability-enablement 2.3)."""
         step = new_id("s_")
         await self._await_recall(tid)
         msgs, sizes = await self.messages(tid, tools, model, turn=True)
         choice = "auto"
         if wrap_up:     # the thrash guard: no more tools this turn, say what happened
             choice = "none"
-            msgs.append({"role": "user", "content": WRAP_UP})
-            self.emit(tid, "note", {"text": "the model kept repeating a call; asked it to answer without tools", "level": "warn"})
+            msgs.append({"role": "user", "content": wrap_up if isinstance(wrap_up, str) else WRAP_UP})
+            self.emit(tid, "note", {"text": "several tool calls failed in a row; asked the model to answer without tools"
+                                    if isinstance(wrap_up, str) else "the model kept repeating a call; asked it to answer without tools", "level": "warn"})
 
         t0, first = time.monotonic(), []                         # the call's time and time to first token (plan 21.4)
 
@@ -210,7 +212,7 @@ class Prompting:
             model = fb
             msgs, sizes = await self.messages(tid, tools, model, turn=True)
             if wrap_up:
-                msgs.append({"role": "user", "content": WRAP_UP})
+                msgs.append({"role": "user", "content": wrap_up if isinstance(wrap_up, str) else WRAP_UP})
             reply = await self.llm.chat(model, msgs, tools.functions(), delta, known, tool_choice=choice)
         if reply.runaway:
             self.emit(tid, "note", {"text": "the model started repeating itself; stopped it and asked again", "level": "warn"})
@@ -231,7 +233,8 @@ class Prompting:
         if wrap_up:
             reply.tool_calls = []
             if not reply.text.strip():
-                reply.text = "I couldn't finish this: I kept repeating the same step without getting anywhere."
+                reply.text = ("I couldn't finish this: the tools I needed kept failing." if isinstance(wrap_up, str)
+                              else "I couldn't finish this: I kept repeating the same step without getting anywhere.")
         if reply.thinking:
             self.emit(tid, "thinking", {"text": reply.thinking, "seconds": reply.thinking_s, "step": step})
         if reply.details:       # plan llm-servers 2.1: the provider's hidden state, sent back with this step

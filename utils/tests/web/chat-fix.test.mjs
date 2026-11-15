@@ -41,3 +41,18 @@ test('a fix-it card stands in for the live card of a failed step', () => {
   assert.deepEqual(live.liveRows(turn).map(r => r.row.key), ['b']);
   undo();
 });
+
+test('capability-enablement 2.3: a mod that is off reads plainly, and Turn on turns it on', async () => {
+  const steps = await import(pathToFileURL(path.join(root, 'web/chat/chat-steps.js')).href);
+  const r = row('a', 'failed', {});
+  assert.deepEqual(fix.fixAction({ label: 'Turn on Calendar', service: 'calendar', action: 'enable' }, r), { kind: 'tool', tool: 'hub_enable_service', arguments: { id: 'calendar' } });
+  assert.deepEqual(fix.fixAction({ label: 'Set up Web', setup: 'web', command: 'gaifa setup web' }, r), { kind: 'copy', text: 'gaifa setup web' });
+  const e = { code: 'capability_unavailable', detail: "I can't search the web and read pages: Web isn't set up on this machine", fix: "tell the user" };
+  assert.equal(steps.errorText({ status: 'error', error: e }).text, "Web isn't set up on this machine");
+  assert.equal(steps.errorText({ status: 'error', error: { ...e, detail: "web_search: I can't search the web and read pages: Web isn't set up on this machine" } }).text, "Web isn't set up on this machine");
+  assert.equal(steps.errorText({ status: 'error', error: { code: 'capability_unavailable', detail: 'web_search is off right now: no SearXNG answers at http://127.0.0.1:8080' } }).text,
+    'No SearXNG answers at http://127.0.0.1:8080');
+  const turn = { latest: true, steps: [{ rows: [{ ...row('a', 'error', { ...e, fixes: [{ label: 'Set up Web', setup: 'web', command: 'gaifa setup web' }] }), name: 'web_search' },
+    { ...row('b', 'error', { ...e, fix: 'you already know' }), name: 'web_search' }] }] };
+  assert.deepEqual(fix.fixRows(turn).map(x => x.key), ['a'], 'one card for the first refusal; the local answers carry no fixes');
+});

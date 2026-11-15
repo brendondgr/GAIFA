@@ -23,6 +23,7 @@ export function fixRows(turn) {
 export function fixAction(f, row) {
   if (f.retry) return { kind: 'tool', tool: row.name, arguments: { ...(row.item?.call?.arguments || {}), ...f.retry } };
   if (f.tool) return { kind: 'tool', tool: f.tool, arguments: f.arguments || {} };
+  if (f.service && f.action === 'enable') return { kind: 'tool', tool: 'hub_enable_service', arguments: { id: f.service } };   // capability-enablement 2.3
   if (f.service) return { kind: 'service', service: f.service, action: f.action || 'restart' };
   if (f.command) return { kind: 'copy', text: f.command };
   return null;

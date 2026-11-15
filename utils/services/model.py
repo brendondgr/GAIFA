@@ -69,6 +69,7 @@ class Service:
     operations_ts: float | None = None
     operations_error: str | None = None
     last_error: str | None = None
+    start_failed_at: float | None = None   # capability-enablement 1.3: when its last start failed; cleared once ready or stopped
     in_flight: int = 0
     last_request_ts: float | None = None
     misses: int = 0

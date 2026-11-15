@@ -99,6 +99,9 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
         self._check_controllable(svc)
         if not svc.startable:
             raise ServiceError(409, "manifest_invalid", f"{svc.id} can't start: {svc.errors[0]}", {"errors": svc.errors})
+        if not self.installed(svc):     # capability-enablement 1.3: nothing to launch until it's set up
+            raise ServiceError(409, "not_set_up", f"{svc.mod.name} isn't set up on this machine",
+                               {"fix": f"gaifa setup {svc.id}", "command": f"gaifa setup {svc.id}"})
         if not svc.eff.enabled:
             raise ServiceError(409, "service_disabled", f"{svc.id} is disabled; enable it in Settings or config.toml first")
         why = self.unavailable(svc)
@@ -133,12 +136,14 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
             svc.gpu_index = self._pick_gpu(svc)
             spec = mf.launch_spec(svc.mod, self.config, self.paths, self.hub_port, gpu_index=svc.gpu_index)
         except mf.ManifestError as e:
+            svc.start_failed_at = time.time()
             self._set(svc, "failed", error=str(e))
             raise ServiceError(409, "manifest_invalid", f"{svc.id} can't start: {e}") from None
         st = await self._backend_state(svc)
         if st.active != "active" and await asyncio.to_thread(port_listening, svc.port):
             owner = await asyncio.to_thread(port_owner, svc.port)
             msg = f"port {svc.port} is already in use by {owner_text(owner)}"
+            svc.start_failed_at = time.time()
             self._set(svc, "failed", error=msg)
             await self.activity.add(f"{svc.mod.name} can't start: {msg}", service=svc.id, level="error", route=f"#/s/{svc.id}")
             raise ServiceError(409, "port_in_use", f"{svc.id} can't start: {msg}", {"port": svc.port, "owner": owner})
@@ -155,6 +160,7 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
             st = await self.backend.start(spec)
         except BackendError as e:
             msg = f"couldn't launch: {e}"
+            svc.start_failed_at = time.time()
             self._set(svc, "failed", error=msg + await self._tail(svc))
             await self.activity.add(f"{svc.mod.name} failed to launch: {e}", service=svc.id, level="error", route=f"#/s/{svc.id}/logs")
             raise ServiceError(500, "service_failed", f"{svc.id}: {msg}") from None
@@ -191,7 +197,7 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
                 return
             if gen != svc.gen:
                 return
-            svc.pid = svc.started_ts = svc.live_port = None
+            svc.pid = svc.started_ts = svc.live_port = svc.start_failed_at = None
             self._clear_runtime(svc)
             self._set(svc, "stopped")
             await self.activity.add(f"Stopped {svc.mod.name}", service=svc.id)

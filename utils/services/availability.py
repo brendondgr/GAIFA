@@ -53,7 +53,7 @@ def availability(mgr: ServiceManager, svc: Service) -> dict[str, Any]:
         return {"status": "on", "why": "", "fix": _fix("none", sid)}
     if svc.external:
         return {"status": "failed", "why": f"{name} doesn't answer (it runs outside GAIFA)", "fix": _fix("none", sid)}
-    if svc.state == "failed":
+    if svc.state == "failed" or svc.start_failed_at:
         err = _first_line(svc.last_error)
         return {"status": "failed", "why": f"{name} didn't start" + (f": {err}" if err else ""), "fix": _fix("logs", sid, f"gaifa logs {sid}")}
     return {"status": "starts_on_use", "why": f"{name} is stopped; using it starts it", "fix": _fix("start", sid, f"gaifa start {sid}")}

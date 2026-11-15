@@ -243,7 +243,7 @@ skills = "skills"                   # optional: skills/<name>/SKILL.md for the a
 - Operations (`[memory]`, `[[ui.widgets]].source`, `[tools]`, `[api.responses]` keys) are written `"METHOD /path"`.
 - `[ui].page` must be inside the mod's `ui/` folder, and so must `[ui].logo` (an `.svg`, `.png` or `.webp`). The summary's `logo_url` is `/ui/services/<id>/<file>`, or null when the file is missing.
 - Two mods can't share a port, and no mod may use the hub's port.
-- Mods not mentioned in `config.toml` are enabled and autostart, once they're installed: a mod whose command doesn't exist yet (no venv, binary or script) isn't autostarted and shows `not installed: run gaifa setup <id>` as its last error (plan 23.12).
+- Mods not mentioned in `config.toml` are enabled and autostart, once they're installed: a mod whose command doesn't exist yet (no venv, binary or script) isn't autostarted (at boot or by a rescan) and shows `not set up: run gaifa setup <id>` as its last error (plan 23.12); starting it answers `409 not_set_up` with the fix in `data.fix` before anything is launched, and `gaifa start all` skips it with that line (capability-enablement 1.3).
 
 ### 4.4 Placeholders and environment
 
@@ -384,7 +384,7 @@ gaifa-decide.service                 decide (d3-lite)         :5107  (+ its mode
 - **starting:** health is polled every 0.5 s up to `start_timeout_s`. A mod that exits, or never gets healthy (it is then stopped), goes to `failed` with the last 20 log lines in `last_error`.
 - **ready:** health every 5 s. 2 misses → `degraded`; 5 misses → stopped and `failed`; the process exiting → `failed`.
 - **failed:** `restart = "on-failure"` retries after 2 / 4 / 8 s, at most 3 times in 5 minutes, then gives up. A failure raises an alert and an activity item.
-- **On boot:** running `gaifa-*` units started from this root are adopted (`starting` until healthy); one whose folder is gone is stopped. Then enabled mods with autostart start in the background, each after the mods in its `after` list.
+- **On boot:** running `gaifa-*` units started from this root are adopted (`starting` until healthy); one whose folder is gone is stopped. Then enabled mods with autostart start in the background, each after the mods in its `after` list; one that isn't set up is skipped. A start that fails (its process exits or never turns healthy, or it can't be launched) is recorded as `start_failed_at` until it is ready or stopped, so its availability reads `failed` (capability-enablement 1.3).
 - **Settings changes while running:** a new port or env applies at the mod's next start. Until then, health checks and the proxy keep using the port the process was started with.
 - **External mods** (`kind = "external"`): health only. Never reachable = `stopped`; reachable = `ready`; lost = `degraded`, then `failed`. Start and stop are refused (`external_service`).
 - `python app.py --dev` runs mods as child processes instead of units; they stop with the hub.

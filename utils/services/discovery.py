@@ -108,6 +108,9 @@ class DiscoveryMixin(_Base):
             for mod in mf.start_order([self.services[i].mod for i in added], self.config.services.order):
                 svc = self.services[mod.id]
                 if svc.startable and svc.eff.enabled and svc.eff.autostart and not svc.external:
+                    if not self.installed(svc):     # capability-enablement 1.3: nothing to start until it's set up
+                        log.info("autostart %s: not set up", svc.id)
+                        continue
                     self._spawn(svc, self._start_quietly(svc.id))
         return {"added": added, "removed": removed, "changed": changed}
 

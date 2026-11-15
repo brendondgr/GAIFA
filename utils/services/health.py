@@ -53,6 +53,7 @@ class HealthMixin(_Base):
             if gen != svc.gen:
                 return
             if st.active != "active":
+                svc.start_failed_at = time.time()   # capability-enablement 1.3
                 await self._failed(svc, gen, f"{st.describe_exit()} while starting")
                 return
             h = await self.check_health(svc)
@@ -61,6 +62,7 @@ class HealthMixin(_Base):
             svc.health = h
             if h["ok"]:
                 svc.misses = 0
+                svc.start_failed_at = None
                 self._set(svc, "ready")
                 self.alerts.clear(f"svc-{svc.id}")
                 verb = "is ready again" if adopted else "is ready"
@@ -73,6 +75,7 @@ class HealthMixin(_Base):
                     self._spawn(svc, status.poll(self, svc, gen))
                 return
             if time.monotonic() > deadline:
+                svc.start_failed_at = time.time()
                 await self._quiet_stop(svc)
                 await self._failed(svc, gen, f"not healthy after {svc.m.run.start_timeout_s:g}s ({svc.m.run.health} {_why(h)})", stopped=True)
                 return

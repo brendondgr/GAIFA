@@ -289,13 +289,24 @@ async def test_bad_placeholder_fails_at_start(rig):
     assert mgr.get("fake-ok").state == "failed"
 
 
-async def test_missing_executable_fails_with_its_name(rig):
+async def test_missing_executable_is_not_set_up(rig):
+    """capability-enablement 1.3: a missing command is a mod that was never set up, refused before any launch."""
     rig.add("fake-ok", edit={"command": '["./missing-binary"]'})
     mgr = await rig.manager()
     with pytest.raises(ServiceError) as e:
         await mgr.start("fake-ok")
+    assert e.value.code == "not_set_up" and e.value.data["fix"] == "gaifa setup fake-ok"
+    assert mgr.get("fake-ok").state == "stopped"
+
+
+async def test_a_launch_that_fails_names_the_executable(rig):
+    """Set up by its `installed` marker, but the command itself is missing: the launch error names it."""
+    rig.add("fake-ok", edit={"command": '["./missing-binary"]', "installed": '"sh"'})
+    mgr = await rig.manager()
+    with pytest.raises(ServiceError) as e:
+        await mgr.start("fake-ok")
     assert e.value.code == "service_failed" and "missing-binary" in e.value.detail
-    assert mgr.get("fake-ok").state == "failed"
+    assert mgr.get("fake-ok").state == "failed" and mgr.get("fake-ok").start_failed_at
 
 
 async def test_failed_while_hub_was_down(rig):

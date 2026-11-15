@@ -428,6 +428,9 @@ def _lifecycle(action: str, target: str | None) -> int:
         for s in services:
             if s["kind"] == "external" or s["manifest_errors"] or (action == "start" and not s.get("enabled", True)):
                 continue
+            if action == "start" and s.get("installed") is False:   # capability-enablement 1.3
+                print(f"{s['id']}: not set up, skipped (gaifa setup {s['id']})")
+                continue
             if action == "stop" and s["state"] == "stopped":
                 continue
             try:

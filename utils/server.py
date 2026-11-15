@@ -64,6 +64,7 @@ class Options:
     autostart: bool = True
     demo_mods: bool = False  # also load utils/tests/fixtures/mods/
     extra_hosts: tuple[str, ...] = ()  # Host names allowed besides loopback: only the tests' ASGI clients (`http://hub`)
+    setup_runner: Any = None  # capability-enablement 3.1: tests' fake `gaifa` for setup jobs (utils/setup_jobs.py)
 
 
 @dataclass
@@ -97,6 +98,7 @@ class Hub:
     sessions: Any = None    # sessions.Sessions
     prefs: Any = None       # prefs.Prefs (plan 21.2)
     repos: Any = None       # repos_watch.RepoWatcher (plan mod-repos 3.3)
+    setup: Any = None       # setup_jobs.SetupJobs (capability-enablement 3.1)
     ui_store: Any = None    # ui_store.UiStore, made on first use (settings-that-stick 4.1)
     services: ServiceManager | None = None
     timing: Any = None  # services.Timing; tests shorten it
@@ -148,7 +150,7 @@ def default_backend(options: Options, config: Config | None = None, paths: Paths
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
     from utils.lan import Lan
-    from utils.routes import events, gpu, lan, llm, mcp, memory, mentions, metrics, models, notify, outputs, overview, prefs, repos, services, sessions, settings, skills, system, tools, ui_store, web, webpages, widgets
+    from utils.routes import events, gpu, lan, llm, mcp, memory, mentions, metrics, models, notify, outputs, overview, prefs, repos, services, sessions, settings, setup, skills, system, tools, ui_store, web, webpages, widgets
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options, config, paths), options=options, version=hub_version())
@@ -285,6 +287,11 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             hub.repos = RepoWatcher(hub)
             await hub.repos.start()
             stack.push_async_callback(hub.repos.close)
+            # 12. setup from the app (capability-enablement 3.1): the same gaifa setup, as one job at a time.
+            from utils.setup_jobs import SetupJobs
+
+            hub.setup = SetupJobs(hub, run=hub.options.setup_runner)
+            stack.push_async_callback(hub.setup.close)
             log.info("GAIFA %s ready on port %s (root %s)", hub.version, hub.port, paths.root)
             yield
 
@@ -328,8 +335,9 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(ui_store.router)  # /api/ui/store (settings-that-stick 4.1)
     app.include_router(notify.router)  # /api/notify (calendar 2.1)
     app.include_router(lan.router)  # /signin, /api/lan (lan-access 1.3)
+    app.include_router(setup.router)  # /api/setup (capability-enablement 3.1)
     for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets",
-                 "overview", "settings", "tools", "sessions", "prefs", "webpages", "gpu", "mentions", "repos", "llm", "ui_store", "notify", "lan"):
+                 "overview", "settings", "tools", "sessions", "prefs", "webpages", "gpu", "mentions", "repos", "llm", "ui_store", "notify", "lan", "setup"):
         hub.mark_live(area)
 
     app.include_router(web.router)

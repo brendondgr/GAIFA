@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from utils import api_models as am
 from utils.routes import repos as rr
+from utils.routes import setup as rsetup
 from utils.routes import sessions as rs
 from utils.tools import api as ta
 from utils.tests.conftest import REPO
@@ -78,7 +79,7 @@ async def test_every_api_js_route_exists(client):
 
 # brief interface → the pydantic model the hub answers with
 MODELS: dict[str, type[BaseModel]] = {
-    "Stat": am.Stat, "ServiceSummary": am.ServiceSummary, "Availability": am.Availability, "AvailabilityFix": am.AvailabilityFix, "ServiceDetail": am.ServiceDetail, "ServiceConfig": am.ServiceConfig,
+    "Stat": am.Stat, "ServiceSummary": am.ServiceSummary, "Availability": am.Availability, "AvailabilityFix": am.AvailabilityFix, "SetupJob": rsetup.SetupJob, "SetupTest": rsetup.SetupTest, "SetupJobView": rsetup.SetupJobView, "SetupAbout": rsetup.SetupAbout, "ServiceDetail": am.ServiceDetail, "ServiceConfig": am.ServiceConfig,
     "Operation": am.Operation, "Memory": am.SystemMemory, "MakeRoomPlan": am.MakeRoomPlan, "Model": am.Model,
     "Discovered": am.Discovered, "Totals": am.ModelTotals, "Disk": am.Disk, "Output": am.Output, "OutputPage": am.OutputPage,
     "OutputText": am.OutputText, "OutputSearch": am.OutputSearch, "OutlineItem": am.OutlineItem, "SearchHit": am.SearchHit,

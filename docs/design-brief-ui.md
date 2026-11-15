@@ -471,6 +471,22 @@ interface ServiceSummary {
 }
 
 // capability-enablement 1.2: one answer for "can this mod be used", read by every caller (UI, tools, agent, doctor)
+// capability-enablement 3.1: setup from the app. GET /api/setup/plan?ids= returns `gaifa setup --plan --json`'s object
+// (stage, setups, mods, disk_gb, images, steps [{id, setup, mod, run, what, ask, interactive}], questions, suggestions
+// [{setup, name, size_gb, good_for, licence, source, required, gated}], host [{id, ok, detail, fix, needs_root}], checks,
+// variants [{setup, accel, label, untested, note}], unavailable, smokes) plus `about`: SetupAbout[].
+interface SetupAbout { id: string; name: string; provides: string; description: string; folder: string; port: number | null;
+                       recommended: boolean; installed: boolean }
+interface SetupJob { id: string; ids: string[]; state: "running" | "done" | "failed" | "needs_you" | "cancelled";
+                     started_ts: number; finished_ts: number | null;
+                     lines: string[];              // the last progress lines
+                     report: any;                  // gaifa setup's JSON report once it ends
+                     needs: { questions: object[]; interactive: object[]; host: object[]; stage: string } | null;   // needs_you
+                     error: string | null;
+                     started: { id: string; state: string; error?: string }[] }   // done: each mod started after setup
+interface SetupJobView { job: SetupJob | null }   // GET and DELETE /api/setup/job
+interface SetupTest { id: string; passed: boolean; seconds: number; device: string | null; run: string; log: string; output: string }
+
 interface Availability {
   status: "on" | "starts_on_use" | "off" | "not_set_up" | "cant_run" | "failed" | "broken";
   //       on: ready, degraded or starting · starts_on_use: stopped, set up and on (a call starts it) · off: enabled = false

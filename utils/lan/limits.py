@@ -5,7 +5,8 @@ here does, except for what would widen what GAIFA may do or who may reach it.
   `PUT /api/settings`: its port);
 - a chat, project or task in Bypass (any `"mode": "bypass"` sent to the agent);
 - a workspace folder's level or Bypass (`level` above Read, or `"bypass": true`, sent to a folder route);
-- `/mcp` (Claude Code and Codex on this machine only).
+- `/mcp` (Claude Code and Codex on this machine only);
+- setting mods up (`/api/setup*` writes: capability-enablement 3.1).
 
 `refused(method, path, body)` says why, or None. The body is the request's JSON (None when it has none or isn't JSON).
 """
@@ -40,6 +41,8 @@ def refused(method: str, path: str, body: Any = None) -> str | None:
         return "GAIFA's MCP server is for coding agents on the GAIFA machine only."
     if method not in UNSAFE:
         return None
+    if path == "/api/setup" or path.startswith("/api/setup/"):      # capability-enablement 3.1: it runs commands here
+        return f"Setting mods up runs commands on the GAIFA machine, so it's done there. {WHERE}"
     if path == "/api/system/restart":
         return f"GAIFA can only be restarted from the GAIFA machine. {WHERE}"
     if path.startswith("/api/lan/") and path not in ("/api/lan/signin", "/api/lan/signout"):

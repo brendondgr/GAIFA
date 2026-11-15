@@ -336,7 +336,20 @@ export function createMockApi() {
       state: s.state, state_since: s.state_since, load: s.load, idle_s: s.load === 'n/a' ? null : s.idle_s, memory: { used_bytes: s.used, estimate_bytes: s.estimate, peak_bytes: s.peak },
       stats: s.stats.map(st => withSeries(s.id, st)), has_page: s.has_page, chat_url: CHAT_MODS.includes(s.id) ? `/ui/services/${s.id}/chat.js` : null, logo_url: ['relay', 'lcpp', 'tts', 'gen3d', 'comfy', 'opencode'].includes(s.id) ? `/ui/services/${s.id}/logo.svg` : null, has_outputs: s.has_outputs, native_ui: s.native_ui, enabled: s.config?.enabled ?? true, autostart: s.config?.autostart ?? s.autostart,
       last_error: s.last_error, manifest_errors: [...s.manifest_errors],
-      accel: MOCK_ACCEL[s.id] ?? null, unavailable: s.id === 'example' ? "its variant (cuda) needs a GPU this machine doesn't have (it has rocm, vulkan, cpu): run `gaifa setup example` to pick another" : null };   // plan 38.3
+      accel: MOCK_ACCEL[s.id] ?? null, unavailable: s.id === 'example' ? "its variant (cuda) needs a GPU this machine doesn't have (it has rocm, vulkan, cpu): run `gaifa setup example` to pick another" : null,   // plan 38.3
+      installed: s.installed ?? true, availability: mockAvailability(s) };
+  }
+  // capability-enablement 1.2: utils/services/availability.py's answer, from the mock's own fields
+  function mockAvailability(s) {
+    const fix = (kind, command = '', tool = '') => ({ kind, id: s.id, command, tool });
+    const on = s.config?.enabled ?? true;
+    if (s.manifest_errors.length) return { status: 'broken', why: `${s.name} has a problem in its service.toml: ${s.manifest_errors[0]}`, fix: fix('none', `gaifa check ${s.id}`) };
+    if (s.installed === false) return { status: 'not_set_up', why: `${s.name} isn't set up on this machine`, fix: fix('setup', `gaifa setup ${s.id}`) };
+    if (s.id === 'example') return { status: 'cant_run', why: `${s.name} can't run on this machine: its variant (cuda) needs a GPU this machine doesn't have`, fix: fix('setup', `gaifa setup ${s.id}`) };
+    if (!on) return { status: 'off', why: `${s.name} is turned off`, fix: fix('enable', `turn ${s.name} on in Settings → Services`) };
+    if (['ready', 'degraded', 'starting'].includes(s.state)) return { status: 'on', why: '', fix: fix('none') };
+    if (s.state === 'failed') return { status: 'failed', why: `${s.name} didn't start${s.last_error ? ': ' + s.last_error.split('\n')[0] : ''}`, fix: fix('logs', `gaifa logs ${s.id}`) };
+    return { status: 'starts_on_use', why: `${s.name} is stopped; using it starts it`, fix: fix('start', `gaifa start ${s.id}`, 'hub_start_service') };
   }
   function detail(s) {
     const manifest = s.manifest_errors.length ? { id: s.id, name: s.name } : { id: s.id, name: s.name, description: s.description, version: s.version, icon: s.icon,

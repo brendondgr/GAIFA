@@ -464,6 +464,24 @@ interface ServiceSummary {
   manifest_errors: string[];     // non-empty → state "failed", not startable
   accel: string | null;          // plan 38.3: the variant installed (rocm, cuda, xpu, mps, vulkan, cpu); null: not recorded
   unavailable: string | null;    // plan 38.3: why it can't start on this machine (its variant's accel isn't here); start answers 409 unavailable
+  installed: boolean;            // capability-enablement 1.2: its command exists (its venv, binary or script): `gaifa setup <id>` has run
+  availability: Availability | null;   // capability-enablement 1.2: can it be used, why not, what turns it on
+}
+
+// capability-enablement 1.2: one answer for "can this mod be used", read by every caller (UI, tools, agent, doctor)
+interface Availability {
+  status: "on" | "starts_on_use" | "off" | "not_set_up" | "cant_run" | "failed" | "broken";
+  //       on: ready, degraded or starting · starts_on_use: stopped, set up and on (a call starts it) · off: enabled = false
+  //       not_set_up: no venv/binary yet · cant_run: its variant needs hardware this machine lacks · failed · broken: service.toml errors
+  why: string;                   // a sentence for a person ("Web isn't set up on this machine"); "" when on
+  fix: AvailabilityFix;
+}
+
+interface AvailabilityFix {
+  kind: "setup" | "enable" | "start" | "logs" | "none";
+  id: string;
+  command: string;               // what a person runs: "gaifa setup web"; "" for none
+  tool: string;                  // the hub tool that does it (hub_start_service, …); "" until that tool exists
 }
 
 interface ServiceDetail extends ServiceSummary {

@@ -236,7 +236,7 @@ async def test_a_mod_that_isnt_installed_isnt_autostarted(rig):
     await until(lambda: mgr.get("ready-one").state == "ready")
     await asyncio.sleep(0.2)
     fresh = mgr.get("fresh")
-    assert fresh.state == "stopped" and fresh.last_error == "not installed: run `gaifa setup fresh`"
+    assert fresh.state == "stopped" and fresh.last_error == "not set up: run `gaifa setup fresh`"
     assert mgr.installed(fresh) is False and mgr.installed(mgr.get("ready-one")) is True
     assert mgr.get("script").state == "stopped" and mgr.installed(mgr.get("script")) is False
     assert mgr.installed(mgr.get("either")) is True
@@ -357,7 +357,7 @@ async def test_every_change_is_published_with_a_full_summary(rig):
     expected = {
         "id", "name", "description", "icon", "version", "kind", "port", "url", "state", "state_since", "load", "idle_s",
         "busy", "memory", "stats", "has_page", "page_url", "logo_url", "chat_url", "badge", "main", "chat_panel", "has_outputs", "native_ui", "enabled", "autostart", "last_error", "manifest_errors",
-        "accel", "unavailable",
+        "accel", "unavailable", "installed", "availability",
     }
     assert set(ev) == expected
     assert ev["url"] == f"http://127.0.0.1:{rig.ports['fake-ok']}" and ev["has_outputs"] is True

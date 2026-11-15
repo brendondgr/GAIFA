@@ -395,7 +395,7 @@ gaifa-decide.service                 decide (d3-lite)         :5107  (+ its mode
 
 ## 6. Hub API
 
-The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md)**. These routes are backend-only additions:
+The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md)**. Every mod in `GET /api/services` carries `installed` and `availability` (`utils/services/availability.py`, plan capability-enablement 1.2): one status (`on`, `starts_on_use`, `off`, `not_set_up`, `cant_run`, `failed`, `broken`), a sentence saying why, and the fix (`{kind, id, command, tool}`) that the tool catalog, the agent, the doctor and the UI all read; a mod found without its command gets `last_error = "not set up: run `gaifa setup <id>`"` at boot and rescan. These routes are backend-only additions:
 
 | Route | Purpose |
 |---|---|

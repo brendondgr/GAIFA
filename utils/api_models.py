@@ -55,6 +55,19 @@ class ChatPanel(_Model):
     url: str
 
 
+class AvailabilityFix(_Model):
+    kind: Literal["setup", "enable", "start", "logs", "none"]
+    id: str
+    command: str = Field(description="What a person runs, e.g. `gaifa setup web`; empty for none")
+    tool: str = Field(description="The hub tool that does it (hub_start_service, …); empty until that tool exists")
+
+
+class Availability(_Model):
+    status: Literal["on", "starts_on_use", "off", "not_set_up", "cant_run", "failed", "broken"]
+    why: str = Field(description="A sentence for a person (\"Web isn't set up on this machine\"); empty when on")
+    fix: AvailabilityFix
+
+
 class ServiceSummary(_Model):
     id: str
     name: str
@@ -86,6 +99,8 @@ class ServiceSummary(_Model):
     manifest_errors: list[str]
     accel: str | None = Field(None, description="The variant installed (plan 38.3): rocm, cuda, xpu, mps, vulkan, cpu; null: not recorded")
     unavailable: str | None = Field(None, description="Why it can't start on this machine (its variant's accel isn't here), else null")
+    installed: bool = Field(True, description="Its command exists (its venv, binary or script): `gaifa setup <id>` has run (plan 23.12)")
+    availability: Availability | None = Field(None, description="Can it be used, why not, and what turns it on (plan capability-enablement 1.2)")
 
 
 class Health(_Model):

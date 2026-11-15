@@ -34,6 +34,9 @@ class DiscoveryMixin(_Base):
                 svc.state = "failed"
             services[mod.id] = svc
         self.services = services
+        for svc in services.values():     # capability-enablement 1.2: said wherever last_error shows
+            if not svc.errors and not self.installed(svc):
+                svc.last_error = f"not set up: run `gaifa setup {svc.id}`"
         self._manifest_alerts()
 
     def _manifest_alerts(self) -> None:
@@ -79,6 +82,8 @@ class DiscoveryMixin(_Base):
                 svc = Service(mod=mod, eff=mf.effective(mod, self.config), errors=errors)
                 svc.load = self._idle_load(svc)
                 svc.state = "failed" if errors else "stopped"
+                if not errors and not self.installed(svc):   # capability-enablement 1.2: said wherever last_error shows
+                    svc.last_error = f"not set up: run `gaifa setup {svc.id}`"
                 self.services[mod.id] = svc
                 added.append(mod.id)
                 await self.activity.add(f"Found a new mod: {mod.name}", service=mod.id, route=f"#/s/{mod.id}")
@@ -202,8 +207,8 @@ class DiscoveryMixin(_Base):
                 log.info("autostart %s: unavailable (%s)", svc.id, svc.eff.accel)
                 continue
             if not self.installed(svc):   # a fresh clone: nothing to start until it's set up (plan 23.12)
-                svc.last_error = f"not installed: run `gaifa setup {svc.id}`"
-                log.info("autostart %s: not installed", svc.id)
+                svc.last_error = f"not set up: run `gaifa setup {svc.id}`"
+                log.info("autostart %s: not set up", svc.id)
                 continue
             deps = [tasks[d] for d in (svc.m.run.after if svc.m else []) if d in tasks]
             tasks[svc.id] = asyncio.create_task(self._start_after(svc, deps))

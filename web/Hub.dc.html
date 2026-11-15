@@ -941,6 +941,7 @@ class Component extends DCLogic {
     const forceMock = new URLSearchParams(location.search).has('mock');
     this.api = hub.createApi({ base: window.GAIFA_API_BASE ?? null, liveAreas: forceMock ? [] : (window.GAIFA_LIVE_AREAS || []), mock: mod.createMockApi() });
     this.ModKit = modKitMod; modKitMod.store.attach(this.api);   // 4.2: mod pages' remembered choices, on the hub
+    imp('setup-dialog.js').then(m => m.install({ api: this.api, toast: (t, l) => this.toast(t, l), on: this.modOn, go: h => this.go(h) }));   // capability-enablement 3.4
     this.UiPrefs = uiPrefsMod; uiPrefsMod.uiPrefs.attach(this.api);   // settings-that-stick 3.2: the UI's choices, saved in config.toml
     uiPrefsMod.uiPrefs.onError = e => { if (!this.prefErrShown) { this.prefErrShown = true; this.toast(`Couldn’t save: kept in this browser only (${e?.detail || e?.message || e})`, 'error'); } };
     if (!location.hash) history.replaceState(null, '', '#/overview');

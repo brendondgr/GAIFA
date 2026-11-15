@@ -105,3 +105,11 @@ async def test_chat_search_says_embed_isnt_set_up(env):
     e = env.payloads(tid, "tool_result")[0]["error"]
     assert e["code"] == "capability_unavailable" and e["detail"] == "I can't search your chats by meaning: Embeddings isn't set up on this machine"
     assert "offer to set it up (`gaifa setup embed`)" in e["fix"]
+
+
+def test_the_rule_rides_with_the_section():
+    """capability-enablement 2.2: the rule is in the section, never in a prompt where everything is on."""
+    text = prompts.off_section(OFF_TOOLS[:2], SERVICES)
+    assert text.startswith("When a request needs one of these: say in one sentence what is missing")
+    assert "never reach it another way" in text and "`capability_unavailable` result is final for this turn" in text
+    assert "Off on this machine" not in prompts.base_text() and "capability_unavailable" not in prompts.base_text()

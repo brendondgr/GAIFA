@@ -45,7 +45,7 @@ UNAVAILABLE = ("isn't set up", "is not set up", "not set up", "isn't available",
                "can't browse", "cannot browse", "no web", "can't check", "cannot check", "couldn't check", "could not check",
                "turned off", "isn't running", "not running", "didn't start", "can't reach", "cannot reach", "couldn't reach",
                "unable to search", "unable to access", "gaifa setup", "isn't currently working", "not currently working",
-               "connectivity issues", "connection errors", "don't have direct access", "unable to retrieve", "couldn't retrieve", "wasn't able to", "aren't set up",
+               "connectivity issues", "connection errors", "isn't working", "don't have direct access", "unable to retrieve", "couldn't retrieve", "wasn't able to", "aren't set up",
                "isn't set up", "currently down", "is down", "can't get the", "cannot get the",
                "technical trouble", "isn't starting", "not starting", "not working", "disabled", "don't have access", "do not have access", "no access", "not connected")
 OFFER = ("set it up", "set up", "turn it on", "turn on", "enable", "start it", "want me to")

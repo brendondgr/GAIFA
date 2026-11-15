@@ -14,6 +14,7 @@ import { AGENT_BLOCKS } from './blocks-agent.js';
 import { REPO_BLOCKS } from './blocks-repos.js';
 import { LLM_BLOCKS } from './blocks-llm.js';
 import { LAN_BLOCKS } from './blocks-lan.js';
+import { SETUP_BLOCKS } from './blocks-setup.js';
 import { voiceChoices } from '../chat/chat-speak.js';
 import { baseOf } from '../settings-merge.js';
 import { allowRule } from '../chat/chat-judge.js';
@@ -21,7 +22,7 @@ import { useUiPref } from '../ui-prefs.js';
 import { store } from '../ui-store.js';
 
 const R = () => globalThis.React;
-const BLOCKS = { ...HUB_BLOCKS, ...AGENT_BLOCKS, ...REPO_BLOCKS, ...LLM_BLOCKS, ...LAN_BLOCKS };
+const BLOCKS = { ...HUB_BLOCKS, ...AGENT_BLOCKS, ...REPO_BLOCKS, ...LLM_BLOCKS, ...LAN_BLOCKS, ...SETUP_BLOCKS };
 // The flash on a row or group a hash names (2.2): a short accent ring, 1.2 s.
 const FLASH_CSS = '@keyframes gaifaFlash{0%{box-shadow:0 0 0 2px var(--acc,#FFB224);background:var(--tacc,rgba(255,178,36,.13))}100%{box-shadow:0 0 0 2px transparent;background:transparent}}.gaifa-flash{animation:gaifaFlash 1.2s ease-out;border-radius:8px}.gaifa-settings-link:hover{background:var(--hov,#161C28)}';
 function useFlashCss() {

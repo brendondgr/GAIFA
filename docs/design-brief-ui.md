@@ -466,6 +466,7 @@ interface ServiceSummary {
   unavailable: string | null;    // plan 38.3: why it can't start on this machine (its variant's accel isn't here); start answers 409 unavailable
   provides: string;              // capability-enablement 1.4: what it lets the agent do, completing "I can't …" ("search the web and read pages"); "" when not said
   recommended: boolean;          // capability-enablement 1.4: its setup doc recommends it for chat: offered first and pre-ticked
+  testable: boolean;             // capability-enablement 3.5: its setup doc has a test (smoke): testSetup(id) runs it on this machine
   installed: boolean;            // capability-enablement 1.2: its command exists (its venv, binary or script): `gaifa setup <id>` has run
   availability: Availability | null;   // capability-enablement 1.2: can it be used, why not, what turns it on
 }

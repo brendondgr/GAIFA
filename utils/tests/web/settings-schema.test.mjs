@@ -79,7 +79,7 @@ test('2.1: nine sections in order, with their groups (LLMs since llm-servers 4.1
   assert.deepEqual(secs.map(s => s.id), ['general', 'machine', 'services', 'llms', 'agent', 'permissions', 'speech', 'sessions', 'about']);
   const groups = Object.fromEntries(secs.map(s => [s.id, s.groups.map(g => g.id)]));
   assert.deepEqual(groups, {
-    general: ['hub', 'network', 'interface', 'outputs'], machine: ['memory', 'storage', 'hardware'], services: ['services', 'repositories'],
+    general: ['hub', 'network', 'interface', 'outputs'], machine: ['memory', 'storage', 'hardware'], services: ['recommended', 'services', 'repositories'],
     llms: ['servers', 'add', 'engines', 'defaults'],
     agent: ['model', 'documents', 'web', 'instructions', 'memory', 'skills', 'learning'],
     permissions: ['modes', 'rules', 'grants', 'judge', 'screening', 'judged'], speech: ['dictation', 'voice', 'voiceMode'], sessions: ['sessions'], about: ['versions', 'cli', 'doctor'] });

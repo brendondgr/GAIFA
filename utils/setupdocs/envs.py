@@ -88,27 +88,31 @@ def load_envs(root: Path) -> tuple[list[Env], dict[str, str]]:
     return envs, problems
 
 
-_RECOMMENDED: dict[Path, tuple[tuple[float, ...], bool]] = {}
+_FLAGS: dict[Path, tuple[tuple[float, ...], tuple[bool, bool]]] = {}
 
 
-def recommended(mod_dir: Path) -> bool:
-    """The mod's own setup doc (the block whose id is the mod's) says `recommended = true` (capability-enablement 1.4).
-    Cached by the docs' modification times: the hub asks for every summary."""
+def setup_flags(mod_dir: Path) -> tuple[bool, bool]:
+    """(recommended, has a test) from the mod's own setup doc (the block whose id is the mod's): `recommended = true`
+    (capability-enablement 1.4) and a `smoke` (3.5). Cached by the docs' modification times: the hub asks per summary."""
     docs = sorted((mod_dir / "setup").glob("*.md")) if (mod_dir / "setup").is_dir() else []
     try:
         key = tuple(d.stat().st_mtime for d in docs)
     except OSError:
-        return False
-    hit = _RECOMMENDED.get(mod_dir)
+        return False, False
+    hit = _FLAGS.get(mod_dir)
     if hit and hit[0] == key:
         return hit[1]
-    out = False
+    out = (False, False)
     for d in docs:
         env, _ = parse(d, mod_dir.name)
-        if env and env.id == mod_dir.name and env.setup.recommended:
-            out = True
-    _RECOMMENDED[mod_dir] = (key, out)
+        if env and env.id == mod_dir.name:
+            out = (env.setup.recommended, bool(env.setup.smoke))
+    _FLAGS[mod_dir] = (key, out)
     return out
+
+
+def recommended(mod_dir: Path) -> bool:
+    return setup_flags(mod_dir)[0]
 
 
 def under(path: str, folder: str) -> bool:

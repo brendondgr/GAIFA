@@ -167,6 +167,11 @@ export function sections(ctx = {}) {
         block('hardware', 'HardwareCard', { label: 'Hardware', card: true, keywords: ['GPU', 'VRAM', 'CPU', 'accelerator', 'ROCm', 'CUDA'] }),
       ] }] },
     { id: 'services', label: 'Services', icon: 'puzzle', areas: SETTINGS_AREAS.services, groups: [
+      // capability-enablement 3.5: the mods a chat uses, what each gives, Set up the rest
+      { id: 'recommended', label: 'Recommended for chat', summary: c => { const r = (c.services || []).filter(s => s.recommended);
+          const miss = r.filter(s => s.availability?.status === 'not_set_up').length; return r.length ? (miss ? `${miss} of ${r.length} not set up` : `all ${r.length} set up`) : 'None'; }, rows: [
+        block('recommended', 'RecommendedCard', { label: 'Recommended for chat', card: true, keywords: ['set up', 'setup', 'install', 'recommended', 'coding agent', 'gaifa setup'] }),
+      ] },
       { id: 'services', label: 'Services', summary: () => { const en = Object.values(d.services?.enabled || {}); return `${n(en.length, 'mod')} · ${en.filter(Boolean).length} enabled`; }, rows: [
         block('table', 'ServicesTable', { label: 'Folders in services/', keys: ['services.order', 'services.enabled', 'services.autostart'], card: true,
           keywords: ['mods', 'enabled', 'autostart', 'order', 'sidebar', 'tools'] }),

@@ -9,6 +9,7 @@ import { useData, svcColor } from './views.js';
 import { LiveThumb } from './live-kit.js';
 import { jobGpuText, gpuSummary } from './gpu-queue.js';
 import { Icon, useTileSize } from './bento.js';
+import { store } from './ui-store.js';
 
 const TX = 'var(--tx,#E6EAF2)';
 const GB = b => (b >= 0.05e9 ? fmtBytes(b) : '—');
@@ -23,7 +24,7 @@ export function jobStatusText(j) {
 }
 
 // What needs you, worst first: errors and failed mods, approvals, warnings, memories to review.
-export function needsRows({ alerts = [], services = [], approvals = [], memReview = 0 }) {
+export function needsRows({ alerts = [], services = [], approvals = [], memReview = 0, setupNotNow = [] }) {
   const rows = [], failedAlert = new Set(alerts.filter(a => a.service && a.level === 'error').map(a => a.service));
   for (const a of alerts) rows.push({ key: 'a:' + a.id, rank: a.level === 'error' ? 0 : 2, tone: a.level === 'error' ? 'red' : 'accent', text: a.text, action: a.action?.label || 'Open', href: a.action?.route || null });
   for (const s of services) {
@@ -32,6 +33,11 @@ export function needsRows({ alerts = [], services = [], approvals = [], memRevie
       rows.push({ key: 'f:' + s.id, rank: 0, tone: 'red', text: `${s.name} ${mf ? 'has a manifest error' : 'failed'}`, sub: mf ? s.manifest_errors[0] : s.last_error || '', action: mf ? 'Details' : 'Logs', href: `#/s/${s.id}${mf ? '' : '/logs'}` });
   }
   if (approvals.length) rows.push({ key: 'ap', rank: 1, tone: 'purple', text: `${approvals.length} approval${approvals.length > 1 ? 's' : ''} waiting`, sub: [...new Set(approvals.map(a => a.tool))].slice(0, 2).join(', '), action: 'Review', approvals: true });
+  // capability-enablement 3.5: the recommended mods that aren't set up, once (until Not now)
+  const missing = services.filter(s => s.recommended && s.availability?.status === 'not_set_up');
+  if (missing.length && !missing.every(s => setupNotNow.includes(s.id)))
+    rows.push({ key: 'setup', rank: 2, tone: 'accent', text: `${missing.length} recommended mod${missing.length > 1 ? 's' : ''} not set up`,
+      sub: missing.map(s => s.name).join(', '), action: 'Set up', setup: missing.map(s => s.id) });
   if (memReview > 0) rows.push({ key: 'mem', rank: 3, tone: 'cyan', text: `${memReview} ${memReview > 1 ? 'memories' : 'memory'} to review`, action: 'Review', href: '#/s/agent/review' });
   return rows.sort((a, b) => a.rank - b.rank);
 }
@@ -100,13 +106,23 @@ export const PATHS = {
 
 // ---------- Needs you ----------
 export function NeedsW({ ctx }) {
-  const rows = needsRows(ctx);
+  const React = globalThis.React, [, redraw] = React.useState(0);
+  const notNow = store.get('hub.overview.setupNotNow', []) || [];
+  const rows = needsRows({ ...ctx, setupNotNow: notNow });
   if (!rows.length) return h(Calm, { icon: PATHS.check, text: 'All clear: nothing needs you' });
-  return h('div', null, rows.map((r, i) => h(Row, { key: r.key, first: i === 0, href: r.href || undefined, onClick: r.approvals ? ctx.onApprovals : undefined, title: r.sub ? `${r.text}: ${r.sub}` : r.text,
+  const setup = ids => globalThis.dispatchEvent?.(new CustomEvent('gaifa:setup', { detail: { ids } }));   // the Set up dialog (3.4)
+  const later = ids => { store.set('hub.overview.setupNotNow', [...new Set([...notNow, ...ids])]); redraw(n => n + 1); };
+  return h('div', null, rows.map((r, i) => h(Row, { key: r.key, first: i === 0, href: r.href || undefined,
+    onClick: r.approvals ? ctx.onApprovals : r.setup ? () => setup(r.setup) : undefined, title: r.sub ? `${r.text}: ${r.sub}` : r.text,
     lead: h('span', { style: dotSt(TONE[r.tone]) }), text: r.text, sub: r.sub,
-    right: h(Muted, { style: { color: TONE[r.tone] === TONE.red ? TONE.red : 'var(--cy,#58C4DD)' } }, r.action + ' →') })));
+    right: r.setup ? h('span', { style: { display: 'flex', gap: 8 } },
+        h('span', { role: 'button', tabIndex: 0, onClick: e => { e.stopPropagation(); later(r.setup); },        // inside the row's button: not a button itself
+          onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); later(r.setup); } },
+          style: { fontSize: 11.5, color: MUT, cursor: 'pointer', textDecoration: 'underline', whiteSpace: 'nowrap', flex: 'none' } }, 'Not now'),
+        h(Muted, { style: { color: 'var(--cy,#58C4DD)' } }, r.action + ' →'))
+      : h(Muted, { style: { color: TONE[r.tone] === TONE.red ? TONE.red : 'var(--cy,#58C4DD)' } }, r.action + ' →') })));
 }
-export const needsCount = ctx => { const r = needsRows(ctx); return { count: r.length || null, tone: r.some(x => x.tone === 'red') ? 'red' : r.length ? 'accent' : null }; };
+export const needsCount = ctx => { const r = needsRows({ ...ctx, setupNotNow: store.get('hub.overview.setupNotNow', []) || [] }); return { count: r.length || null, tone: r.some(x => x.tone === 'red') ? 'red' : r.length ? 'accent' : null }; };
 
 // ---------- Running now ----------
 export function RunningW({ ctx }) {

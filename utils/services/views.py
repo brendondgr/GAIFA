@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from utils.services.availability import availability
-from utils.setupdocs.envs import recommended
+from utils.setupdocs.envs import recommended, setup_flags
 from utils.services.status import slug
 
 if TYPE_CHECKING:
@@ -58,6 +58,7 @@ def summary(mgr: ServiceManager, svc: Service) -> dict[str, Any]:
         "installed": mgr.installed(svc),
         "provides": (m.agent.provides if m else None) or "",
         "recommended": recommended(svc.mod.dir),
+        "testable": setup_flags(svc.mod.dir)[1],
         "availability": availability(mgr, svc),
     }
 

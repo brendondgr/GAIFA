@@ -92,7 +92,28 @@ test('the hub blocks render with fixed data', () => {
   all(t, n => n.props['aria-label'] === 'Move LLM Relay down')[0].props.onClick(); assert.deepEqual(d.services.order, ['lcpp', 'relay']);
 });
 
-test('every block the schema names exists', () => {
-  const names = { ...B.HUB_BLOCKS, ...A.AGENT_BLOCKS, ...RB.REPO_BLOCKS, ...LB.LLM_BLOCKS, ...NB.LAN_BLOCKS };
+test('every block the schema names exists', async () => {
+  const names = { ...B.HUB_BLOCKS, ...A.AGENT_BLOCKS, ...RB.REPO_BLOCKS, ...LB.LLM_BLOCKS, ...NB.LAN_BLOCKS, ...(await load('settings/blocks-setup.js')).SETUP_BLOCKS };
   for (const r of S.rowsOf(S.sections({ services })).filter(r => r.control === 'block')) assert.ok(names[r.block], r.block);
+});
+
+test('capability-enablement 3.5: each service row says its state and what turns it on; the recommended group', async () => {
+  const st = await load('settings/blocks-setup.js');
+  const w = x => st.statusWords(x);
+  assert.deepEqual(w({ id: 'web', name: 'Web', state: 'stopped', availability: { status: 'not_set_up' } }).action, { id: 'setup', label: 'Set up', title: 'Set up Web' });
+  assert.equal(w({ id: 'web', name: 'Web', state: 'stopped', availability: { status: 'not_set_up' } }).text, 'Not set up');
+  assert.equal(w({ id: 'c', name: 'Calendar', state: 'stopped', availability: { status: 'off' } }).action.label, 'Turn on');
+  assert.equal(w({ id: 'c', name: 'Calendar', state: 'stopped', availability: { status: 'starts_on_use' } }).action.label, 'Start');
+  assert.equal(w({ id: 'c', name: 'Calendar', state: 'ready', availability: { status: 'on' } }).action, null);
+  assert.equal(w({ id: 'c', name: 'C', state: 'failed', availability: { status: 'failed' } }).tone, 'red');
+  const r = st.recommendedRows([{ id: 'web', name: 'Web', provides: 'search the web', recommended: true, availability: { status: 'not_set_up' } },
+    { id: 'calendar', name: 'Calendar', provides: 'keep your calendar', recommended: true, state: 'ready', availability: { status: 'on' } },
+    { id: 'stt', name: 'STT', recommended: false, availability: { status: 'not_set_up' } }]);
+  assert.deepEqual(r.rows.map(x => [x.id, x.text]), [['web', 'Not set up'], ['calendar', 'On']]);
+  assert.deepEqual(r.missing, ['web']);
+  const out = render(h(st.RecommendedCard, { ctx: { services: [{ id: 'web', name: 'Web', provides: 'search the web and read pages', recommended: true, availability: { status: 'not_set_up' } }], api: {} } }));
+  assert.match(text(out), /1 of 1 aren't set up/);
+  assert.match(text(out), /search the web and read pages/);
+  assert.match(text(out), /Set up the rest/);
+  assert.match(text(out), /Have your coding agent do it/);
 });

@@ -9,6 +9,7 @@ import { overrideLines, showValue } from './schema.js';
 import { settingsHash } from './route.js';
 import { HardwareCard as Hardware } from '../hardware.js';
 import { SessionsPanel } from '../sessions.js';
+import { StatusCell } from './blocks-setup.js';
 
 const R = () => globalThis.React;
 const GB = 1e9;
@@ -76,16 +77,17 @@ export function ServicesTable({ ctx }) {
   return h('section', { style: { background: T.card, border: '1px solid ' + T.bd, borderRadius: 10, overflow: 'hidden' } },
     h('div', { style: { display: 'flex', gap: 12, padding: '10px 16px', ...head } }, h('span', { style: { flex: 1 } }, 'Folders in services/'),
       extra ? h('span', { style: { width: 50, textAlign: 'center' } }, extra.label) : null,
-      h('span', { style: { width: 60, textAlign: 'center' } }, 'Enabled'), h('span', { style: { width: 64, textAlign: 'center' } }, 'Autostart'), h('span', { style: { width: 60, textAlign: 'center' } }, 'Order')),
+      h('span', { style: { width: 60, textAlign: 'center' } }, 'On'), h('span', { style: { width: 64, textAlign: 'center' } }, 'Autostart'), h('span', { style: { width: 60, textAlign: 'center' } }, 'Order')),
     ids.map((id, i) => { const x = map[id], bad = (x.manifest_errors || []).length > 0;
       return h('div', { key: id, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderTop: '1px solid ' + T.bd, flexWrap: 'wrap' } },
         h('div', { style: { flex: '1 1 220px', minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 } },
           svg(ctx.icons?.[x.icon] || ctx.icons?.puzzle || PUZZLE, 16, { flex: 'none', color: T.mut }),
           h('div', { style: { minWidth: 0 } }, h('a', { href: `#/s/${id}/settings`, style: { fontWeight: 500, color: T.tx } }, x.name), ' ',
             h('span', { style: { fontFamily: MONO, fontSize: 11.5, color: T.mut } }, `services/${id} · ${x.port ? ':' + x.port : '—'}`),
-            bad ? h('div', { style: { fontFamily: MONO, fontSize: 11.5, color: T.rd } }, x.manifest_errors.join(' · ')) : null)),
+            bad ? h('div', { style: { fontFamily: MONO, fontSize: 11.5, color: T.rd } }, x.manifest_errors.join(' · ')) : null,
+            h(StatusCell, { x, ctx }))),   // capability-enablement 3.5: its state in words, with what turns it on
         extra ? h('span', { style: { width: 50, textAlign: 'center', fontFamily: MONO, fontSize: 12, color: T.mut } }, extra.value(id)) : null,
-        h('span', { style: col(60) }, h(Toggle, { label: 'Enabled', on: d.services.enabled[id] ?? true, onChange: on => set(y => { y.services.enabled[id] = on; }) })),
+        h('span', { style: col(60) }, h(Toggle, { label: 'On', on: d.services.enabled[id] ?? true, onChange: on => set(y => { y.services.enabled[id] = on; }) })),
         h('span', { style: col(64) }, h(Toggle, { label: 'Autostart', on: d.services.autostart[id] ?? false, onChange: on => set(y => { y.services.autostart[id] = on; }) })),
         h('span', { style: col(60) },
           h('button', { type: 'button', disabled: i === 0, 'aria-label': `Move ${x.name} up`, onClick: () => move(i, -1), style: { ...iconBtn, color: T.tx } }, svg(CHEV_U)),

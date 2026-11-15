@@ -117,3 +117,15 @@ test('ages read now, minutes, hours, days', () => {
   assert.equal(d.ago(1000, 1000 + 3 * 3600), '3h');
   assert.equal(d.ago(1000, 1000 + 2 * 86400), '2d');
 });
+
+test('capability-enablement 3.5: recommended mods that are not set up, once, until Not now', () => {
+  const ns = (id, o = {}) => svc(id, { state: 'stopped', recommended: true, availability: { status: 'not_set_up' }, ...o });
+  const services = [ns('web'), ns('decide'), svc('calendar', { recommended: true, availability: { status: 'on' } }), svc('stt', { availability: { status: 'not_set_up' } })];
+  const [row] = t.needsRows({ services });
+  assert.equal(row.text, '2 recommended mods not set up');
+  assert.equal(row.sub, 'WEB, DECIDE');
+  assert.deepEqual(row.setup, ['web', 'decide']);
+  assert.equal(row.action, 'Set up');
+  assert.deepEqual(t.needsRows({ services, setupNotNow: ['web', 'decide'] }), [], 'Not now: gone');
+  assert.equal(t.needsRows({ services, setupNotNow: ['web'] }).length, 1, 'a new one brings it back');
+});

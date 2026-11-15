@@ -22,7 +22,6 @@ import os
 import re
 import secrets
 import signal
-import sys
 import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -54,7 +53,7 @@ async def run_gaifa(args: list[str], root: Path, on_line: Callable[[str], None],
             return 124, f"the test didn't finish in {TEST_TIMEOUT_S} s"
         return proc.returncode or 0, out.decode(errors="replace")
     proc = await asyncio.create_subprocess_exec(
-        sys.executable, str(CODE / "bin" / "gaifa"), *args, cwd=str(root), env=env,
+        str(CODE / "bin" / "gaifa"), *args, cwd=str(root), env=env,     # a bash script: it finds its own Python
         stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, start_new_session=True)
     on_proc(proc)
 

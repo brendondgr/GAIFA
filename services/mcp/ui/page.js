@@ -28,9 +28,8 @@ export default {
 
   mount(el, ctx) {
     const { ui } = ctx, h = ui.h, svc = ctx.service;
-    if (svc.state !== 'ready' && svc.state !== 'degraded') {
-      el.append(ui.empty(`${svc.name} is not running`, 'Start it to add MCP servers and approve their tools.',
-        ui.button(`Start ${svc.name}`, () => ctx.api.startService(svc.id).catch(e => ctx.toast(e.detail, 'error')), { kind: 'primary' })));
+    if (ctx.service.state !== 'ready' && ctx.service.state !== 'degraded') {   // the shared box: Set up, Turn on or Start (mod-off.js)
+      import('/mod-kit.js').then(k => k.requireRunning(el, ctx, 'MCP servers and their tools'));
       return;
     }
     const body = h('div', { style: 'display:flex;flex-direction:column;gap:12px' });

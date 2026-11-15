@@ -32,7 +32,8 @@ class Component extends DCLogic {
   componentDidUpdate() { this.sync(); }
   componentWillUnmount() { this.teardown(); this.el = null; }
 
-  keyOf(m) { return [m.service.id, m.tab, m.up ? 'up' : 'down', JSON.stringify(m.params || {}), (m.route || []).join('/')].join('|'); }
+  // capability-enablement 3.3: a change of availability (not set up → stopped → on) mounts the page again, not only up/down
+  keyOf(m) { return [m.service.id, m.tab, m.up ? 'up' : 'down', m.service.availability?.status || '', m.service.state === 'starting' ? 's' : '', JSON.stringify(m.params || {}), (m.route || []).join('/')].join('|'); }
 
   sync() {
     const m = this.props.mod;

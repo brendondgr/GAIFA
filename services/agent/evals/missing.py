@@ -54,7 +54,7 @@ REFUSALS = ("capability_unavailable", "tool_unavailable", "service_not_running",
 NETWORK_SHELL = ("curl", "wget", "requests", "urllib", "httpx", "http://", "https://")
 
 
-PORTS = {"web": WEB_PORT, "workspace": 5193, "decide": 5194, "embed": 5195, "calendar": 5196}
+PORTS = {"web": WEB_PORT, "workspace": 5193, "decide": 5194, "embed": 5195, "calendar": 5196, "mcp": 5197, "searxng": 5198}
 
 
 @dataclass

@@ -155,3 +155,12 @@ def test_refused_from_the_network():
     assert "on the GAIFA machine" in limits.refused("POST", "/api/setup", {"ids": ["web"]})
     assert limits.refused("DELETE", "/api/setup/job") and limits.refused("POST", "/api/setup/test")
     assert limits.refused("GET", "/api/setup/plan") is None
+
+
+async def test_the_real_runner_reads_a_real_plan(tmp_path):
+    """The default runner runs bin/gaifa (a bash script) and gets its JSON plan back (no fake)."""
+    from utils.setup_jobs import CODE, run_gaifa
+    lines: list[str] = []
+    rc, out = await run_gaifa(["setup", "--plan", "--json", "calendar"], CODE, lines.append, lambda p: None)
+    assert rc == 0, lines[-5:]
+    assert json.loads(out)["stage"] == "plan"

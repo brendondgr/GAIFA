@@ -475,6 +475,8 @@ interface ServiceSummary {
 // (stage, setups, mods, disk_gb, images, steps [{id, setup, mod, run, what, ask, interactive}], questions, suggestions
 // [{setup, name, size_gb, good_for, licence, source, required, gated}], host [{id, ok, detail, fix, needs_root}], checks,
 // variants [{setup, accel, label, untested, note}], unavailable, smokes) plus `about`: SetupAbout[].
+// capability-enablement 3.3: methods getSetupPlan(ids) → SetupPlan, startSetup(ids, answers) → SetupJob, getSetupJob() → SetupJob | null,
+// cancelSetup() → SetupJob | null, testSetup(id) → SetupTest, getSetupPrompt(ids) → string (area `setup`; events {type: "setup", job})
 interface SetupAbout { id: string; name: string; provides: string; description: string; folder: string; port: number | null;
                        recommended: boolean; installed: boolean }
 interface SetupJob { id: string; ids: string[]; state: "running" | "done" | "failed" | "needs_you" | "cancelled";
@@ -813,7 +815,7 @@ Thumbnails and posters are generated client-side (SVG gradients or canvas with a
 
 - First load: skeleton, then data. GAIFA down banner and its recovery. A dropped event stream while the hub still answers is not "down": the UI checks with `GET /api/overview`, reopens the stream and refetches without the banner (Firefox drops quiet connections whenever a network interface changes); a failed check or a second drop within 10 s shows the banner.
 - Overview: alerts present and absent; every service state and load state; manifest-error tile; empty recent outputs.
-- Service page: custom page (Example), generic page (Transcribe), service stopped, service unreachable, starting, failed with log excerpt, service with a native UI link (Images & Video → ComfyUI).
+- Service page: custom page (Example), generic page (Transcribe), service stopped, service unreachable, starting, failed with log excerpt, service with a native UI link (Images & Video → ComfyUI); not set up (Set up, a small setup's progress in the box, or the coding-agent prompt), turned off (Turn on), can't run here (capability-enablement 3.3, `web/mod-off.js`).
 - API tab: JSON response, audio response, image response, stream response with Stop, error response (`upstream_error`), destructive confirm, multipart file upload form.
 - Make room: enough (unload & continue), not enough (cancel only).
 - Logs: streaming, follow paused with "N new", filter with no matches, empty.

@@ -35,6 +35,7 @@ export const METHOD_AREA = {
   listMentions: 'mentions',
   getUiStore: 'ui_store', saveUiStore: 'ui_store',
   getLan: 'lan', saveLan: 'lan', setLanPassword: 'lan', signOutLanDevice: 'lan', signOutThisDevice: 'lan', restartHub: 'system',
+  getSetupPlan: 'setup', startSetup: 'setup', getSetupJob: 'setup', cancelSetup: 'setup', testSetup: 'setup', getSetupPrompt: 'setup',   // capability-enablement 3.1–3.4
 };
 
 // HubEvent type → area, for merging live and mock event streams.
@@ -44,6 +45,7 @@ export const EVENT_AREA = {
   approval: 'tools', tool_call: 'tools', grant: 'tools', grant_deleted: 'tools',
   session: 'sessions', session_step: 'sessions', repos: 'repos', settings: 'settings', ui_store: 'ui_store',
   notification: 'notify', badge: 'notify',   // calendar 2.2: mods' notifications and badges (POST /api/notify)
+  setup: 'setup',                             // capability-enablement 3.1: a setup job's progress
 };
 
 const enc = encodeURIComponent;
@@ -206,6 +208,13 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     signOutLanDevice: id => req('DELETE', `/api/lan/sessions/${enc(id)}`),
     signOutThisDevice: () => req('POST', '/api/lan/signout'),
     restartHub: () => req('POST', '/api/system/restart'),
+    // capability-enablement 3.1–3.2: setting mods up from the app (the same gaifa setup), and the coding-agent prompt
+    getSetupPlan: ids => req('GET', `/api/setup/plan${qs({ ids })}`),
+    startSetup: (ids, answers = {}) => req('POST', '/api/setup', { json: { ids, answers } }),
+    getSetupJob: () => req('GET', '/api/setup/job').then(r => r.job),
+    cancelSetup: () => req('DELETE', '/api/setup/job').then(r => r.job),
+    testSetup: id => req('POST', `/api/setup/test${qs({ id })}`),
+    getSetupPrompt: ids => req('GET', `/api/setup/prompt${qs({ ids })}`).then(r => r.text),
     saveUiStore: (scope, { set = {}, del = [] } = {}) => req('PATCH', `/api/ui/store/${enc(scope)}`, { json: { set, delete: del } }),   // plan settings-redesign 4.1: config.example.toml's values
     getMetrics: ({ series, range, step } = {}) => req('GET', `/api/metrics${qs({ series, range, step })}`),
     listMetricSeries: () => req('GET', '/api/metrics/series'),

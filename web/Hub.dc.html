@@ -1814,7 +1814,13 @@ class Component extends DCLogic {
     if (mf) v.banner = B('red', 'Manifest invalid — this mod cannot start', d.manifest_errors.join(' · '), [{ label: 'Show manifest', on: () => this.go(`#/s/${d.id}/settings`), st: btn('sec', { sm: true }) }]);
     else if (d.state === 'failed') v.banner = B('red', `${d.name} failed`, d.last_error || 'The process exited unexpectedly.', [startA, logsA]);
     else if (d.state === 'degraded') v.banner = B('accent', `${d.name} is not responding on 127.0.0.1:${d.port}`, 'The process is running but its health check fails. Restarting usually fixes this.', [{ label: 'Restart', on: () => this.restart(d), st: btn('pri', { sm: true }) }, logsA]);
-    else if (d.state === 'stopped') v.banner = B('dim', `${d.name} is stopped`, d.kind === 'external' ? `GAIFA controls it through: ${d.command.join(' ')}` : 'Start it to use its API and pages.', [startA]);
+    // capability-enablement 3.3: the same words as the page's box (mod-off.js), from the mod's availability
+    else if (d.availability?.status === 'not_set_up') v.banner = B('dim', `${d.name} isn't set up on this machine`, (d.provides ? `It lets GAIFA ${d.provides}. ` : '') + `Set it up from its page, or run gaifa setup ${d.id}.`,
+      [{ label: `Set up ${d.name}`, on: () => d.has_page ? this.go(`#/s/${d.id}/page`) : globalThis.dispatchEvent(new CustomEvent('gaifa:setup', { detail: { ids: [d.id] } })), st: btn('pri', { sm: true }) }]);
+    else if (d.availability?.status === 'off') v.banner = B('dim', `${d.name} is turned off`, 'Turn it on to use its API and pages.',
+      [{ label: `Turn on ${d.name}`, on: async () => { try { await this.api.saveServiceConfig(d.id, { enabled: true }); await this.api.startService(d.id); } catch (e) { this.err(e); } }, st: btn('pri', { sm: true }) }]);
+    else if (d.availability?.status === 'cant_run') v.banner = B('red', `${d.name} can't run on this machine`, d.availability.why || d.unavailable || '', [logsA]);
+    else if (d.state === 'stopped') v.banner = B('dim', `${d.name} is stopped`, d.kind === 'external' ? `GAIFA controls it through: ${d.command.join(' ')}` : (d.last_error ? d.last_error.split('\n')[0] : 'Start it to use its API and pages.'), [startA]);
     else if (d.state === 'starting') v.banner = B('accent', `${d.name} is starting…`, 'Waiting for the health check to pass.', [logsA]);
     v.hasBanner = !!v.banner;
     const running = d.state === 'ready';

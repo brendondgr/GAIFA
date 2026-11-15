@@ -321,6 +321,7 @@ export function createMockApi() {
   { const r = rng(5); for (let i = 0; i < 80; i++) { const svc = services[0]; svc.logs.push({ ts: T0 - (80 - i) * 37, text: `POST /v1/chat/completions ${r() < 0.8 ? 'gemma-4-26b-it' : 'minicpm-5-2b'} 200 ${Math.floor(200 + r() * 900)}ms ${Math.floor(100 + r() * 2000)} tok`, stream: 'stdout' }); } }
 
   const svcById = id => services.find(s => s.id === id);
+  let setupJob = null;   // capability-enablement 3.1: the mock's one setup job
   const emit = ev => { if (hubDown) return; for (const fn of listeners) { try { fn(ev); } catch (e) { console.error(`GAIFA event handler failed (${ev.type}): ${e?.message}`, e?.stack); } } };
   const later = (ms, fn) => setTimeout(fn, ms / speed);
   const gpuNow = Date.now() / 1000, gpuL = (id, service, name, cls, label, extra) => ({ id, service, name, group: service, class: cls, label, created_ts: gpuNow - 60, renewed_ts: gpuNow, ...extra });
@@ -418,6 +419,7 @@ export function createMockApi() {
   // ----- lifecycle -----
   function startSvc(s) {
     if (s.manifest_errors.length) throw err(422, 'manifest_invalid', `Cannot start ${s.id}: ${s.manifest_errors[0]}`);
+    if (s.installed === false) throw err(409, 'not_set_up', `${s.name} isn't set up on this machine`, { fix: `gaifa setup ${s.id}` });   // capability-enablement 1.3
     if (!s.config.enabled) throw err(409, 'invalid_config', `${s.name} is disabled in config.toml`);
     if (['ready', 'starting', 'degraded'].includes(s.state)) return;
     const clash = services.find(o => o !== s && o.config.port === s.config.port && o.state === 'ready');
@@ -766,6 +768,24 @@ export function createMockApi() {
     async setLanPassword(pw) { await net(); if (!pw || pw.length < 12) throw err(422, 'invalid', 'At least 12 characters'); lanState.has_password = true; lanState.devices = []; return { ok: true, has_password: true }; },
     async signOutLanDevice(id) { await net(); lanState.devices = id === 'all' ? [] : lanState.devices.filter(d => d.id !== id); return { ok: true }; },
     async restartHub() { await net(); return { restarting: true }; },
+    // capability-enablement 3.1–3.4: setup in the mock: a plan from the service, a job that makes it set up in ~1.5 s
+    async getSetupPlan(ids) { await net(); const list = (Array.isArray(ids) ? ids : String(ids).split(',')).map(getSvc);
+      return { stage: 'plan', setups: list.map(s => s.id), mods: list.map(s => s.id), disk_gb: list.reduce((a, s) => a + (s.setup_gb ?? 0.1), 0), images: {},
+        steps: list.map(s => ({ id: `${s.id}/1`, setup: s.id, mod: s.id, run: `gaifa install ${s.id}`, what: `makes .venv/ (${s.setup_gb ?? 0.1} GB)`, ask: null, interactive: false })),
+        questions: list.flatMap(s => s.setup_questions || []), suggestions: [], host: [], checks: [], variants: [], unavailable: [], smokes: [],
+        about: list.map(s => ({ id: s.id, name: s.name, provides: MOCK_PROVIDES[s.id] || '', description: s.description, folder: `services/${s.id}`, port: s.port, recommended: MOCK_RECOMMENDED.includes(s.id), installed: s.installed ?? true })) }; },
+    async startSetup(ids, answers = {}) { await net(); if (setupJob?.state === 'running') throw err(409, 'setup_busy', 'a setup is running');
+      setupJob = { id: 'sj_mock' + Date.now(), ids: [...ids], state: 'running', started_ts: Date.now() / 1000, finished_ts: null, lines: [], report: null, needs: null, error: null, started: [] };
+      const job = setupJob, say = l => { job.lines = [...job.lines, l]; emit({ type: 'setup', job: clone(job) }); };
+      say(`==> ${ids.join(', ')}: makes .venv/`);
+      later(1500, () => { for (const id of ids) { const s = svcById(id); if (s) { s.installed = true; startSvc(s); } }
+        say('==> check passed'); Object.assign(job, { state: 'done', finished_ts: Date.now() / 1000, report: { stage: 'report', done: ids, failed: [] }, started: ids.map(id => ({ id, state: 'starting' })) });
+        emit({ type: 'setup', job: clone(job) }); });
+      return clone(job); },
+    async getSetupJob() { await net(); return setupJob ? clone(setupJob) : null; },
+    async cancelSetup() { await net(); if (setupJob?.state === 'running') Object.assign(setupJob, { state: 'cancelled', finished_ts: Date.now() / 1000 }); return setupJob ? clone(setupJob) : null; },
+    async testSetup(id) { await net(); const s = getSvc(id); return { id, passed: true, seconds: 2.4, device: s.id === 'embed' ? 'cuda' : null, run: 'scripts/smoke.sh', log: `data/state/setup/logs/${id}/test.log`, output: 'ok' }; },
+    async getSetupPrompt(ids) { await net(); return `Set up these GAIFA mods: ${[].concat(ids).join(', ')} on this machine.\n\nGAIFA is a local app that runs AI services as mods. Its clone is at ~/Agents/GAIFA.\n…`; },
     async signOutThisDevice() { await net(); return { ok: true }; },
     async getUiStore(scope) { await net(); if (scope !== 'hub' && !svcById(scope)) throw err(404, 'not_found', `No mod '${scope}'`); return { values: clone(uiStore[scope] || {}) }; },
     async saveUiStore(scope, { set = {}, del = [] } = {}) { await net(); if (scope !== 'hub' && !svcById(scope)) throw err(404, 'not_found', `No mod '${scope}'`);

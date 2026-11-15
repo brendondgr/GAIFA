@@ -3,6 +3,7 @@
 // Written by us, not Claude Design. Import from a page module as '/mod-kit.js'.
 
 import { h } from './mod-ui.js';
+import { modOff } from './mod-off.js';
 
 export const GB = 1e9;
 export const MONO = "'JetBrains Mono',ui-monospace,monospace";
@@ -28,15 +29,12 @@ export function fmtAgo(ts) {
   return new Date(ts * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-/** True when the mod can take calls; otherwise fills `el` with a Start button and returns false. */
+/** True when the mod can take calls; otherwise fills `el` with the box for its state (mod-off.js: Set up, Turn on,
+ *  Start, the error with View logs …) and returns false. */
 export function requireRunning(el, ctx, what = 'this page') {
   const svc = ctx.service;
   if (svc.state === 'ready' || svc.state === 'degraded') return true;
-  const { ui } = ctx;
-  const starting = svc.state === 'starting';
-  el.append(ui.empty(starting ? `${svc.name} is starting…` : `${svc.name} is not running`,
-    starting ? 'This page opens as soon as it is ready.' : `Start it to use ${what}.`,
-    starting ? null : ui.button(`Start ${svc.name}`, () => ctx.api.startService(svc.id).catch(e => ctx.toast(e.detail || 'Start failed', 'error')), { kind: 'primary' })));
+  modOff(el, ctx, what);
   return false;
 }
 

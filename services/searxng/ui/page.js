@@ -5,10 +5,7 @@
 const CELL = 'padding:6px 10px;border-bottom:1px solid var(--bd,#1D2430);text-align:left;font-size:12.5px;vertical-align:top';
 
 function notRunning(el, ctx) {
-  const { ui } = ctx;
-  const svc = ctx.service;
-  el.append(ui.empty(`${svc.name} is not running`, 'Start it to see SearXNG and its engines.',
-    ui.button(`Start ${svc.name}`, () => ctx.api.startService(svc.id).catch(e => ctx.toast(e.detail, 'error')), { kind: 'primary' })));
+  import('/mod-kit.js').then(k => k.requireRunning(el, ctx, 'SearXNG and its engines'));     // capability-enablement 3.3: the shared box
 }
 
 function when(ts) {

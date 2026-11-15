@@ -144,13 +144,14 @@ One step at a time: each numbered step is one commit (`GAIFA (capability-enablem
 
 ## Phase 2 — The agent knows, says so, and can turn it on (M)
 
-- [ ] **2.1 The model knows every tool, and calls only those that can run: `services/agent/agent/tools.py`, `prompts.py`, `prompting.py`.**
+- [x] **2.1 The model knows every tool, and calls only those that can run: `services/agent/agent/tools.py`, `prompts.py`, `prompting.py`.**
   - `refresh()` gives function schemas for tools whose `state` is `on` or `starts_on_use` (a stopped mod's tools stay callable: the call starts it, as today). Tools in any other state are not callable, and are listed.
   - A new prompt section, **Off on this machine**, from the index: one line per mod that isn't usable, with what it gives, its tool names, the reason and the one tool that turns it on:
     `- search the web and read pages (web: web_search, web_fetch): not set up. Turn on: hub_setup {"ids": ["web"]}, after the user says yes.`
     `- keep your calendar and reminders (calendar: calendar_agenda, …): turned off in Settings. Turn on: hub_enable_service {"id": "calendar"}.`
     Left out when everything is on. The Environment line shows `web (not set up)` in place of `web (stopped)`. `find_tools` and `load_tools` answer for such a tool with its `why` and `turn_on`.
   *Done when:* `services/agent/tests/test_prompt_unavailable.py`: the section, the tool names and the schemas for a fake index with one mod in each status; a chat with everything on has no section. Architecture §14.1 updated.
+  *As built:* the section sits after More tools (`prompts.off_section`); a `failed` mod's line says to try `hub_start_service` once; until 4.1 a mod that isn't set up says "the user runs `gaifa setup web` (offer it)". `load_tools` answers such a tool under `not_available` (not `unknown`), and `find_tools` marks it `available: false` with a note. The fake hub's index passes `state`, `why` and `turn_on`, and takes extra mods (`more_services`).
 - [ ] **2.2 The rule: `services/agent/harness/systemprompt.md`.**
   - "If what the user asks needs something under *Off on this machine*: a mod that is stopped, just call its tool. One that is turned off: say so and turn it on with `hub_enable_service` if the user asked for what it does. One that isn't set up: say in one sentence what is missing and offer to set it up (`hub_setup`); don't try to reach it another way (no shell, no other tool standing in). If you can still answer well without it, do, and say what you couldn't check." and "A result with code `capability_unavailable` is final for this turn unless you turn the mod on."
   - The web-search line becomes "when `web_search` is among your tools".

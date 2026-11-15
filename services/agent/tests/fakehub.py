@@ -84,6 +84,7 @@ def _model_view(t: dict[str, Any]) -> dict[str, Any]:
 class FakeHub:
     def __init__(self) -> None:
         self.tools = {t["name"]: t for t in TOOLS}
+        self.more_services: list[dict[str, Any]] = []
         self.calls: list[dict[str, Any]] = []         # every executed call: {name, arguments, mode}
         self.attempts: list[dict[str, Any]] = []      # every call request
         self.approvals: dict[str, dict[str, Any]] = {}
@@ -274,7 +275,7 @@ class FakeHub:
 
         @app.get("/api/tools/index")
         def index() -> list:
-            return [{k: t[k] for k in ("name", "mod", "risk", "core", "summary", "available", "group") if k in t} for t in self.tools.values()]
+            return [{k: t[k] for k in ("name", "mod", "risk", "core", "summary", "available", "group", "state", "why", "turn_on") if k in t} for t in self.tools.values()]
 
         @app.get("/api/tools")
         def tools(names: str | None = None, q: str | None = None, view: str = "full") -> list:
@@ -574,7 +575,8 @@ class FakeHub:
         def services() -> list:
             return [{"id": "fake", "name": "Fake", "state": "ready", "load": "loaded"},
                     *([{"id": "workspace", "name": "Workspace", "state": "ready"}] if self.workspace is not None else []),
-                    *([{"id": "calendar", "name": "Calendar", "state": "ready"}] if self.calendar is not None else [])]
+                    *([{"id": "calendar", "name": "Calendar", "state": "ready"}] if self.calendar is not None else []),
+                    *self.more_services]                     # capability-enablement 2.1: mods a test adds
 
         @app.get("/api/s/calendar/v1/items/{iid}")
         def cal_item(iid: str) -> dict:

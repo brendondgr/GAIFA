@@ -76,6 +76,7 @@ class Prompting:
                  "skills": await k.skill_list(set(tools.disabled), await ctx.chat_skills(
                      self.hub, tid, thread_settings(self.store, tid), services, tools.disabled, self.projects)),
                  "tools": prompts.tool_index(tools.deferred(), set(tools.full), tools.disabled),
+                 "off": prompts.off_section(tools.unusable(), services),          # capability-enablement 2.1
                  "env": prompts.environment(services, memory, model, meta.get("context_length"), meta.get("vision"))
                  + (f"\nTurned off in this chat: {', '.join(sorted(tools.disabled))} (their tools can't be used here; "
                     "the user can turn them back on in the composer)" if tools.disabled else "")
@@ -85,7 +86,7 @@ class Prompting:
                  "agenda": await ctx.chat_agenda(self.hub, services, tools.disabled, (self.project_of(tid) or {}).get("id"))}
         sizes = {"instructions": ctx.est(parts["base"] + parts["guardrails"] + parts["agent_md"] + parts["env"] + parts["agenda"]),
                  "skills_memory": ctx.est(parts["skills"] + parts["memory"]),
-                 "tool_index": ctx.est(parts["tools"]), "outputs": ctx.est(parts["outputs"] + parts["summary"])}
+                 "tool_index": ctx.est(parts["tools"] + parts["off"]), "outputs": ctx.est(parts["outputs"] + parts["summary"])}
         if (p := self.project_of(tid)) is not None:         # plan projects 3.3: the project, its files and pages
             from .projects import knowledge
             parts["project"] = knowledge.project_text(p)

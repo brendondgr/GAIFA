@@ -106,9 +106,18 @@ class Local(ProjectTools, TaskTools, WorkflowTools):
                              and (not hidden_group(group_of(t)) or not tools.hidden(t))})
             return self.ok(tid, cid, "find_tools", (_off_note(off) + " " if off else "") +
                            "No tools match. The groups are: " + ", ".join(groups))
-        return self.ok(tid, cid, "find_tools", {"tools": [{"name": h["name"], "summary": h["summary"], "risk": h["risk"],
-                                                           "loaded": h["name"] in tools.full} for h in hits],
-                                                "next": "load_tools with the names you need"})
+        from .tools import usable
+        rows = []
+        for h in hits:
+            row = {"name": h["name"], "summary": h["summary"], "risk": h["risk"], "loaded": h["name"] in tools.full}
+            if not usable(h):                           # capability-enablement 2.1: it exists, but can't run here now
+                row.update(available=False, why=h.get("why") or h.get("state"), **({"turn_on": h["turn_on"]} if h.get("turn_on") else {}))
+            rows.append(row)
+        out: dict[str, Any] = {"tools": rows, "next": "load_tools with the names you need"}
+        if any(not usable(h) for h in hits):
+            out["note"] = ("tools with available: false can't be used now; tell the user what is missing and offer to turn it on "
+                           "(turn_on), don't reach for it another way")
+        return self.ok(tid, cid, "find_tools", out)
 
     async def t_load_tools(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
         names = args.get("names") or []
@@ -124,6 +133,13 @@ class Local(ProjectTools, TaskTools, WorkflowTools):
         out: dict[str, Any] = {"loaded": ok}
         off = sorted({t["mod"] for n in bad if (t := tools.by_name(n)) and t["mod"] in tools.disabled})
         bad = [n for n in bad if not ((t := tools.by_name(n)) and t["mod"] in tools.disabled)]
+        from .tools import usable
+        cant = [t for n in bad if (t := tools.by_name(n)) and not usable(t)]      # capability-enablement 2.1
+        if cant:
+            out["not_available"] = [{"name": t["name"], "why": t.get("why") or t.get("state"), **({"turn_on": t["turn_on"]} if t.get("turn_on") else {})}
+                                    for t in cant]
+            out["note"] = "these can't be used now: tell the user what is missing and offer to turn it on; don't retry"
+            bad = [n for n in bad if n not in {t["name"] for t in cant}]
         if off:
             out["turned_off"] = _off_note(off) + " Don't try again; tell the user, who can turn them back on in the composer."
         if bad:

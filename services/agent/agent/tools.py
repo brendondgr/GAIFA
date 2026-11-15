@@ -101,6 +101,14 @@ def function(t: dict[str, Any], note: str | None = None) -> dict[str, Any]:
     return {"type": "function", "function": {"name": t["name"], "description": desc, "parameters": t.get("parameters") or {"type": "object"}}}
 
 
+CALLABLE = ("on", "starts_on_use")   # capability-enablement 2.1: a stopped mod's tools stay callable (the call starts it)
+
+
+def usable(t: dict[str, Any]) -> bool:
+    """The tool's mod can be used (its `state` from the hub's catalog); the rest are listed under Off on this machine."""
+    return t.get("state", "on") in CALLABLE
+
+
 def group_of(t: dict[str, Any]) -> str:
     """A tool's group in the chat: its mod's own group (mcp-client 4.1: `mcp:<server>`), else its mod."""
     return t.get("group") or t["mod"]
@@ -147,7 +155,7 @@ class ToolSet:
             self.index = await self.hub.index()
         except Exception:  # noqa: BLE001 - the hub may be restarting: keep what we had
             self.index = self.index or []
-        names = [t["name"] for t in self.index if not self.off(t) and not self.hidden(t) and
+        names = [t["name"] for t in self.index if not self.off(t) and not self.hidden(t) and usable(t) and
                  (self.all_tools or t["core"] or t["mod"] in self.pinned or group_of(t) in self.pinned or t["name"] in self.loaded)]
         self.full = {t["name"]: t for t in await self.hub.tools(names)} if names else {}
 
@@ -166,7 +174,11 @@ class ToolSet:
         return [function(t, self.notes.get(t["name"])) for t in self.local()] + [function(t, self.notes.get(t["name"])) for t in self.full.values()]
 
     def deferred(self) -> list[dict[str, Any]]:
-        return [t for t in self.index if t["name"] not in self.full and not self.off(t) and not self.hidden(t)]
+        return [t for t in self.index if t["name"] not in self.full and not self.off(t) and not self.hidden(t) and usable(t)]
+
+    def unusable(self) -> list[dict[str, Any]]:
+        """Tools that exist but can't run here now (not set up, off, failed, broken, or off by the mod), for the prompt."""
+        return [t for t in self.index if not usable(t) and not self.off(t) and not self.hidden(t)]
 
     def risk(self, name: str) -> str:
         if name in LOCAL_NAMES:
@@ -182,7 +194,7 @@ class ToolSet:
             if hidden_group(group):
                 self.on.add(group)
         known = {t["name"] for t in self.index}
-        ok = [n for n in want if n in known and not self.off(self.by_name(n))]  # type: ignore[arg-type]
+        ok = [n for n in want if n in known and not self.off(self.by_name(n)) and usable(self.by_name(n))]  # type: ignore[arg-type]
         bad = [n for n in want if n not in ok]
         for n in ok:
             if n not in self.loaded:

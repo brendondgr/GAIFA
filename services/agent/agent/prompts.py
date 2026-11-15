@@ -31,6 +31,53 @@ def tool_index(index: list[dict[str, Any]], loaded: set[str], disabled: set[str]
     return "\n".join(lines)
 
 
+STATE_WORDS = {"not_set_up": "not set up", "off": "turned off in Settings", "cant_run": "can't run on this machine",
+               "failed": "failed to start", "broken": "broken (its service.toml has errors)"}
+
+
+def turn_on_text(state: str, turn_on: dict[str, Any] | None) -> str:
+    """"Turn on: hub_enable_service {"id": "calendar"}." and the like, for a line under Off on this machine."""
+    import json
+
+    on = turn_on or {}
+    if on.get("tool"):
+        call = f"{on['tool']} {json.dumps(on.get('arguments') or {}, separators=(', ', ': '))}"
+        if state in ("not_set_up", "cant_run"):
+            return f" Turn on: {call}, after the user says yes."
+        if state == "failed":
+            return f" Turn on: {call} once; if it fails again, tell the user."
+        return f" Turn on: {call}."
+    if on.get("command"):
+        return f" Turn on: the user runs `{on['command']}` (offer it)." if state != "off" else f" Turn on: ask the user to {on['command']}."
+    return ""
+
+
+def off_section(unusable: list[dict[str, Any]], services: list[dict[str, Any]] | None) -> str:
+    """capability-enablement 2.1: one line per mod (or tool the mod turned off) that exists but can't be used here,
+    with what it gives, its tools, why, and the one tool that turns it on. "" when everything is on."""
+    if not unusable:
+        return ""
+    svc = {s["id"]: s for s in services or []}
+    by_mod: dict[str, list[dict[str, Any]]] = {}
+    lines = []
+    for t in unusable:
+        if t.get("state") == "off_by_mod":
+            lines.append(f"- {t['name']} ({t['mod']}): off right now: {t.get('why') or 'the mod says so'}.")
+        else:
+            by_mod.setdefault(t["mod"], []).append(t)
+    for mod, tools in by_mod.items():
+        s = svc.get(mod) or {}
+        gives = s.get("provides") or s.get("description") or s.get("name") or mod
+        names = [t["name"] for t in tools]
+        shown = ", ".join(names[:4]) + (", …" if len(names) > 4 else "")
+        state = tools[0].get("state", "")
+        why = STATE_WORDS.get(state, state.replace("_", " "))
+        if state == "failed" and tools[0].get("why"):
+            why += f": {tools[0]['why']}"
+        lines.append(f"- {gives} ({mod}: {shown}): {why}.{turn_on_text(state, tools[0].get('turn_on'))}")
+    return "\n".join(lines)
+
+
 def outputs_table(outputs: list[dict[str, Any]]) -> str:
     rows = []
     for o in outputs[-40:]:
@@ -44,10 +91,20 @@ def environment(services: list[dict[str, Any]] | None, memory: dict[str, Any] | 
     lines = [f"Date: {time.strftime('%A %Y-%m-%d %H:%M')}", f"Model: {model}" + (f" ({window:,} token window)" if window else "")
              + (", can see images" if vision else ", can't see images (view_output returns the image's details as text)" if vision is False else "")]
     if services:
-        lines.append("Mods: " + ", ".join(f"{s['id']} ({s['state']}{', loaded' if s.get('load') == 'loaded' else ''})" for s in services))
+        lines.append("Mods: " + ", ".join(f"{s['id']} ({_mod_state(s)}{', loaded' if s.get('load') == 'loaded' else ''})" for s in services))
     if memory:
         lines.append(f"Memory: {memory.get('available_bytes', 0) / 1e9:.0f} GB free of {memory.get('total_bytes', 0) / 1e9:.0f} GB")
     return "\n".join(lines)
+
+
+def _mod_state(s: dict[str, Any]) -> str:
+    """The Environment line's word for a mod: its availability when it can't be used ("not set up"), else its state."""
+    st = (s.get("availability") or {}).get("status")
+    if st in ("not_set_up", "cant_run", "broken"):
+        return STATE_WORDS[st].split(" (")[0]
+    if st == "off":
+        return "turned off"
+    return s["state"]
 
 
 def build(parts: dict[str, str]) -> str:
@@ -63,6 +120,7 @@ def build(parts: dict[str, str]) -> str:
     out += section("Skills (read one with read_skill before doing that kind of task)", parts.get("skills", ""))
     out += section("Project files and pages", parts.get("project_knowledge", ""))
     out += section("More tools (not loaded; load_tools or find_tools first)", parts.get("tools", ""))
+    out += section("Off on this machine (these tools exist but can't be used now)", parts.get("off", ""))   # capability-enablement 2.1
     out += section("Environment", parts.get("env", ""))
     out += section("Your calendar (today and tomorrow; calendar_agenda reads other days; add or change only what the user asks for)",
                    parts.get("agenda", ""))                                     # calendar 5.2

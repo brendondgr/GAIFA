@@ -94,6 +94,18 @@ async def cancel_job(request: Request) -> dict[str, Any]:
     return {"job": await _jobs(request).cancel()}
 
 
+class SetupPrompt(_Model):
+    text: str = Field(description="The prompt to paste into your own coding agent, with this clone's path and the mods")
+
+
+@router.get("/api/setup/prompt", summary="A prompt for your own coding agent to set these mods up", response_model=SetupPrompt)
+async def get_prompt(request: Request, ids: str = "") -> dict[str, Any]:
+    from utils.setup_jobs import check_ids
+    from utils.setup_prompt import coding_agent_prompt
+
+    return {"text": coding_agent_prompt(request.app.state.hub.paths.root, check_ids(ids.split(",")) if ids else [])}
+
+
 @router.post("/api/setup/test", summary="Run a mod's test on this machine (its setup doc's smoke)", response_model=SetupTest)
 async def test_mod(request: Request, id: str) -> dict[str, Any]:
     return await _jobs(request).test(id)

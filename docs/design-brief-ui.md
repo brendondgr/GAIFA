@@ -485,6 +485,7 @@ interface SetupJob { id: string; ids: string[]; state: "running" | "done" | "fai
                      error: string | null;
                      started: { id: string; state: string; error?: string }[] }   // done: each mod started after setup
 interface SetupJobView { job: SetupJob | null }   // GET and DELETE /api/setup/job
+interface SetupPrompt { text: string }   // GET /api/setup/prompt?ids=: paste into your own coding agent (3.2)
 interface SetupTest { id: string; passed: boolean; seconds: number; device: string | null; run: string; log: string; output: string }
 
 interface Availability {

@@ -79,7 +79,7 @@ async def test_every_api_js_route_exists(client):
 
 # brief interface → the pydantic model the hub answers with
 MODELS: dict[str, type[BaseModel]] = {
-    "Stat": am.Stat, "ServiceSummary": am.ServiceSummary, "Availability": am.Availability, "AvailabilityFix": am.AvailabilityFix, "SetupJob": rsetup.SetupJob, "SetupTest": rsetup.SetupTest, "SetupJobView": rsetup.SetupJobView, "SetupAbout": rsetup.SetupAbout, "ServiceDetail": am.ServiceDetail, "ServiceConfig": am.ServiceConfig,
+    "Stat": am.Stat, "ServiceSummary": am.ServiceSummary, "Availability": am.Availability, "AvailabilityFix": am.AvailabilityFix, "SetupJob": rsetup.SetupJob, "SetupTest": rsetup.SetupTest, "SetupJobView": rsetup.SetupJobView, "SetupPrompt": rsetup.SetupPrompt, "SetupAbout": rsetup.SetupAbout, "ServiceDetail": am.ServiceDetail, "ServiceConfig": am.ServiceConfig,
     "Operation": am.Operation, "Memory": am.SystemMemory, "MakeRoomPlan": am.MakeRoomPlan, "Model": am.Model,
     "Discovered": am.Discovered, "Totals": am.ModelTotals, "Disk": am.Disk, "Output": am.Output, "OutputPage": am.OutputPage,
     "OutputText": am.OutputText, "OutputSearch": am.OutputSearch, "OutlineItem": am.OutlineItem, "SearchHit": am.SearchHit,

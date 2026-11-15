@@ -211,6 +211,13 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
     runner, probe = runner or Runner(), probe or host_mod.Probe()
     root, code = Path(cli.ROOT), Path(cli.CODE)
     targets = list(args.targets or [])
+    if getattr(args, "prompt", False):        # capability-enablement 3.2: the text for your own coding agent
+        if __package__:
+            from utils.setup_prompt import coding_agent_prompt
+        else:                                  # loaded by bin/gaifa from utils/ (cli._setup)
+            from setup_prompt import coding_agent_prompt  # type: ignore[no-redef]
+        print(coding_agent_prompt(root, targets), end="")
+        return 0
     try:
         if targets[:1] == ["hub"]:
             done = run_mod.hub_stage(code, runner, stream=not args.json)
@@ -311,4 +318,5 @@ def add_parser(sub: Any) -> None:
     p.add_argument("--set", action="append", metavar="ID=VALUE", help="a value question's answer, by its id or config key, e.g. agent/config:services.agent.env.AGENT_MODEL=gpt-4o (repeatable)")
     p.add_argument("--from-scratch", action="store_true", help="forget which steps a previous run finished")
     p.add_argument("--accel", action="append", metavar="ID=ACCEL", help="the variant for a setup or mod: rocm, cuda, xpu, mps, vulkan or cpu (repeatable; default: the best this machine has)")
+    p.add_argument("--prompt", action="store_true", help="print a prompt to paste into your own coding agent (Claude Code, Codex) so it sets these mods up for you")
     p.add_argument("--smoke", action="store_true", help="after the checks, run each setup's smoke: real work (an image, a sentence spoken) that proves the GPU path")

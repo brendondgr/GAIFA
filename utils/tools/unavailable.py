@@ -93,6 +93,7 @@ def refusal(mgr: Any, tool: ToolDef) -> dict[str, Any] | None:
     if tool.state == "off_by_mod" and tool.why:          # the mod itself said this tool is off (1.6)
         av = {"status": "off_by_mod", "why": tool.why, "fix": {"kind": "none", "id": svc.id, "command": "", "tool": ""}}
         err = capability_error(svc, tool, av)
+        err["detail"] = f"{tool.name} is off right now: {tool.why}"    # only this tool: the mod's others still work
         if tool.off_fix:
             err["fix"] = tool.off_fix + "; don't retry and don't reach for it another way"
         return err

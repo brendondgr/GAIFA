@@ -63,7 +63,7 @@ async def test_the_catalog_and_a_call_follow_it(hub):
     r = await c.post("/api/tools/fake_tools_get_item/call?wait=10", json={"arguments": {"item_id": "a"}, "mode": "bypass", "origin": {}})
     e = r.json()["error"]
     assert e["code"] == "capability_unavailable" and e["state"] == "off_by_mod"
-    assert e["detail"].endswith(": the item store is offline")
+    assert e["detail"] == "fake_tools_get_item is off right now: the item store is offline"
     assert e["fix"].startswith("tell the user the store is down") and "don't retry" in e["fix"]
     app.state.hub.services.get("fake-tools").tools_off = {}          # the mod says it's back
     tools = {t["name"]: t for t in (await c.get("/api/tools")).json()}

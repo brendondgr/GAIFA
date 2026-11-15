@@ -135,9 +135,12 @@ One step at a time: each numbered step is one commit (`GAIFA (capability-enablem
 **Wire — Phase 1:** nothing new in the UI yet; `Service.availability` is live for Phase 3.
 
 **Checks & deliverables — Phase 1**
-- [ ] On a scratch hub whose `web` has no `.venv`: `GET /api/services` shows `availability.status: "not_set_up"`; `POST /api/tools/web_search/call` answers `capability_unavailable` in under a second; `POST /api/services/web/start` is 409 `not_set_up`; `gaifa doctor` lists it under What works.
-- [ ] On the installed hub after `gaifa restart`: with SearXNG stopped by the user, `web_search` shows `state: "off_by_mod"` within a status poll, and comes back when SearXNG does.
-- [ ] Delivered: `availability.py`, `unavailable.py`, `provides` and `recommended` in every mod, `tools_off`, `hub_enable_service`, the doctor's section, the baseline eval.
+- [x] On a scratch hub whose `web` has no `.venv`: `GET /api/services` shows `availability.status: "not_set_up"`; `POST /api/tools/web_search/call` answers `capability_unavailable` in under a second; `POST /api/services/web/start` is 409 `not_set_up`; `gaifa doctor` lists it under What works.
+  *As built (2026-11-15, port 7078, `evals/missing.py`'s scratch root for case a):* `not_set_up` with "Web isn't set up on this machine" and `last_error` "not set up: run `gaifa setup web`"; the call answered `capability_unavailable` in 0.0 s ("I can't search the web and read pages: Web isn't set up on this machine"); start 409 `not_set_up` with `data.fix`; the doctor's What works warned "search the web and read pages: not set up (recommended)".
+- [x] On the installed hub after `gaifa restart`: with SearXNG stopped by the user, `web_search` shows `state: "off_by_mod"` within a status poll, and comes back when SearXNG does.
+  *As built:* the off half ran on the scratch hub (case b, SearXNG at a dead port): `web_search` was `off_by_mod` ("no SearXNG answers at http://127.0.0.1:5299") on the first read after the start and `web_fetch` stayed on; a call answered `capability_unavailable` naming only that tool ("web_search is off right now: …", fixed from the first run, which said "search the web and read pages" though fetch works). On the installed hub after `gaifa restart` both are `on` with the user's SearXNG up, and the doctor lists every mod as working. Stopping the user's own SearXNG to watch it go off and back is theirs to do.
+- [x] Delivered: `availability.py`, `unavailable.py`, `provides` and `recommended` in every mod, `tools_off`, `hub_enable_service`, the doctor's section, the baseline eval.
+  *As built:* except `provides` in the four submodules and relay's `recommended` (their own repositories; see 1.4).
 
 ## Phase 2 — The agent knows, says so, and can turn it on (M)
 

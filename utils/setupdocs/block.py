@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 TOP = {"id", "title", "models", "scan", "summary", "gpu", "disk_gb", "images", "needs", "after", "check", "steps", "suggest", "config",
-       "variants", "smoke"}
+       "variants", "smoke", "recommended"}
 VARIANT = {"accel", "os", "tested", "env", "steps", "check", "smoke", "note", "needs"}
 ACCELS = ("rocm", "cuda", "xpu", "mps", "vulkan", "cpu")        # utils/hardware ACCELS, in the order they're tried
 OSES = ("linux", "wsl", "darwin")
@@ -95,6 +95,7 @@ class Setup:
     config: list[Config] = field(default_factory=list)   # values asked after install (choices come from it)
     variants: list[Variant] = field(default_factory=list)   # version 3; empty: see `effective_variants`
     smoke: str = ""                                          # version 3: real work, run with --smoke
+    recommended: bool = False                                # capability-enablement 1.4: offered first, pre-ticked; a chat without it says so
 
     def effective_variants(self) -> list[Variant]:
         """The declared variants, or the one a version-2 block stands for."""
@@ -286,6 +287,10 @@ def read(data: dict[str, Any]) -> tuple[Setup | None, str | None]:
         if not isinstance(data["check"], str) or not data["check"].strip():
             return None, "`check` must be a non-empty command"
         out.check = data["check"].strip()
+    if "recommended" in data:
+        if not isinstance(data["recommended"], bool):
+            return None, "`recommended` must be true or false"
+        out.recommended = data["recommended"]
     if "smoke" in data:
         if not isinstance(data["smoke"], str) or not data["smoke"].strip():
             return None, "`smoke` must be a non-empty command"

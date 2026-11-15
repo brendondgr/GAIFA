@@ -26,3 +26,6 @@ engines = { op = "GET /v1/engines", view = { kind = "table", rows = "engines", c
 health = { op = "GET /v1/health", description = "SearXNG's health: whether /healthz answers, the last test search (time, results, engines that failed) and recent history." }
 set_engine = { op = "POST /v1/engines/{name}", risk = "write", ask = ["enabled"], description = "Turn one SearXNG engine on or off. Backs up settings.yml, restarts SearXNG and checks a search works, restoring the backup if not. Use it for engines that keep failing (see searxng_engines with failing=true)." }
 adjust = { op = "POST /v1/settings", risk = "write", description = "Change SearXNG's settings: safe_search (0 off, 1 moderate, 2 strict), default_lang, request_timeout (seconds per engine), engine_timeouts per engine, json_format (true turns the JSON format on; the web mod needs it). One backup, restart and check for all of them; the backup goes back if the check fails." }
+
+[agent]
+provides = "see or change your SearXNG's settings"   # what it lets the agent do, completing "I can't …" (capability-enablement 1.4)

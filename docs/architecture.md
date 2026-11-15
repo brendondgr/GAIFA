@@ -231,6 +231,7 @@ delete_voice = { op = "DELETE /v1/voices/{name}", confirm = true }
 [agent]                             # optional: tools the mod lists at runtime (comfy: one per task)
 tools_source = "GET /v1/tools"      # read at start and whenever status's tools_rev changes (§4.6) → {"tools": [{"type": "function", "function": {name, description, parameters}, "op": "POST …", "job": {…}|null, "risk", "ask", "examples", "core", "grant_key"}]}
 skills = "skills"                   # optional: skills/<name>/SKILL.md for the agent (plan 14.9)
+provides = "search the web and read pages"   # optional, ≤ 80 characters: what it lets the agent do, completing "I can't …"; in ServiceSummary.provides, the agent's Off on this machine lines and the doctor (capability-enablement 1.4)
 ```
 
 `config.toml` may override `port`, `env` (merged), `enabled`, `autostart`, `idle_unload_s`, `auto_unload` and `priority` per mod.

@@ -46,3 +46,6 @@ dirs = ["decide"]
 
 [tools]
 ask = { op = "POST /v1/decide", risk = "read", description = "Ask a small decision model yes/no, choice or score questions about a text (or JSON), answered with a probability per answer in about 0.1 s, without generated text. Give `input` and `questions`: [{id, type: \"yesno\" | \"choice\" | \"score\", question, options (choice: 2–64 names), scale (score: 2–10 levels, lowest first)}]. Each answer is {probs, top, p}; treat p below 0.9 as unsure. Good for quick classification or checking a fact stated in the text; not for open questions.", examples = [{ input = "The parcel arrived broken and the customer wants a refund.", questions = [{ id = "refund", type = "yesno", question = "Does the customer ask for a refund?" }, { id = "team", type = "choice", question = "Which team handles this?", options = ["returns", "billing", "technical"] }] }] }
+
+[agent]
+provides = "judge tool calls in Auto mode or screen pages with a decision model"   # what it lets the agent do, completing "I can't …" (capability-enablement 1.4)

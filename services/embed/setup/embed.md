@@ -4,6 +4,7 @@ title = "Embeddings: EmbeddingGemma 2"
 models = ["embed/**"]
 scan = []
 summary = "Embeddings: search outputs, documents and chats by meaning (text, images, audio, video in one space)"
+recommended = true   # offered first for chat (capability-enablement 1.4)
 gpu = true
 disk_gb = 6.6
 needs = ["uv"]

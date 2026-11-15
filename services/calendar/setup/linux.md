@@ -4,6 +4,7 @@ title = "Calendar"
 models = []
 scan = []
 summary = "Calendar: events, to-dos and reminders in GAIFA, with in-app alerts and tools for the agent"
+recommended = true   # offered first for chat (capability-enablement 1.4)
 gpu = false
 disk_gb = 0.1
 needs = ["uv"]

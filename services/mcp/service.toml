@@ -25,6 +25,7 @@ kinds = ["image", "audio"]
 page = "ui/page.js"                # servers, their tools and risks, approval with the difference, import
 
 [agent]
+provides = "use tools from other MCP servers, such as Blender"   # what it lets the agent do, completing "I can't …" (capability-enablement 1.4)
 skills = "skills"                  # skills/<name>/SKILL.md; one names its servers in metadata.mcp-servers
 tools_source = "GET /v1/tools"     # one tool per approved server's tool: mcp_<server>_<tool> (all mcp = false)
 

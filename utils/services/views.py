@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from utils.services.availability import availability
+from utils.setupdocs.envs import recommended
 from utils.services.status import slug
 
 if TYPE_CHECKING:
@@ -55,6 +56,8 @@ def summary(mgr: ServiceManager, svc: Service) -> dict[str, Any]:
         "unavailable": mgr.unavailable(svc),
         "manifest_errors": svc.errors,
         "installed": mgr.installed(svc),
+        "provides": (m.agent.provides if m else None) or "",
+        "recommended": recommended(svc.mod.dir),
         "availability": availability(mgr, svc),
     }
 

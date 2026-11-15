@@ -4,6 +4,7 @@ title = "MCP servers"
 models = []
 scan = []
 summary = "Other MCP servers' tools (Blender, and any stdio or HTTP MCP server) in GAIFA's chats, after you approve them"
+recommended = true   # offered first for chat (capability-enablement 1.4)
 gpu = false
 disk_gb = 0.2
 needs = []

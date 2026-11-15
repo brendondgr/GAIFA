@@ -4,6 +4,7 @@ title = "Workspace (folders, edits in place, the sandbox)"
 models = []
 scan = []
 summary = "Workspace: let the agent read and edit your folders at a level you set, and run code in a podman sandbox"
+recommended = true   # offered first for chat (capability-enablement 1.4)
 gpu = false
 disk_gb = 1.1
 needs = ["uv", "podman", "git"]

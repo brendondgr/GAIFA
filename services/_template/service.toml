@@ -36,3 +36,6 @@ span = 4
 
 [tools]                            # operations the agent may call (Phase 13)
 hello = { op = "GET /v1/hello", description = "Say hello to someone" }
+
+[agent]
+provides = "do what __NAME__ does"   # what it lets the agent do, completing "I can't …" (capability-enablement 1.4)

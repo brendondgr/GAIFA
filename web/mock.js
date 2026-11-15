@@ -337,8 +337,11 @@ export function createMockApi() {
       stats: s.stats.map(st => withSeries(s.id, st)), has_page: s.has_page, chat_url: CHAT_MODS.includes(s.id) ? `/ui/services/${s.id}/chat.js` : null, logo_url: ['relay', 'lcpp', 'tts', 'gen3d', 'comfy', 'opencode'].includes(s.id) ? `/ui/services/${s.id}/logo.svg` : null, has_outputs: s.has_outputs, native_ui: s.native_ui, enabled: s.config?.enabled ?? true, autostart: s.config?.autostart ?? s.autostart,
       last_error: s.last_error, manifest_errors: [...s.manifest_errors],
       accel: MOCK_ACCEL[s.id] ?? null, unavailable: s.id === 'example' ? "its variant (cuda) needs a GPU this machine doesn't have (it has rocm, vulkan, cpu): run `gaifa setup example` to pick another" : null,   // plan 38.3
-      installed: s.installed ?? true, availability: mockAvailability(s) };
+      provides: MOCK_PROVIDES[s.id] || '', recommended: MOCK_RECOMMENDED.includes(s.id), installed: s.installed ?? true, availability: mockAvailability(s) };
   }
+  // capability-enablement 1.4: `[agent] provides` and the setup docs' `recommended`
+  const MOCK_PROVIDES = { relay: 'reach the chat models the relay serves', lcpp: 'run local GGUF chat models', tts: 'speak text aloud or clone voices', gen3d: 'make 3D models from text or pictures', comfy: 'make or edit pictures and videos' };
+  const MOCK_RECOMMENDED = ['relay'];
   // capability-enablement 1.2: utils/services/availability.py's answer, from the mock's own fields
   function mockAvailability(s) {
     const fix = (kind, command = '', tool = '') => ({ kind, id: s.id, command, tool });

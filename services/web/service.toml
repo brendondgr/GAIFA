@@ -25,6 +25,7 @@ kinds = ["text"]                   # gains "document" with plan 24.1 (the PDFs c
 page = "ui/page.js"                # Read a page (plan 30.8): through the hub's POST /api/web/read, screened whole
 
 [agent]
+provides = "search the web and read pages"   # what it lets the agent do, completing "I can't …" (capability-enablement 1.4)
 skills = "skills"                  # skills/<name>/SKILL.md for the chat agent (plan 14.9)
 
 [tools]                            # risk and grant_key: plan 25; dry_run: in the agent eval, search and fetch read fakeweb/ (plan 26.2); cap_kb: a page of max_chars with its line numbers stays whole

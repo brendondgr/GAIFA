@@ -4,6 +4,7 @@ title = "Web (SearXNG search and page fetching)"
 models = []
 scan = []
 summary = "Web: search through your SearXNG and fetch pages and PDFs into Outputs, for you and the agent"
+recommended = true   # offered first for chat (capability-enablement 1.4)
 gpu = false
 disk_gb = 0.1
 needs = ["uv"]

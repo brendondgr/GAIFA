@@ -25,6 +25,7 @@ chat_panel = { module = "ui/panel.js", label = "Calendar" }   # calendar 7.2: th
 main = { label = "Calendar", after = "chat" }      # calendar 3.1: #/calendar, after Chat in the sidebar
 
 [agent]
+provides = "keep your calendar, to-dos and reminders"   # what it lets the agent do, completing "I can't …" (capability-enablement 1.4)
 limits = "POST /v1/limits"     # calendar 4.1: each call's action (read, change, or edit for an item it made in this chat)
 
 # @-mentions (calendar 4.4): @day:tomorrow fills the agenda's day; @event:<item> fills the item to change

@@ -464,6 +464,8 @@ interface ServiceSummary {
   manifest_errors: string[];     // non-empty → state "failed", not startable
   accel: string | null;          // plan 38.3: the variant installed (rocm, cuda, xpu, mps, vulkan, cpu); null: not recorded
   unavailable: string | null;    // plan 38.3: why it can't start on this machine (its variant's accel isn't here); start answers 409 unavailable
+  provides: string;              // capability-enablement 1.4: what it lets the agent do, completing "I can't …" ("search the web and read pages"); "" when not said
+  recommended: boolean;          // capability-enablement 1.4: its setup doc recommends it for chat: offered first and pre-ticked
   installed: boolean;            // capability-enablement 1.2: its command exists (its venv, binary or script): `gaifa setup <id>` has run
   availability: Availability | null;   // capability-enablement 1.2: can it be used, why not, what turns it on
 }

@@ -50,9 +50,14 @@ stop_timeout_s = 30                 # SIGTERM → wait → SIGKILL
 restart = "on-failure"              # retries after 2/4/8 s, at most 3 per 5 min; or "no"
 after = ["relay"]                   # start after these (ordering only)
 # installed = ["~/.opencode/bin/opencode", "opencode"]   # optional: what exists once it's set up, any one (default: the command's first word)
+
+[agent]
+provides = "search the web and read pages"   # what it lets the agent do, completing "I can't …" (≤ 80 characters)
 ```
 
-- **Installed:** until a mod's command exists (its venv, binary), the hub shows it as "not installed" and doesn't autostart it. A mod whose command is a tracked script (opencode's `./run.sh`) names what its setup makes in `installed` (a path, `~/…` or in the mod folder, or a command on the hub's `PATH`; a list means any one). A hub running older code rejects the key as unknown: `gaifa restart` after pulling.
+- **Provides:** one phrase that completes "I can't …": what a chat loses without your mod. The agent says it when the mod is off or not set up ("I can't search the web and read pages: Web isn't set up"), and the doctor lists it under What works. Optional, but every mod in GAIFA has one; longer than 80 characters is a manifest error.
+
+- **Installed:** until a mod's command exists (its venv, binary), the hub shows it as "not set up" (`availability.status: "not_set_up"`), doesn't autostart it and refuses to start it (`409 not_set_up`). A mod whose command is a tracked script (opencode's `./run.sh`) names what its setup makes in `installed` (a path, `~/…` or in the mod folder, or a command on the hub's `PATH`; a list means any one). A hub running older code rejects the key as unknown: `gaifa restart` after pulling.
 
 - **Paths in `command`:** an executable containing `/` resolves against the mod folder (`.venv/bin/python`); a bare name (`python3`, `node`) comes from `PATH`. Arguments starting with `./` or `../` resolve against the mod folder; others are passed as written and are relative to `cwd`, which is the mod folder by default.
 - **Unknown keys are errors**, so a typo like `helth` is reported rather than ignored.
@@ -256,6 +261,7 @@ title = "Kokoro-82M (Speech)"
 models = ["hf-cache/hub/models--hexgrad--Kokoro-82M"]
 scan = []
 summary = "Speech: fast English voices"     # one line, shown when choosing mods
+recommended = true                          # optional: offered first for chat and pre-ticked; only on the mod's own block (id = the mod's id)
 gpu = true                                  # needs the GPU (and so host.md's GPU parts)
 disk_gb = 14                                # the environment alone; images and models are extra
 images = { "docker.io/org/image" = 15.1 }   # container images it pulls, in GB: two setups sharing one count it once

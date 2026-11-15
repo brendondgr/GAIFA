@@ -4,6 +4,7 @@ title = "SearXNG watcher (the searxng mod)"
 models = []
 scan = []
 summary = "SearXNG watcher: see your SearXNG's health and engines, and change its settings from GAIFA or the agent"
+recommended = true   # offered first for chat (capability-enablement 1.4)
 gpu = false
 disk_gb = 0.03
 needs = ["uv"]

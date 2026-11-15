@@ -52,4 +52,5 @@ transcribe = { op = "POST /v1/transcribe", risk = "generate", ask = ["preset"], 
 list_models = { op = "GET /v1/models", view = { kind = "table", rows = "models", columns = [{ key = "name", label = "Model" }, { key = "size", label = "Size" }, { key = "downloaded", label = "On disk", format = "yesno" }, { key = "loaded", label = "Loaded", format = "yesno" }, { key = "device", label = "Device" }] }, description = "The speech-to-text models: which are downloaded and loaded, and the presets" }
 
 [agent]
+provides = "transcribe audio or take dictation"   # what it lets the agent do, completing "I can't …" (capability-enablement 1.4)
 skills = "skills"            # skills/<name>/SKILL.md for the chat agent (plan 14.9)

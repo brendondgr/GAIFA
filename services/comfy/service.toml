@@ -66,6 +66,7 @@ hide = ["GET /v1/hub/*"]
 "GET /v1/workflows/{wid}/preview" = "image"
 
 [agent]
+provides = "make or edit pictures and videos"   # what it lets the agent do, completing "I can't …" (capability-enablement 1.4)
 skills = "skills"
 tools_source = "GET /v1/tools"    # one tool per task (generate_image, animate_image, …); plan 11.10
 

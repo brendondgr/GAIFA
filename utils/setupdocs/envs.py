@@ -88,6 +88,29 @@ def load_envs(root: Path) -> tuple[list[Env], dict[str, str]]:
     return envs, problems
 
 
+_RECOMMENDED: dict[Path, tuple[tuple[float, ...], bool]] = {}
+
+
+def recommended(mod_dir: Path) -> bool:
+    """The mod's own setup doc (the block whose id is the mod's) says `recommended = true` (capability-enablement 1.4).
+    Cached by the docs' modification times: the hub asks for every summary."""
+    docs = sorted((mod_dir / "setup").glob("*.md")) if (mod_dir / "setup").is_dir() else []
+    try:
+        key = tuple(d.stat().st_mtime for d in docs)
+    except OSError:
+        return False
+    hit = _RECOMMENDED.get(mod_dir)
+    if hit and hit[0] == key:
+        return hit[1]
+    out = False
+    for d in docs:
+        env, _ = parse(d, mod_dir.name)
+        if env and env.id == mod_dir.name and env.setup.recommended:
+            out = True
+    _RECOMMENDED[mod_dir] = (key, out)
+    return out
+
+
 def under(path: str, folder: str) -> bool:
     return path == folder or path.startswith(folder + "/")
 

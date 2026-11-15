@@ -56,3 +56,6 @@ chat_list = { op = "POST /v1/external/list", risk = "read", description = "The G
 hide = ["GET /v1/threads/{tid}/stream"]
 [api.responses]
 "GET /v1/threads/{tid}/stream" = "stream"
+
+[agent]
+provides = "chat with you and use GAIFA's tools"   # what it lets the agent do, completing "I can't …" (capability-enablement 1.4)

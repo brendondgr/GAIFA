@@ -49,3 +49,6 @@ page = "ui/page.js"
 
 [api.responses]
 "POST /v1/speech" = "audio"
+
+[agent]
+provides = "talk with you in voice mode on a speech-to-speech model"   # what it lets the agent do, completing "I can't …" (capability-enablement 1.4)

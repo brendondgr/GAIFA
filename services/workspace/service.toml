@@ -22,6 +22,7 @@ install = "install.sh"
 page = "ui/page.js"                # Environments (their folders, levels, allow Bypass; plan 34), Activity (turns with Undo, runs, checkpoints), Sandbox (plan 27.7)
 
 [agent]
+provides = "read or edit your folders, or run code in a sandbox"   # what it lets the agent do, completing "I can't …" (capability-enablement 1.4)
 skills = "skills"                  # skills/<name>/SKILL.md for the chat agent (plan 14.9)
 limits = "POST /v1/limits"         # the hub asks this before deciding a call (plan 27.4): action, level, Bypass, preview
 

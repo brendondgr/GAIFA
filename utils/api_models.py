@@ -99,6 +99,8 @@ class ServiceSummary(_Model):
     manifest_errors: list[str]
     accel: str | None = Field(None, description="The variant installed (plan 38.3): rocm, cuda, xpu, mps, vulkan, cpu; null: not recorded")
     unavailable: str | None = Field(None, description="Why it can't start on this machine (its variant's accel isn't here), else null")
+    provides: str = Field("", description="What it lets the agent do, completing \"I can't …\" (`[agent] provides`, capability-enablement 1.4)")
+    recommended: bool = Field(False, description="Its setup doc recommends it for chat (`recommended = true`): offered first and pre-ticked")
     installed: bool = Field(True, description="Its command exists (its venv, binary or script): `gaifa setup <id>` has run (plan 23.12)")
     availability: Availability | None = Field(None, description="Can it be used, why not, and what turns it on (plan capability-enablement 1.2)")
 

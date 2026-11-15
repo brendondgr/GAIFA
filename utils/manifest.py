@@ -372,6 +372,19 @@ class AgentSpec(_Strict):
     skills: str | None = None     # a folder inside the mod: skills/<name>/SKILL.md
     limits: Op | None = None      # plan 27.4: "POST /v1/limits", the preflight the hub asks before deciding a call
     mentions: list[MentionSpec] = []   # plan 48.1: what the user can @-mention (utils/routes/mentions.py)
+    provides: str | None = None   # capability-enablement 1.4: what it lets the agent do, completing "I can't …" (≤ 80 characters)
+
+    @field_validator("provides")
+    @classmethod
+    def _provides(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = " ".join(v.split())
+        if not v:
+            raise ValueError("must say what the mod gives, completing \"I can't …\"")
+        if len(v) > 80:
+            raise ValueError(f"is {len(v)} characters; keep it to 80 (it completes \"I can't …\")")
+        return v
 
     @field_validator("skills")
     @classmethod

@@ -4,6 +4,7 @@ title = "Decisions: d3-lite"
 models = ["decide/**"]
 scan = []
 summary = "Decisions: fast yes/no, choice and score answers with probabilities (the Auto judge's d3-lite)"
+recommended = true   # offered first for chat (capability-enablement 1.4)
 gpu = true
 disk_gb = 6.6
 needs = ["uv"]

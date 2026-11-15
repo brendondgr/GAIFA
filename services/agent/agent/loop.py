@@ -587,7 +587,8 @@ class Agent(Compaction, Queueing, Prompting):
             self._result(tid, cid, name, {"status": "error", "error": stop})
             return "ok"
         mod = (tools.by_name(name) or {}).get("mod")
-        if mod and mod != "hub" and name not in guard.TURN_ON and (err := guard.out_for_turn(evs, lambda n: (tools.by_name(n) or {}).get("mod")).get(mod)):
+        out = guard.out_for_turn(evs, lambda n: (tools.by_name(n) or {}).get("mod")) if mod and mod != "hub" and name not in guard.TURN_ON else {}
+        if err := (out.get(mod) or out.get(f"tool:{name}")):
             self._result(tid, cid, name, guard.answer_out(name, err))   # capability-enablement 2.3: its mod is out for this turn
             return "ok"
         if (n := guard.repeated(evs, e)) >= 3:
@@ -663,6 +664,7 @@ class Agent(Compaction, Queueing, Prompting):
                 origin["untrusted"] = True  # the chat holds text from a page, file or transcript: a preference asks first
             args = self._refs(tid, args or {}, (tools.full.get(hub_name) or {}).get("parameters"))
             res = await self.hub.call(hub_name, args, origin, mode, wait=2)
+            res = await guard.turn_on_and_retry(self, tid, hub_name, args, origin, mode, res)   # capability-enablement 2.4
             if res.get("status") == "needs_approval":
                 self.emit(tid, "approval", {"id": cid, "approval_id": res["approval_id"], "tool": hub_name,
                                             "arguments": res.get("arguments"), "ask_fields": res.get("ask_fields") or [],

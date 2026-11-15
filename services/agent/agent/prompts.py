@@ -46,6 +46,8 @@ def turn_on_text(state: str, turn_on: dict[str, Any] | None) -> str:
             return f" Turn on: {call}, after the user says yes."
         if state == "failed":
             return f" Turn on: {call} once; if it fails again, tell the user."
+        if state == "off":       # capability-enablement 2.4: set up and only turned off: the agent turns it on itself
+            return f" It's set up: when the user asks for what it does, turn it on yourself with {call} and carry on; don't ask first."
         return f" Turn on: {call}."
     if on.get("command"):
         return f" Turn on: the user runs `{on['command']}` (offer it)." if state != "off" else f" Turn on: ask the user to {on['command']}."

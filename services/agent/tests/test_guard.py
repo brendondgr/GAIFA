@@ -85,3 +85,40 @@ def test_out_for_turn_from_events():
     evs[-1]["payload"].update(status="done", error=None)
     assert guard.out_for_turn(evs, mod_of) == {}
     assert guard.failing(evs[:3], 1) == ["web_search: tool_unavailable"] and guard.failing(evs, 4) == []
+
+
+async def test_a_turned_off_mod_is_turned_on_by_its_call(env):
+    """2.4: the hub refuses a turned-off mod's tool with turn_on hub_enable_service; the agent turns it on and runs it again."""
+    add_web(env)
+    env.hub.refuse["web_search"] = {**NOT_SET_UP, "state": "off", "detail": "I can't search the web: Web is turned off",
+                                    "turn_on": {"tool": "hub_enable_service", "arguments": {"id": "web"}, "command": ""}}
+    tid = await env.thread()
+    env.model.queue(*calls(("web_search", {"query": "a"})), {"text": "Found it."})
+    await env.send(tid, "search for a")
+    names = [a["name"] for a in env.hub.attempts]
+    assert names == ["web_search", "hub_enable_service", "web_search"]
+    assert env.payloads(tid, "tool_result")[0]["status"] != "error"
+    assert any("turned on web to run web_search" in n["text"] for n in env.payloads(tid, "note"))
+
+
+async def test_not_in_an_unattended_run(env):
+    add_web(env)
+    env.hub.refuse["web_search"] = {**NOT_SET_UP, "state": "off",
+                                    "turn_on": {"tool": "hub_enable_service", "arguments": {"id": "web"}, "command": ""}}
+    tid = await env.thread(settings={"unattended": True})
+    env.model.queue(*calls(("web_search", {"query": "a"})), {"text": "Off."})
+    await env.send(tid, "search for a")
+    assert [a["name"] for a in env.hub.attempts] == ["web_search"]
+
+
+async def test_a_tool_the_mod_turned_off_is_out_alone(env):
+    """2.4: web_search off by the mod (no SearXNG) doesn't take web_fetch out of the turn."""
+    add_web(env)
+    env.hub.tools["web_fetch"] = T("web_fetch", "web", "read", {"url": {"type": "string"}}, ["url"], core=True, desc="Fetch a page")
+    env.hub.refuse["web_search"] = {"code": "capability_unavailable", "detail": "web_search is off right now: no SearXNG answers",
+                                    "state": "off_by_mod", "service": "web"}
+    tid = await env.thread(mode="bypass")
+    env.model.queue(*calls(("web_search", {"query": "a"}), ("web_fetch", {"url": "https://example.org/"}), ("web_search", {"query": "b"})),
+                    {"text": "ok"})
+    await env.send(tid, "look it up")
+    assert [a["name"] for a in env.hub.attempts] == ["web_search", "web_fetch"]      # the second search is answered locally

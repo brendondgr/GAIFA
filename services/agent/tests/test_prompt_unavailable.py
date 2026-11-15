@@ -39,7 +39,7 @@ def test_the_section_from_an_index():
     text = prompts.off_section([t for t in OFF_TOOLS if t["state"] != "starts_on_use"], SERVICES)
     lines = text.split("\n")
     assert "- search the web and read pages (web: web_search, web_fetch): not set up. Turn on: the user runs `gaifa setup web` (offer it)." in lines
-    assert '- keep your calendar, to-dos and reminders (calendar: calendar_agenda): turned off in Settings. Turn on: hub_enable_service {"id": "calendar"}.' in lines
+    assert '- keep your calendar, to-dos and reminders (calendar: calendar_agenda): turned off in Settings. It\'s set up: when the user asks for what it does, turn it on yourself with hub_enable_service {"id": "calendar"} and carry on; don\'t ask first.' in lines
     assert any(ln.startswith("- do dud things (dud: dud_go): failed to start: Dud didn't start: exited.") for ln in lines)
     assert "- lens_find (lens): off right now: no SearXNG answers at http://127.0.0.1:8080." in lines
     assert prompts.off_section([], SERVICES) == ""
@@ -59,12 +59,13 @@ async def test_schemas_only_for_tools_that_can_run_and_the_prompt(env):
     await env.send(tid, "what's the weather?")
     req = env.model.received[-1]
     offered = {f["function"]["name"] for f in req.get("tools") or []}
-    assert "stt_transcribe" in offered                                  # stopped: still callable, the call starts it
-    assert not offered & {"web_search", "web_fetch", "calendar_agenda", "dud_go", "lens_find"}
+    assert {"stt_transcribe", "calendar_agenda"} <= offered   # stopped: the call starts it; turned off: the agent turns it on (2.4)
+    assert not offered & {"web_search", "web_fetch", "dud_go", "lens_find"}
     sp = system_prompt(env)
     assert "## Off on this machine" in sp
     assert "search the web and read pages (web: web_search, web_fetch): not set up" in sp
     assert "web (not set up)" in sp and "calendar (turned off)" in sp and "stt (stopped)" in sp
+    assert "(calendar: calendar_agenda)" not in sp                     # callable, so not under Off on this machine
 
 
 async def test_no_section_when_everything_is_on(env):
@@ -87,3 +88,20 @@ async def test_find_and_load_say_why(env):
     assert '"available": false' in found and "gaifa setup web" in found and "don't reach for it another way" in found
     loaded = results[1]["content"]
     assert '"not_available"' in loaded and "Web isn't set up on this machine" in loaded and '"unknown"' not in loaded
+
+
+async def test_chat_search_says_embed_isnt_set_up(env):
+    """capability-enablement 2.4: chat_search without the embed mod says what the hub says (not set up), not "stopped"."""
+    class NoEmbed:
+        async def search(self, q, limit):
+            raise RuntimeError("HTTP 503")
+    env.agent.summaries = NoEmbed()
+    env.hub.more_services = [{"id": "embed", "name": "Embeddings", "state": "stopped",
+                              "availability": {"status": "not_set_up", "why": "Embeddings isn't set up on this machine",
+                                               "fix": {"kind": "setup", "command": "gaifa setup embed", "tool": ""}}}]
+    tid = await env.thread()
+    env.model.queue({"tool_calls": [{"name": "chat_search", "arguments": {"query": "boots"}}]}, {"text": "Embeddings isn't set up."})
+    await env.send(tid, "find the chat about boots")
+    e = env.payloads(tid, "tool_result")[0]["error"]
+    assert e["code"] == "capability_unavailable" and e["detail"] == "I can't search your chats by meaning: Embeddings isn't set up on this machine"
+    assert "offer to set it up (`gaifa setup embed`)" in e["fix"]

@@ -70,14 +70,33 @@ def test_a_turned_on_offer_is_seen():
     assert s["ok"] and s["offers_to_turn_on"]
 
 
+def test_the_kinds_have_their_own_bar():
+    from evals.missing import CASES
+    auto, cal = (next(c for c in CASES if c.state == k) for k in ("decide", "calendar"))
+    card = [ev(1, "user", text="weather?"), ev(2, "usage"), call(3, "c1", "web_search", {"query": "w"}),
+            ev(4, "approval", approval_id="a1", tool="web_search"), result(5, "c1", "web_search"), ev(6, "usage"),
+            ev(7, "assistant", text="Sunny, 75°F ([site](https://x) #1:3).")]
+    assert score(card, auto, 9)["ok"] and score(card[:3] + card[4:], auto, 9)["ok"]               # with or without a card
+    assert not score(card[:-1], auto, 9)["ok"]                                                    # no answer: not ok
+    turned = [ev(1, "user", text="tomorrow?"), ev(2, "usage"), call(3, "c1", "hub_enable_service", {"id": "calendar"}),
+              result(4, "c1", "hub_enable_service"), ev(5, "usage"), call(6, "c2", "calendar_agenda", {"day": "tomorrow"}),
+              result(7, "c2", "calendar_agenda"), ev(8, "usage"), ev(9, "assistant", text="Nothing tomorrow.")]
+    assert score(turned, cal, 9)["ok"] and not score(turned[:2] + turned[4:], cal, 9)["ok"]
+
+
 def test_table_has_a_row_per_run():
     t = table([score(GAVE_UP, WEB, 9.3)])
     assert t.count("\n") == 2 and "| a | not_set_up | 4 | 3 / 1 |" in t
 
 
 def test_scratch_roots(tmp_path):
-    assert [c.state for c in CASES] == ["not_set_up", "no_searxng", "off", "start_fails"]
+    assert [c.state for c in CASES][:4] == ["not_set_up", "no_searxng", "off", "start_fails"]
     roots = {c.state: build_root(tmp_path / c.id, c, "http://127.0.0.1:9/v1", "m") for c in CASES}
+    assert not (roots["workspace"] / "services/workspace/.venv").exists() and not (roots["workspace"] / "services/web").exists()
+    cal = tomllib.loads((roots["calendar"] / "config.toml").read_text())
+    assert cal["services"]["calendar"]["enabled"] is False and cal["services"]["calendar"]["port"] == 5196
+    auto = next(c for c in CASES if c.state == "decide")
+    assert auto.mode == "auto" and (roots["decide"] / "services/web/.venv").exists() and not (roots["decide"] / "services/decide/.venv").exists()
     assert not (roots["not_set_up"] / "services/web/.venv").exists()
     assert (roots["no_searxng"] / "services/web/.venv").exists()
     assert "fails on purpose" in (roots["start_fails"] / "services/web/server.py").read_text()

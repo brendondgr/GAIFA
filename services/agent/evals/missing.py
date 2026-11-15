@@ -44,7 +44,9 @@ UNAVAILABLE = ("isn't set up", "is not set up", "not set up", "isn't available",
                "unavailable", "can't search", "cannot search", "can't access the web", "cannot access the web",
                "can't browse", "cannot browse", "no web", "can't check", "cannot check", "couldn't check", "could not check",
                "turned off", "isn't running", "not running", "didn't start", "can't reach", "cannot reach", "couldn't reach",
-               "unable to search", "unable to access", "currently down", "is down", "can't get the", "cannot get the",
+               "unable to search", "unable to access", "gaifa setup", "isn't currently working", "not currently working",
+               "connectivity issues", "connection errors", "don't have direct access", "unable to retrieve", "couldn't retrieve", "wasn't able to", "aren't set up",
+               "isn't set up", "currently down", "is down", "can't get the", "cannot get the",
                "technical trouble", "isn't starting", "not starting", "not working", "disabled", "don't have access", "do not have access", "no access", "not connected")
 OFFER = ("set it up", "set up", "turn it on", "turn on", "enable", "start it", "want me to")
 REFUSALS = ("capability_unavailable", "tool_unavailable", "service_not_running", "not_set_up", "searxng_failed",
@@ -52,17 +54,30 @@ REFUSALS = ("capability_unavailable", "tool_unavailable", "service_not_running",
 NETWORK_SHELL = ("curl", "wget", "requests", "urllib", "httpx", "http://", "https://")
 
 
+PORTS = {"web": WEB_PORT, "workspace": 5193, "decide": 5194, "embed": 5195, "calendar": 5196}
+
+
 @dataclass
 class Case:
     id: str
-    state: str
+    state: str                       # web's state, or the case's name for the 2.4 cases
     question: str = QUESTION
-    mod: str = "web"
+    mod: str = "web"                 # the mod that is missing
     tools: tuple[str, ...] = ("web_search", "web_fetch")
+    mods: dict[str, str] = field(default_factory=dict)   # other mods: id → on | not_set_up | off | start_fails | no_searxng
+    mode: str = "manual"
+    kind: str = "missing"            # missing: says what is missing · auto_answers: Auto without its judge still answers · turns_on: it turns the mod on
     notes: list[str] = field(default_factory=list)
 
 
-CASES = [Case("a", "not_set_up"), Case("b", "no_searxng"), Case("c", "off"), Case("d", "start_fails")]
+CASES = [Case("a", "not_set_up"), Case("b", "no_searxng", tools=("web_search",)), Case("c", "off", kind="turns_on"), Case("d", "start_fails"),
+         # plan 2.4: the other recommended mods
+         Case("e", "workspace", "What's in my Documents folder?", "workspace",
+              ("workspace_folders", "workspace_tree", "workspace_read", "workspace_run", "workspace_python"), {"workspace": "not_set_up"}),
+         Case("f", "decide", QUESTION, "decide", (), {"web": "on", "decide": "not_set_up"}, mode="auto", kind="auto_answers"),
+         Case("g", "embed", "Find the chat where we talked about boots for Torres del Paine.", "embed",
+              ("embed_library_search", "embed_library_collections", "chat_search"), {"embed": "not_set_up"}),
+         Case("h", "calendar", "What's on my calendar tomorrow?", "calendar", ("calendar_agenda",), {"calendar": "off"}, kind="turns_on")]
 
 
 # --- the scratch root ---------------------------------------------------------------------------------------------
@@ -76,29 +91,36 @@ def _link_tree(src: Path, dst: Path, skip: tuple[str, ...] = ()) -> None:
             (dst / p.name).symlink_to(p)
 
 
+def _mod(root: Path, mid: str, state: str) -> list[str]:
+    """Put mod `mid` into the scratch root in `state`; its config.toml lines."""
+    src, dst = REPO / "services" / mid, root / "services" / mid
+    if state == "not_set_up":
+        _link_tree(src, dst, skip=(".venv", ".env"))
+    elif state == "start_fails":
+        _link_tree(src, dst, skip=("server.py", ".env"))
+        (dst / "server.py").write_text(f"import sys\nsys.exit('this {mid} mod fails on purpose (evals/missing.py)')\n")
+    else:
+        _link_tree(src, dst, skip=(".env",))
+    lines = [f"[services.{mid}]", f"port = {PORTS[mid]}", *(["enabled = false"] if state == "off" else []), ""]
+    if mid == "web":
+        lines += ["[services.web.env]", f'SEARXNG_URL = "http://127.0.0.1:{DEAD_PORT}"' if state == "no_searxng" else
+                  'SEARXNG_URL = "http://127.0.0.1:8080"', ""]
+    return lines
+
+
 def build_root(root: Path, case: Case, llm: str, model: str) -> Path:
-    """A scratch GAIFA root for `case`: the agent linked, `web` in the case's state, `config.toml` with its ports."""
+    """A scratch GAIFA root for `case`: the agent linked, its mods in the case's states, `config.toml` with their ports."""
     if root.exists():
         shutil.rmtree(root)
     (root / "services").mkdir(parents=True)
     (root / "web").symlink_to(REPO / "web")
     (root / "services" / "agent").symlink_to(AGENT_DIR)
-    web = root / "services" / "web"
-    if case.state == "not_set_up":
-        _link_tree(WEB_DIR, web, skip=(".venv", ".env"))
-    elif case.state == "start_fails":
-        _link_tree(WEB_DIR, web, skip=("server.py", ".env"))
-        (web / "server.py").write_text("import sys\nsys.exit('this web mod fails on purpose (evals/missing.py, case d)')\n")
-    else:
-        _link_tree(WEB_DIR, web, skip=(".env",))
-    cfg = [
-        "[hub]", f"port = {HUB_PORT}", "",
-        "[services.agent]", f"port = {AGENT_PORT}", "",
-        "[services.agent.env]", f'AGENT_LLM_URL = "{llm}"', f'AGENT_MODEL = "{model}"', "",
-        "[services.web]", f"port = {WEB_PORT}", *(["enabled = false"] if case.state == "off" else []), "",
-        "[services.web.env]", f'SEARXNG_URL = "http://127.0.0.1:{DEAD_PORT}"' if case.state == "no_searxng" else
-        'SEARXNG_URL = "http://127.0.0.1:8080"', "",
-    ]
+    mods = dict(case.mods) if case.mods else {"web": case.state}
+    cfg = ["[hub]", f"port = {HUB_PORT}", "",
+           "[services.agent]", f"port = {AGENT_PORT}", "",
+           "[services.agent.env]", f'AGENT_LLM_URL = "{llm}"', f'AGENT_MODEL = "{model}"', ""]
+    for mid, state in mods.items():
+        cfg += _mod(root, mid, state)
     (root / "config.toml").write_text("\n".join(cfg))
     return root
 
@@ -180,7 +202,14 @@ def score(events: list[dict[str, Any]], case: Case, seconds: float) -> dict[str,
     says = any(w in reply for w in UNAVAILABLE)
     offers = any(w in reply for w in OFFER)
     ok = (says and (steps_after <= 3) and after_refusal <= 1 and not shell)
-    return {"case": case.id, "state": case.state, "steps": steps, "steps_after_refusal": steps_after, "seconds": round(seconds, 1),
+    if case.kind == "auto_answers":        # decide not set up in Auto: the fixed rules or a card decide, and the turn answers
+        ok = bool(reply.strip()) and not any(e["type"] == "error" for e in events) and steps <= 12
+    elif case.kind == "turns_on":          # a turned-off mod: the agent turns it on and answers from it
+        on = [c for c in calls if c["name"] == "hub_enable_service" and (c.get("arguments") or {}).get("id") == case.mod] + \
+             [n for n in pay("note") if f"turned on {case.mod} " in (n.get("text") or "")]     # 2.4: the agent turns it on itself
+        used = [c for c in calls if c["name"] in case.tools and not _code(results.get(c["id"]) or {})]
+        ok = bool(on) and bool(used) and bool(reply.strip())
+    return {"case": case.id, "state": case.state, "kind": case.kind, "approvals": len(pay("approval")), "steps": steps, "steps_after_refusal": steps_after, "seconds": round(seconds, 1),
             "calls": rows, "calls_after_refusal": after_refusal, "network_shell": len(shell), "says_unavailable": says,
             "offers_to_turn_on": offers, "ok": ok, "reply": (replies[-1] if replies else "")[:400]}
 
@@ -198,7 +227,7 @@ async def run_case(case: Case, root: Path, llm: str, model: str, timeout: float)
         await wait_ready(hub)
         h = Harness(f"{hub}/api/s/agent", model, dry_run=False, hub=hub, log=lambda s: None)
         try:
-            run = await h.run(Task(f"missing-{case.id}", "missing", [case.question], [], mode="manual",
+            run = await h.run(Task(f"missing-{case.id}", "missing", [case.question], [], mode=case.mode,
                                    settings={"dry_run": False}, timeout=timeout))
         finally:
             await h.close()

@@ -317,13 +317,29 @@ class Local(ProjectTools, TaskTools, WorkflowTools):
         try:
             hits = await s.search(str(args.get("query") or ""), int(args.get("limit") or 5))
         except Exception as e:  # noqa: BLE001: no embed mod
-            return self.err(tid, cid, "chat_search", "unavailable", f"search by meaning needs the embed mod ({e})",
-                            fix="tell the user chat search needs the Embeddings mod running")
+            return await self._embed_missing(tid, cid, e)
         hits = [h for h in hits if h["thread_id"] != tid]                  # not the chat it's asked from
         # a summary retells a chat that may have read pages or files: data, never instructions
         hits = [{**h, "title": ctx.label(h.get("title")),
                  "summary": ctx.untrusted(f"chat {h['thread_id']} summary", str(h.get("summary") or ""))} for h in hits]
         return self.ok(tid, cid, "chat_search", {"chats": hits} if hits else {"chats": [], "note": "no earlier chat matches"})
+
+    async def _embed_missing(self, tid: str, cid: str, e: Exception) -> str:
+        """chat_search without the embed mod: what the hub says about it (capability-enablement 2.4: "isn't set up",
+        "is turned off", "is stopped"), so the agent offers the right thing."""
+        av: dict[str, Any] = {}
+        try:
+            av = next((s.get("availability") or {} for s in await self.a.hub.services() if s["id"] == "embed"), {})
+        except Exception:  # noqa: BLE001: the hub may be restarting
+            pass
+        why = av.get("why") or ("the Embeddings mod isn't installed" if not av else str(e))
+        st = av.get("status")
+        if st in ("not_set_up", "off", "cant_run", "broken"):
+            how = ("hub_enable_service with id embed" if st == "off" else f"`{(av.get('fix') or {}).get('command') or 'gaifa setup embed'}`")
+            return self.err(tid, cid, "chat_search", "capability_unavailable", f"I can't search your chats by meaning: {why}",
+                            fix=f"tell the user in one sentence and offer to {'turn it on' if st == 'off' else 'set it up'} ({how}); don't retry")
+        return self.err(tid, cid, "chat_search", "unavailable", f"search by meaning needs the Embeddings mod ({why})",
+                        fix="tell the user chat search needs the Embeddings mod running")
 
     async def t_memory_search(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
         """structured-memory 2.3: names, keywords and meaning, fused."""

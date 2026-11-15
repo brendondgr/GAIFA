@@ -23,7 +23,7 @@ def test_the_active_version_carries_the_off_rules(tmp_path):
     h = Harness(tmp_path)
     h.create({"guardrails.md": "- Never invent ids.\n"}, activate=True)
     sp = h.tree()["systemprompt.md"]
-    assert 'Needs something under "Off on this machine"?' in sp and "turn it on with `hub_enable_service`" in sp
+    assert 'Needs something under "Off on this machine"? Not set up: say in one sentence what is missing' in sp
     assert "A `capability_unavailable` result is final for this turn unless you turn the mod on." in sp
     assert "when `web_search` is among your tools, search with it" in sp
 

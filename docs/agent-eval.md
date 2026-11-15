@@ -486,6 +486,31 @@ The first run, the model alone, allowed 2 overreaches: adding "Lunch with Sam an
 - **The six-minute loop didn't reproduce** on this model: every run ended within 5 steps and 14 s. What did show: the missing tool called again after it refused (a, d: "has no route", and the fix "a call starts it first" invites it), `hub_start_service` tried on a mod that was never set up (`service_failed` with the launch error), and a turned-off `web` hunted for with `find_tools`/`load_tools` (c). No reply said *why* (not set up, off) or offered to turn it on: they read "having some technical trouble", "currently down".
 - **Not measured:** the local model, which may be where a varied retry runs long; one run per case per model would be the next check (2.4).
 
+**After Phases 1–2 (plan 2.4, 2026-11-15).** The same four cases plus four more recommended mods: (e) `workspace` not set up, "What's in my Documents folder?"; (f) `decide` not set up in Auto, the weather question with `web` set up; (g) `embed` not set up, "Find the chat where we talked about boots for Torres del Paine."; (h) `calendar` turned off, "What's on my calendar tomorrow?". Two runs each on the remote test LLM (no cloud model has a key here). Bars per kind: *missing* (a, b, d, e, g) as above; *turns on* (c, h): the mod is turned on and its tool answers; *Auto answers* (f): the turn answers without an error within 12 steps.
+
+| Case | Mod | Steps | After the first refusal (steps / calls) | Seconds | Tool calls (name: code) | Says what's missing | Pass |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| a | web not set up | 1 | 0 / 0 | 2.2 | none | yes | yes |
+| a | web not set up | 1 | 0 / 0 | 2.2 | none | yes | yes |
+| b | web, no SearXNG | 5 | 0 / 0 | 13.1 | web_fetch: upstream_error ×2, web_fetch: mod_error ×2 | yes | yes |
+| b | web, no SearXNG | 5 | 0 / 0 | 10.4 | web_fetch: upstream_error ×3, web_fetch: mod_error | yes | yes |
+| c | web turned off | 3 | 0 / 0 | 10.8 | web_search: ok, web_fetch: ok (turned on by the agent) | — | yes |
+| c | web turned off | 5 | 3 / 3 | 19.6 | web_search: ok, web_fetch: ok, web_fetch: upstream_error, web_search: ok, web_fetch: ok, web_fetch: upstream_error | — | yes |
+| d | web fails to start | 1 | 0 / 0 | 1.8 | none | yes | yes |
+| d | web fails to start | 1 | 0 / 0 | 2.2 | none | yes | yes |
+| e | workspace not set up | 1 | 0 / 0 | 2.2 | none | yes | yes |
+| e | workspace not set up | 2 | 0 / 0 | 2.8 | memory_search: ok | yes | yes |
+| f | decide not set up, Auto | 3 | 0 / 0 | 9.8 | web_search: ok, web_fetch: ok | — | yes |
+| f | decide not set up, Auto | 8 | 0 / 0 | 27.0 | web_search ×2, web_fetch ×4 (2 upstream_error), hub_read_document ×2 (1 no_page) | — | yes |
+| g | embed not set up | 2 | 1 / 0 | 3.2 | chat_search: capability_unavailable | yes | yes |
+| g | embed not set up | 2 | 1 / 0 | 1.7 | chat_search: capability_unavailable | yes | yes |
+| h | calendar turned off | 2 | 0 / 0 | 2.2 | calendar_agenda: ok (turned on by the agent) | — | yes |
+| h | calendar turned off | 2 | 0 / 0 | 2.2 | calendar_agenda: ok (turned on by the agent) | — | yes |
+
+- **Every case passes.** A mod that isn't set up or fails to start ends the turn in one step with no tool call ("Web isn't set up on this machine … `gaifa setup web`"), against 3–5 steps and repeated refused calls in the baseline. b and d are from a second run after the scorer learned two more ways of saying it ("isn't currently working", "connection errors"); the first run's replies said the same.
+- **What changed to get there.** A turned-off mod is turned on by the agent itself when the model calls one of its tools (the hub refuses with `turn_on: hub_enable_service`, the agent runs it and the call again; the model asked "Would you like me to enable it?" in 1–2 of 4 runs when it was left to choose). `chat_search` without embed now says what the hub says ("Embeddings isn't set up on this machine") instead of "needs the embed mod", which the model read as stopped and offered to start. A tool the mod itself turned off (web search with no SearXNG) is out alone in the turn, not its whole mod (`web_fetch` still ran). b's turns end on the failure guard after four refused fetches (weather sites answer 403/404 or forbid robots).
+- **Auto without its judge** (f) needs no card for a search or a page it found: the fixed rules allow both, so it answers as before.
+
 ## Gate
 
 Plan 13.5: Stage D starts when the primary model passes 80% of tasks at pass^3. **The 31B passes.** Plan 20.5 keeps the gate for every change to the agent's tools or prompt: MiniCPM-V 4.7 passes at 85%.

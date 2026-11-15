@@ -5,6 +5,7 @@
 - **Out for this turn:** a mod whose tool answered `capability_unavailable`, `tool_unavailable` or `service_not_running`
   since the user's message is out for the rest of the turn: a further call to any of its tools is answered here with
   that first error, unless `hub_setup`, `hub_enable_service` or `hub_start_service` turned it on since.
+- **Turned off:** a call to a mod the user turned off turns it on (`hub_enable_service`) and runs again (2.4).
 - **Failing:** after `max_fails` error results in a row (any tools, any arguments) the next model call gets no tools
   and a note listing what failed, so a varied retry ends in words instead of running to the step limit.
 """
@@ -60,7 +61,8 @@ def _turned_on(p: dict[str, Any], args: dict[str, Any]) -> set[str]:
 
 
 def out_for_turn(events: list[dict[str, Any]], mod_of: Callable[[str], str | None]) -> dict[str, dict[str, Any]]:
-    """{mod: its first refusal's error} for the mods refused in this turn and not turned on since."""
+    """{mod: its first refusal's error} for the mods refused in this turn and not turned on since; a tool the mod
+    turned off itself is keyed `tool:<name>`."""
     out: dict[str, dict[str, Any]] = {}
     args: dict[str, dict[str, Any]] = {}
     for e in turn(events):
@@ -74,9 +76,10 @@ def out_for_turn(events: list[dict[str, Any]], mod_of: Callable[[str], str | Non
             out.pop(m, None)
         err = p.get("error") or {}
         if err.get("code") in OUT_CODES and p.get("name") not in TURN_ON:
-            mod = err.get("service") or mod_of(p["name"])
-            if mod and mod not in out:
-                out[mod] = err
+            # a tool the mod itself turned off (off_by_mod) is out alone; its mod's other tools still work
+            key = f"tool:{p['name']}" if err.get("state") == "off_by_mod" else (err.get("service") or mod_of(p["name"]))
+            if key and key not in out:
+                out[key] = err
     return out
 
 
@@ -104,3 +107,20 @@ def wrap_note(failed: list[str]) -> str:
     return ("(A note from the app, not from the user: your last tool calls all failed: " + "; ".join(failed) + ". "
             "Tools are off for this reply. Answer the user in plain text: what you tried, what is missing or broken, "
             "and what they can do about it.)")
+
+
+async def turn_on_and_retry(agent: Any, tid: str, name: str, args: Any, origin: dict[str, Any], mode: str,
+                            res: dict[str, Any]) -> dict[str, Any]:
+    """capability-enablement 2.4: a call to a mod the user turned off (set up, `enabled = false`) turns it on with
+    hub_enable_service (decided like any call: allowed by default, refused in Plan) and runs once more. Only in a chat
+    someone is watching; the hub still refuses such calls from every other caller."""
+    err = res.get("error") or {}
+    on = err.get("turn_on") or {}
+    if err.get("code") != "capability_unavailable" or err.get("state") != "off" or on.get("tool") != "hub_enable_service" \
+            or origin.get("unattended"):
+        return res
+    done = await agent.hub.call("hub_enable_service", on.get("arguments") or {}, {**origin, "for_tool": name}, mode, wait=60)
+    if done.get("status") != "done":
+        return res
+    agent.emit(tid, "note", {"text": f"turned on {err.get('service') or (on.get('arguments') or {}).get('id')} to run {name}", "level": "info"})
+    return await agent.hub.call(name, args, origin, mode, wait=2)

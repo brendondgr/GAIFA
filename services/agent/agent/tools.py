@@ -101,7 +101,7 @@ def function(t: dict[str, Any], note: str | None = None) -> dict[str, Any]:
     return {"type": "function", "function": {"name": t["name"], "description": desc, "parameters": t.get("parameters") or {"type": "object"}}}
 
 
-CALLABLE = ("on", "starts_on_use")   # capability-enablement 2.1: a stopped mod's tools stay callable (the call starts it)
+CALLABLE = ("on", "starts_on_use", "off")   # capability-enablement 2.1, 2.4: a stopped mod's call starts it; a turned-off mod's turns it on (loop.py)
 
 
 def usable(t: dict[str, Any]) -> bool:

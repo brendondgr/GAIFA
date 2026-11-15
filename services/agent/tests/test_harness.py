@@ -10,12 +10,22 @@ import pytest
 from agent import prompts
 from agent.harness import Harness, HarnessError, validate
 
-OLD = (Path(__file__).parent / "fixtures" / "base-prompt-2026-10-26.txt").read_text()
+OLD = (Path(__file__).parent / "fixtures" / "base-prompt-2026-11-15.txt").read_text()   # capability-enablement 2.2
 
 
 def test_the_base_prompt_is_unchanged():
     assert prompts.base_text() == OLD
     assert prompts.build({"base": Harness("/nonexistent").tree(0)["systemprompt.md"]}) == prompts.build({}) == OLD
+
+
+def test_the_active_version_carries_the_off_rules(tmp_path):
+    """capability-enablement 2.2: the rule for what's off reaches a learned version that doesn't change the prompt."""
+    h = Harness(tmp_path)
+    h.create({"guardrails.md": "- Never invent ids.\n"}, activate=True)
+    sp = h.tree()["systemprompt.md"]
+    assert 'Needs something under "Off on this machine"?' in sp and "turn it on with `hub_enable_service`" in sp
+    assert "A `capability_unavailable` result is final for this turn unless you turn the mod on." in sp
+    assert "when `web_search` is among your tools, search with it" in sp
 
 
 def test_versions_overlay_activate_and_roll_back(tmp_path):

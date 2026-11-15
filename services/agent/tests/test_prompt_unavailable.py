@@ -71,7 +71,7 @@ async def test_no_section_when_everything_is_on(env):
     tid = await env.thread()
     env.model.queue({"text": "ok"})
     await env.send(tid, "hi")
-    assert "Off on this machine" not in system_prompt(env)
+    assert "## Off on this machine" not in system_prompt(env)
 
 
 async def test_find_and_load_say_why(env):

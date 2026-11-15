@@ -21,6 +21,8 @@ if TYPE_CHECKING:
 
 MAX_STATS = 4
 MAX_REV = 64
+MAX_OFF = 200                           # tools_off: each why and fix (capability-enablement 1.6)
+TOOL_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 JOB_STATES = {"queued", "running", "done", "failed", "cancelled"}
 ACTIVE_JOBS = {"queued", "running"}
 
@@ -30,10 +32,11 @@ def slug(label: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_") or "stat"
 
 
-def validate(body: Any) -> tuple[dict[str, Any], list[str]]:
-    """A status body → (normalized fields, problems). Unknown keys are ignored."""
+def validate(body: Any, tools: set[str] | None = None) -> tuple[dict[str, Any], list[str]]:
+    """A status body → (normalized fields, problems). Unknown keys are ignored. `tools`: the mod's tool names (its
+    `[tools]`), against which `tools_off` is checked; None when its tools come from a route and can't be known here."""
     out: dict[str, Any] = {"loaded": None, "busy": False, "idle_s": None, "memory_estimate_gb": None, "stats": [], "jobs": [],
-                           "tools_rev": None}
+                           "tools_rev": None, "tools_off": {}}
     problems: list[str] = []
     if not isinstance(body, dict):
         return out, [f"status must be a JSON object, got {type(body).__name__}"]
@@ -65,6 +68,22 @@ def validate(body: Any) -> tuple[dict[str, Any], list[str]]:
             out["tools_rev"] = str(rev)
         else:
             problems.append(f"tools_rev must be a string or an integer of 1–{MAX_REV} characters")
+
+    off = body.get("tools_off")             # capability-enablement 1.6: tools the mod says are off right now
+    if off is not None:
+        if not isinstance(off, dict):
+            problems.append("tools_off must be an object: {\"<tool>\": {\"why\": \"…\", \"fix\": \"…\"}}")
+        else:
+            for name, v in off.items():
+                if not isinstance(name, str) or not TOOL_NAME.match(name):
+                    problems.append(f"tools_off: {name!r} isn't a tool name")
+                elif tools is not None and name not in tools:
+                    problems.append(f"tools_off: {name!r} isn't one of the mod's tools ({', '.join(sorted(tools)) or 'none'})")
+                elif not (isinstance(v, dict) and isinstance(v.get("why"), str) and v["why"].strip() and len(v["why"]) <= MAX_OFF
+                          and isinstance(v.get("fix", ""), str) and len(v.get("fix", "")) <= MAX_OFF):
+                    problems.append(f"tools_off.{name} must be {{\"why\": \"…\", \"fix\": \"…\"}}, each at most {MAX_OFF} characters")
+                else:
+                    out["tools_off"][name] = {"why": v["why"].strip(), "fix": (v.get("fix") or "").strip()}
 
     stats = body.get("stats", [])
     if not isinstance(stats, list):
@@ -143,7 +162,7 @@ async def fetch(mgr: ServiceManager, svc: Service) -> tuple[dict[str, Any] | Non
     except ValueError:
         return None, [f"GET {svc.m.run.status}: not JSON"]
     svc.status = body if isinstance(body, dict) else None
-    return validate(body)
+    return validate(body, None if svc.m.agent.tools_source else set(svc.m.tools))
 
 
 def load_from(svc: Service, loaded: bool | None) -> str:
@@ -174,6 +193,7 @@ def apply(mgr: ServiceManager, svc: Service, st: dict[str, Any], asked_at: float
     svc.stats = st["stats"]
     svc.memory_estimate_gb = st["memory_estimate_gb"]
     svc.tools_rev = st.get("tools_rev")
+    svc.tools_off = st.get("tools_off") or {}
     _publish_jobs(mgr, svc, st["jobs"])
     after = (svc.load, svc.busy, svc.stats, svc.memory_estimate_gb, _job_view(svc.jobs))
     return before != after

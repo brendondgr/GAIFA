@@ -14,6 +14,7 @@ functions, and the hub's own tools, as OpenAI-style functions with risk levels.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 import logging
 import re
@@ -186,13 +187,13 @@ class Catalog:
             key = (*operations.cache_key(svc), svc.tools_rev)   # plan 51.1: a new revision reads them again
             cached = self._mods.get(svc.id)
             if cached and cached[0] == key:
-                return cached[1]
+                return self._off_by_mod(svc, cached[1])
             try:
                 tools = await self._build(svc)
                 self.errors.pop(svc.id, None)
                 self._mods[svc.id] = (key, tools)
                 await self._persist(svc.id, tools)
-                return tools
+                return self._off_by_mod(svc, tools)
             except Exception as e:  # noqa: BLE001 - one mod's broken API must not break the catalog
                 self.errors[svc.id] = f"{type(e).__name__}: {e}"
                 log.warning("tools of %s: %s", svc.id, self.errors[svc.id])
@@ -209,6 +210,15 @@ class Catalog:
             t.state = "on" if svc.up else av["status"]
             t.turn_on = None if t.state == "on" else turn_on(av)
         return tools
+
+    @staticmethod
+    def _off_by_mod(svc: Service, tools: list[ToolDef]) -> list[ToolDef]:
+        """Copies of the tools the mod's status says are off (capability-enablement 1.6); the cached ones stay as built."""
+        off = svc.tools_off
+        if not off:
+            return tools
+        return [dataclasses.replace(t, available=False, state="off_by_mod", why=off[t.tool]["why"], off_fix=off[t.tool]["fix"] or None)
+                if t.tool in off else t for t in tools]
 
     async def _build(self, svc: Service) -> list[ToolDef]:
         assert svc.m

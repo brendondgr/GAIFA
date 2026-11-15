@@ -196,7 +196,20 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
             ],
             "jobs": [],
             "searxng": {"url": found["url"], "from": found["source"], "up": up, "detail": why},
+            "tools_off": search_off(up),
         }
+
+    def search_off(up: bool) -> dict:
+        """capability-enablement 1.6: search is off while no SearXNG answers or it refuses JSON (fetch still works)."""
+        if not up:
+            return {"search": {"why": f"no SearXNG answers at {found['url']}",
+                               "fix": "tell the user web search needs a SearXNG: set it up with `gaifa setup searxng` "
+                                      "(services/web/setup/web.md); web_fetch still reads pages"}}
+        if state.get("no_json"):
+            return {"search": {"why": f"the SearXNG at {found['url']} refuses JSON results",
+                               "fix": "tell the user to add json under search.formats in SearXNG's settings.yml "
+                                      "(the searxng mod can do it); web_fetch still reads pages"}}
+        return {}
 
     @app.post("/v1/search", summary="Search the web", response_model=SearchOut,
               responses={503: {"description": "SearXNG doesn't answer"}, 502: {"description": "SearXNG refused or failed"}})
@@ -223,6 +236,7 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
         finally:
             state["busy"] -= 1
         if r.status_code == 403:
+            state["no_json"] = True
             return error(502, "searxng_no_json", f"SearXNG at {base} refused format=json (HTTP 403)",
                          "SearXNG needs `json` under search.formats in its settings.yml (services/web/setup/web.md)")
         if r.status_code == 429:
@@ -234,8 +248,10 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
             if not isinstance(data, dict):
                 raise ValueError(f"expected a JSON object, got {type(data).__name__}")
         except (httpx.HTTPError, ValueError) as e:
-            return error(502, "searxng_failed", f"SearXNG failed: {e}", "try again with a different query")
+            return error(502, "searxng_failed", f"SearXNG failed: {e}",
+                         "try once more; if it fails again, tell the user web search isn't working and don't retry")
         state["searches"] += 1
+        state["no_json"] = False
         seen: set[str] = set()
         results = []
         for it in data.get("results") or []:

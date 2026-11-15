@@ -305,6 +305,7 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
             if job["state"] in status.ACTIVE_JOBS:
                 self.bus.publish({"type": "job", "job": {**job, "state": jobs_end}})
         svc.health = svc.status = svc.status_ts = svc.tools_rev = None
+        svc.tools_off = {}
         svc.stats = []
         svc.memory_estimate_gb = None
         svc.busy, svc.idle_s, svc.jobs = False, None, []

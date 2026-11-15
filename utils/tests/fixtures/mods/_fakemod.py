@@ -23,7 +23,7 @@ GET /v1/widgets/requests?range=24h is a WidgetData (fake-ok's dashboard widget);
 calls in `calls`, and FAKE_BAD_WIDGET=1 makes it malformed.
 POST /v1/fail answers 500 {"detail": ...} (an upstream error); DELETE /v1/jobs/{id} removes a job (destructive).
 POST /v1/jobs {"label", "seconds"} starts a job that /v1/status reports with progress
-(busy while it runs). FAKE_BAD_STATUS=1 makes /v1/status return a malformed body.
+(busy while it runs). FAKE_BAD_STATUS=1 makes /v1/status return a malformed body; FAKE_TOOLS_OFF (JSON) is its tools_off.
 """
 
 from __future__ import annotations
@@ -494,6 +494,8 @@ def status() -> dict:
     }
     if MODE == "tools" and not os.environ.get("FAKE_NO_TOOLS_REV"):
         s["tools_rev"] = "2" if STATE["doodle"] else "1"    # plan 51.1
+    if os.environ.get("FAKE_TOOLS_OFF"):                 # capability-enablement 1.6: tools the mod says are off
+        s["tools_off"] = json.loads(os.environ["FAKE_TOOLS_OFF"])
     if MODE == "mem":
         s["memory_estimate_gb"] = float(os.environ.get("FAKE_ESTIMATE_GB") or round(int(os.environ.get("FAKE_MEM_MB", "64")) / 1024, 3))
     return s

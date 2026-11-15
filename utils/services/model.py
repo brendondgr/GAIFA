@@ -62,6 +62,7 @@ class Service:
     health: dict[str, Any] | None = None
     status: dict[str, Any] | None = None
     status_ts: float | None = None
+    tools_off: dict[str, dict[str, str]] = field(default_factory=dict)   # capability-enablement 1.6: the status's tools_off
     tools_rev: str | None = None  # the status's `tools_rev` (plan 51.1): a change makes the catalog read its tools again
     load_set_at: float = 0.0  # time.monotonic() when the hub itself last set `load` (a status read started before it is stale)
     operations: list[dict[str, Any]] | None = None  # cached per process start (operations.py)

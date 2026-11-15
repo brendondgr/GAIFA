@@ -623,7 +623,7 @@ class Hardware(_Model):
 
 
 class DoctorCheck(_Model):
-    area: Literal["models", "manifests", "paths", "ports", "network", "units", "disk", "offline", "repos"]
+    area: Literal["models", "manifests", "paths", "ports", "network", "units", "disk", "offline", "repos", "what works"]
     level: Literal["ok", "note", "warn", "fail"]
     title: str
     detail: str

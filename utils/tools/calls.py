@@ -524,6 +524,9 @@ class Calls:
         except ServiceError as e:
             c.state = "error"
             c.error = {"code": e.code, "detail": e.detail}
+            if e.code == "not_set_up":       # capability-enablement 1.7: hub_start_service on a mod never set up
+                c.error["fix"] = (f"tell the user it isn't set up and offer to set it up ({(e.data or {}).get('fix', 'gaifa setup')}); "
+                                  "don't retry and don't reach for it another way")
             if e.code == "needs_room":
                 c.error["fix"] = "free memory first (hub_unload_service, or stop an LLM), or turn on agent.make_room"
         except httpx.HTTPError as e:

@@ -155,10 +155,12 @@ async def _mod_tools(cat: Any, sid: str) -> list[Any]:
 
 @router.put("/api/services/{service_id}/config", summary="Save a mod's [services.<id>] settings in config.toml", response_model=SavedConfig)
 async def save_service_config(service_id: str, patch: ServiceConfigPatch, request: Request) -> dict[str, Any]:
-    hub = request.app.state.hub
-    mgr = _mgr(request)
+    return await apply_config(request.app.state.hub, _mgr(request), service_id, patch.model_dump(exclude_unset=True))
+
+
+async def apply_config(hub: Any, mgr: Any, service_id: str, sent: dict[str, Any]) -> dict[str, Any]:
+    """Save a mod's `[services.<id>]` settings (the route, and hub_enable_service: capability-enablement 1.7)."""
     svc = mgr.get(service_id)
-    sent = patch.model_dump(exclude_unset=True)
     old = svc.eff.as_dict()
     # Only real overrides are written: a value equal to the mod's own default removes its key,
     # so saving the whole form doesn't pin every default into config.toml.

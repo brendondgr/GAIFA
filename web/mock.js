@@ -291,7 +291,7 @@ export function createMockApi() {
     speech_input: { mics: [], language: '', preset: 'balanced', mode: 'both' },
     judge: { backend: 'decide', model: 'd3-lite', url: 'http://127.0.0.1:7000/api/s/decide', threshold: 0.35, timeout_s: 3, context: 'none', allow_commands: [], ask_commands: [] },
     screen: { pages: true, documents: false, transcripts: false, timeout_s: 30, window_chars: 800, backend: null, model: null, url: null, threshold: null, confirm: true },
-    permissions: { deny: [], ask: ['hub_set_preference'], allow: ['hub_start_service'] },
+    permissions: { deny: [], ask: ['hub_set_preference'], allow: ['hub_start_service', 'hub_enable_service'] },
     speech_output: { voice: '', engine: 'auto', speed: 1, auto_read: false, pause_ms: 1200 },
     voice_mode: { engine: 'chat', quant: 'q4_k_m', voice: 'female', answers: 'agent', tools: [], ask_chat: false, start_muted: false, talk: 'open', push_key: 'Space', interrupt: 'speech' },   // plan voice-speech-model 3.1, voice-mute 1.3
     web: { relevance: 'auto', model: 'd3-lite', url: 'http://127.0.0.1:7000/api/s/decide', candidates: 24, timeout_s: 8 },

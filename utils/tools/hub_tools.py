@@ -31,12 +31,34 @@ SERVICE = {"type": "string", "description": "A mod id, e.g. tts, gen3d, comfy, l
 
 
 async def list_services(hub: Hub, args: dict[str, Any]) -> Any:
+    from utils.services.availability import availability
+
+    names: dict[str, list[str]] = {}
+    for t in await hub.tools.tools() if hub.tools is not None else []:
+        if t.mod:
+            names.setdefault(t.mod, []).append(t.name)
     out = []
     for s in hub.services.list():
+        av = availability(hub.services, s)
         out.append({"id": s.id, "name": s.mod.name, "description": s.m.description if s.m else "", "state": s.state,
+                    "provides": (s.m.agent.provides if s.m else None) or "", "tools": names.get(s.id, []),
+                    "availability": {"status": av["status"], "why": av["why"], "fix": {"command": av["fix"]["command"], "tool": av["fix"]["tool"]}},
                     "load": s.load, "busy": s.busy, "jobs": [{"label": j.get("label"), "state": j.get("state"),
                                                              "progress": j.get("progress")} for j in s.jobs[:3]]})
     return {"services": out}
+
+
+async def enable_service(hub: Hub, args: dict[str, Any]) -> Any:
+    """Turn on a mod that was turned off (`enabled = true` in config.toml) and start it (capability-enablement 1.7)."""
+    from utils.routes.services import apply_config
+
+    mgr = hub.services
+    svc = mgr.get(args["id"])
+    if not svc.eff.enabled:
+        await apply_config(hub, mgr, svc.id, {"enabled": True})
+    svc = await mgr.start(svc.id, wait=True)
+    out = {"id": svc.id, "enabled": True, "state": svc.state}
+    return {**out, "error": svc.last_error} if svc.last_error and not svc.up else out
 
 
 async def start_service(hub: Hub, args: dict[str, Any]) -> Any:
@@ -169,8 +191,10 @@ def tools() -> list[ToolDef]:
     return [
         t("list_services", "List GAIFA's mods (speech, 3D, images & video, LLMs…) with their state, whether their models "
           "are loaded, and running jobs.", _obj({}), list_services),
-        t("start_service", "Start a mod's process (models load later, on first use).", _obj({"id": SERVICE}, ["id"]),
-          start_service, "write"),
+        t("start_service", "Start a mod's process (models load later, on first use). A mod that isn't set up answers "
+          "not_set_up: tell the user instead.", _obj({"id": SERVICE}, ["id"]), start_service, "write"),
+        t("enable_service", "Turn on a mod that was turned off (Settings → Services) and start it. Use it when the user asks for "
+          "what that mod does.", _obj({"id": SERVICE}, ["id"]), enable_service, "write"),
         t("stop_service", "Stop a mod's process; its running jobs are cancelled.", _obj({"id": SERVICE}, ["id"]),
           stop_service, "destructive"),
         t("unload_service", "Unload a mod's models from memory, keeping it running.", _obj({"id": SERVICE}, ["id"]),

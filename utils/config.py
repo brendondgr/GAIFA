@@ -244,7 +244,7 @@ class PermissionsCfg(_Strict):
     """Tool permissions (plan 13.2, 25.1): name globs; the order with modes and grants is in `utils/tools/approvals.py`."""
     deny: list[str] = []
     ask: list[str] = ["hub_set_preference", "agent_memory_save", "agent_memory_entity"]   # lasting: reaches every later chat, a card in every mode
-    allow: list[str] = ["hub_start_service"]
+    allow: list[str] = ["hub_start_service", "hub_enable_service"]   # capability-enablement 1.7: turning a set-up mod on needs no card
 
     _globs = field_validator("deny", "ask", "allow")(lambda cls, v: tool_globs(v))
 

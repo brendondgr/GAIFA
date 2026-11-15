@@ -10,6 +10,8 @@
 - **units:** no mod is failed or degraded; an enabled autostart mod is running.
 - **disk:** enough free space on the project's disk.
 - **offline:** mods run with `HF_HUB_OFFLINE=1` have every registered model they use.
+- **what works** (capability-enablement 1.7): per mod, what it gives and whether it can be used; a recommended mod
+  that isn't set up warns; search needs a SearXNG, Auto needs decide.
 
 Each check is `{area, level, title, detail, fix?}` with level ok | note | warn | fail.
 """
@@ -152,7 +154,7 @@ async def _ports_units(hub: Any) -> list[dict[str, Any]]:
         elif s.state == "degraded":
             out.append(check("units", "warn", f"{s.id}: degraded (health checks failing)", s.last_error or "", f"gaifa logs {s.id}"))
         elif s.state == "stopped" and s.eff.enabled and s.eff.autostart and s.startable and not _installed(hub, s):
-            out.append(check("units", "note", f"{s.id}: not installed", "it starts with the hub once it's set up", f"gaifa setup {s.id}"))
+            out.append(check("units", "note", f"{s.id}: not set up", "it starts with the hub once it's set up", f"gaifa setup {s.id}"))
         elif s.state == "stopped" and s.eff.enabled and s.eff.autostart and s.startable:
             out.append(check("units", "warn", f"{s.id}: stopped, but set to start with the hub", "", f"gaifa start {s.id}"))
         else:
@@ -222,6 +224,43 @@ def _judge(hub: Any) -> list[dict[str, Any]]:
                   "remove backend, model and url from [agent.judge] (or pick the model in Settings → Permissions)")]
 
 
+def _what_works(hub: Any) -> list[dict[str, Any]]:
+    """capability-enablement 1.7: one line per mod with what it gives and whether it can be used; a recommended mod
+    that isn't set up is a warning. Then what needs more than one mod (search needs a SearXNG, Auto needs decide)."""
+    from utils.services.availability import availability
+    from utils.setupdocs.envs import recommended
+
+    mgr = getattr(hub, "services", None)
+    if mgr is None:
+        return []
+    out = []
+    by_id = {s.id: s for s in mgr.list()}
+    for s in mgr.list():
+        av = availability(mgr, s)
+        gives = (s.m.agent.provides if s.m else None) or (s.m.description if s.m else "") or s.mod.name
+        st, fix = av["status"], av["fix"]
+        if st in ("on", "starts_on_use"):
+            out.append(check("what works", "ok", f"{gives}: works", f"{s.id}: {'running' if st == 'on' else 'starts when used'}"))
+            continue
+        words = {"not_set_up": "not set up", "off": "turned off", "cant_run": "can't run here", "failed": "failed", "broken": "broken"}[st]
+        rec = recommended(s.mod.dir)
+        level = ("warn" if rec else "note") if st == "not_set_up" else "note" if st in ("off", "cant_run") else "warn"
+        if s.id == "agent" and st != "off":
+            level = "fail"            # the one mod Chat can't do without
+        out.append(check("what works", level, f"{gives}: {words}" + (" (recommended)" if rec and st == "not_set_up" else ""),
+                         f"{s.id}: {av['why']}", fix.get("command") or None))
+    web = by_id.get("web")
+    if web is not None and web.up and "search" in (web.tools_off or {}):
+        out.append(check("what works", "warn", "web search: off", f"web: {web.tools_off['search']['why']}", "gaifa setup searxng"))
+    decide = by_id.get("decide")
+    if decide is not None and availability(mgr, decide)["status"] not in ("on", "starts_on_use"):
+        out.append(check("what works", "note", "Auto mode's judge: off", "Auto needs the decide mod; cards ask instead",
+                         availability(mgr, decide)["fix"].get("command") or None))
+    elif decide is None:
+        out.append(check("what works", "note", "Auto mode's judge: off", "Auto needs the decide mod; cards ask instead", "gaifa setup decide"))
+    return out
+
+
 def _offline(hub: Any, views: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     out = []
     for s in hub.services.list() if hub.services else []:
@@ -278,6 +317,7 @@ def _repos(hub: Any) -> list[dict[str, Any]]:
 async def run(hub: Any) -> dict[str, Any]:
     models, views = await asyncio.to_thread(_models, hub)
     checks = (models + _manifests(hub) + _paths(hub) + _stage_d(hub) + await _ports_units(hub)
-              + await asyncio.to_thread(_network, hub) + _disk(hub) + _judge(hub) + _offline(hub, views) + await asyncio.to_thread(_repos, hub))
+              + await asyncio.to_thread(_network, hub) + _disk(hub) + _judge(hub) + _offline(hub, views) + await asyncio.to_thread(_repos, hub)
+              + _what_works(hub))
     counts = {k: sum(c["level"] == k for c in checks) for k in ("ok", "note", "warn", "fail")}
     return {"ts": time.time(), "ok": counts["fail"] == 0, "counts": counts, "checks": checks}

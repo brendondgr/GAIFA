@@ -86,7 +86,8 @@ async def test_off_answers_with_turn_on(hub):
     e = (await call(c, "offmod_get_item", {"item_id": "a"}))["error"]
     assert e["code"] == "capability_unavailable" and e["state"] == "off"
     assert e["fixes"] == [{"label": "Turn on Offmod", "service": "offmod", "action": "enable"}]
-    assert "ask the user to turn Offmod on" in e["fix"]
+    assert "turn it on (hub_enable_service with id offmod) if the user asked for what it does" in e["fix"]
+    assert e["turn_on"] == {"tool": "hub_enable_service", "arguments": {"id": "offmod"}, "command": "turn Offmod on in Settings → Services"}
     assert app.state.hub.services.get("offmod").state == "stopped"
 
 

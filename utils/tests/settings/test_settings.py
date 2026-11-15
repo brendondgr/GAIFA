@@ -44,7 +44,7 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
                       "allow_commands": [], "ask_commands": []},
             "screen": {"pages": True, "documents": False, "transcripts": False, "timeout_s": 30.0, "window_chars": 800,
                        "backend": None, "model": None, "url": None, "threshold": None, "confirm": True, "parallel": 4},
-            "permissions": {"deny": [], "ask": ["hub_set_preference", "agent_memory_save", "agent_memory_entity"], "allow": ["hub_start_service"]},
+            "permissions": {"deny": [], "ask": ["hub_set_preference", "agent_memory_save", "agent_memory_entity"], "allow": ["hub_start_service", "hub_enable_service"]},
             "web": {"relevance": "auto", "model": "d3-lite", "url": "http://127.0.0.1:7000/api/s/decide", "candidates": 24,
                     "timeout_s": 8.0},
             "workflows": {"enabled": True, "parallel_local": 1, "parallel_remote": 3, "max_children": 8, "max_depth": 1,   # agent-workflows 3.6
@@ -222,7 +222,7 @@ async def test_command_rules_and_tool_permissions_are_edited_in_settings(rig, se
         assert r.status_code == 200, r.text
         s = r.json()["settings"]
         assert s["judge"]["allow_commands"] == ["pytest *", "make -C * test"] and s["judge"]["ask_commands"] == ["git status"]
-        assert s["permissions"] == {"deny": ["tts_delete_voice"], "ask": ["hub_set_preference", "comfy_*"], "allow": ["hub_start_service"]}
+        assert s["permissions"] == {"deny": ["tts_delete_voice"], "ask": ["hub_set_preference", "comfy_*"], "allow": ["hub_start_service", "hub_enable_service"]}
         cfg = served.hub.config.agent
         assert cfg.judge.allow_commands == ["pytest *", "make -C * test"] and cfg.permissions.deny == ["tts_delete_voice"]
         doc = tomllib.loads(_file(served))

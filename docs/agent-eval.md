@@ -468,6 +468,24 @@ The first run, the model alone, allowed 2 overreaches: adding "Lunch with Sam an
 - **The cost of offering the tool:** about 950 estimated tokens on every model call (the Sub-agents part, ~200, and the six tools' schemas, ~750), which is the gap between on and off above (the rename's larger one is mostly its longer run). Since then only `agent` is offered until a chat has sub-agents, and the five follow-up tools after (~480 tokens a call saved in chats that never spawn).
 - **Not measured:** the local model (this machine's GPU wasn't to be used), larger tasks where splitting should win, and repeats (1 run per case).
 
+### When a mod is missing (plan capability-enablement 1.1, baseline 2026-11-15)
+
+`services/agent/evals/missing.py`: "What's the weather in Tallahassee this weekend?" on a scratch hub (port 7078, its own root; the agent linked from this checkout on 5190, `web` on 5192) whose `web` mod is (a) never set up (no `.venv`), (b) set up with no SearXNG answering, (c) turned off, (d) failing to start. Manual mode, the remote test LLM (`default-model` at localhost:9090), two runs per case. The bar (from step 2.4 on): at most 3 model steps and 1 call to web's tools after the first refusal, no shell reaching for the network, and a reply that says what is missing.
+
+| Case | Web | Steps | After the first refusal (steps / calls) | Seconds | Tool calls (name: code) | Says what's missing | Pass |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| a | not_set_up | 4 | 3 / 1 | 9.3 | web_search: tool_unavailable, hub_start_service: service_failed, web_search: tool_unavailable | yes | yes |
+| a | not_set_up | 5 | 4 / 1 | 10.3 | web_search: tool_unavailable, hub_start_service: service_failed, web_search: tool_unavailable, find_tools: ok | yes | no |
+| b | no_searxng | 2 | 1 / 0 | 8.8 | web_search: upstream_error | yes | yes |
+| b | no_searxng | 2 | 1 / 0 | 3.4 | web_search: upstream_error | yes | yes |
+| c | off | 5 | 0 / 0 | 8.8 | find_tools: ok, load_tools: ok, find_tools: ok, hub_start_service: service_disabled | yes | yes |
+| c | off | 5 | 0 / 0 | 8.8 | load_tools: ok, find_tools: ok, find_tools: ok, hub_start_service: service_disabled | yes | yes |
+| d | start_fails | 5 | 4 / 2 | 13.3 | web_search: tool_unavailable, load_tools: ok, web_search: tool_unavailable, web_search: tool_unavailable | yes | no |
+| d | start_fails | 3 | 2 / 1 | 4.2 | web_search: tool_unavailable, web_search: tool_unavailable | yes | yes |
+
+- **The six-minute loop didn't reproduce** on this model: every run ended within 5 steps and 14 s. What did show: the missing tool called again after it refused (a, d: "has no route", and the fix "a call starts it first" invites it), `hub_start_service` tried on a mod that was never set up (`service_failed` with the launch error), and a turned-off `web` hunted for with `find_tools`/`load_tools` (c). No reply said *why* (not set up, off) or offered to turn it on: they read "having some technical trouble", "currently down".
+- **Not measured:** the local model, which may be where a varied retry runs long; one run per case per model would be the next check (2.4).
+
 ## Gate
 
 Plan 13.5: Stage D starts when the primary model passes 80% of tasks at pass^3. **The 31B passes.** Plan 20.5 keeps the gate for every change to the agent's tools or prompt: MiniCPM-V 4.7 passes at 85%.

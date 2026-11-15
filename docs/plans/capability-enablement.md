@@ -90,11 +90,12 @@ One step at a time: each numbered step is one commit (`GAIFA (capability-enablem
 
 ## Phase 1 — The hub knows what's off, and says so (M)
 
-- [ ] **1.1 Reproduce the loop before fixing it: `services/agent/evals/missing.py`.**
+- [x] **1.1 Reproduce the loop before fixing it: `services/agent/evals/missing.py`.**
   - An eval with four cases, each a real-world question ("what's the weather in Tallahassee this weekend?") on a scratch hub: (a) `web` never set up (its `.venv` absent in a fixture copy), (b) `web` set up, no SearXNG answering, (c) `web` turned off (`enabled = false`), (d) `web` whose start fails. It records, per case: steps, tool calls by name and error code, seconds, and whether the reply says web isn't available.
   - Pass (used from 2.4 on): at most 3 model steps and 1 call to the missing mod's tools after the first refusal, no `workspace_run`/`workspace_python` reaching for the network, and a reply that names what is missing and offers to turn it on (or answers from knowledge and says it couldn't check).
   - **Why:** the report is second-hand; this shows which path loops and gives the number to beat.
   *Done when:* the eval runs against today's code and its baseline (steps, seconds, calls per case) is a table in `docs/agent-eval.md`; `services/agent/tests/test_eval_missing.py` checks the scoring on recorded transcripts.
+  *As built (2026-11-15):* the eval builds a scratch root per case (the agent linked from this checkout, `web` as a folder of links with its `.venv` left out, its server swapped for one that exits, or its SearXNG at a dead port; `config.toml` with ports 7078/5190/5192) and starts a hub there with `--dev`. Baseline on the remote test LLM, two runs a case: 6 of 8 within the bar, every run under 14 s; the six-minute loop didn't reproduce on this model. What did: the refused tool called again (a, d), `hub_start_service` on a mod never set up, and no reply saying why or offering to turn it on.
 - [ ] **1.2 One answer for "can this mod be used": `utils/services/availability.py`.**
   - `availability(mgr, svc) -> {"status", "why", "fix"}` with `status` one of `on` (ready, degraded, starting), `starts_on_use` (stopped, set up, enabled), `off` (`enabled = false`), `not_set_up` (`installed()` false), `cant_run` (`mgr.unavailable(svc)`), `failed` (state `failed`, or the last start failed), `broken` (manifest errors). `fix` is `{"kind": "setup" | "enable" | "start" | "logs" | "none", "id", "command", "tool"}` (`command`: `gaifa setup <id>` and the like; `tool`: the hub tool that does it, `hub_setup`, `hub_enable_service` or `hub_start_service`).
   - `utils/services/views.py` `summary()` adds `installed` and `availability`; `utils/api_models.py`'s `Service` model too.

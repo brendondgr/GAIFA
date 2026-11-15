@@ -232,9 +232,11 @@ class McpServer:
         entry = self._tool_entry(req, t.name, self._title(t), t.function()["function"]["description"], t.parameters,
                                  t.risk)
         entry["_meta"] = {"gaifa/risk": t.risk, "gaifa/mod": t.mod or "hub", "gaifa/ask": t.ask,
-                          "gaifa/available": t.available}
-        if not t.available and t.why:
+                          "gaifa/available": t.available, "gaifa/state": t.state}
+        if t.state == "starts_on_use" and t.why:
             entry["description"] += f"\n(Not running now: {t.why}. Calling it starts it.)"
+        elif t.state not in ("on", "starts_on_use") and t.why:     # capability-enablement 1.5: a call answers capability_unavailable
+            entry["description"] += f"\n(Not available: {t.why}. Calling it won't work until it's turned on in GAIFA.)"
         return entry
 
     def _tool_entry(self, req: Request, name: str, title: str, description: str, schema: dict[str, Any],

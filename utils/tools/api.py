@@ -24,6 +24,9 @@ class ToolIndexItem(_Model):
     summary: str
     available: bool
     why: str | None = None
+    state: str = Field("on", description="Its mod's availability (capability-enablement 1.5): on, starts_on_use, off, not_set_up, "
+                                         "cant_run, failed, broken, or off_by_mod (the mod said this tool is off)")
+    turn_on: dict[str, Any] | None = Field(None, description="{tool, arguments, command}: what turns its mod on, when it isn't")
     group: str | None = Field(None, description="mcp-client 4.1: a group within its mod (mcp:<server>); the chat's tool groups use it, else the mod")
 
 
@@ -54,8 +57,11 @@ class ToolErrorBody(_Model):
     detail: str
     fix: str | None = None
     problems: list[dict[str, str]] | None = None
-    fixes: list[dict[str, Any]] | None = Field(None, description="Plan 46.5: what fixes it: {label, tool, arguments} | {label, service, action} | {label, retry} | {label, command}")
+    fixes: list[dict[str, Any]] | None = Field(None, description="Plan 46.5: what fixes it: {label, tool, arguments} | {label, service, action} | {label, retry} | {label, command} | {label, setup, command}")
     log: list[str] | None = Field(None, description="Plan 46.5: the mod's log lines around the failure")
+    state: str | None = Field(None, description="capability_unavailable: the mod's availability (not_set_up, off, cant_run, broken, off_by_mod)")
+    service: str | None = Field(None, description="capability_unavailable, service_not_running: the mod it is about")
+    turn_on: dict[str, Any] | None = Field(None, description="capability_unavailable: {tool, arguments, command} that turns the mod on")
 
 
 class Grant(_Model):

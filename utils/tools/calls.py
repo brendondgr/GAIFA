@@ -39,7 +39,7 @@ from utils.tools.approvals import ACTIONS, Approvals, canonical, decide, judge
 from utils.tools.catalog import Catalog, ToolDef
 from utils.tools.doc_tools import untrusted
 from utils.tools.modcall import FIX_NO_ANSWER, ToolError, dry_run, mod_error
-from utils.tools import edits, options, searched, webread
+from utils.tools import edits, options, searched, unavailable, webread
 from utils.tools.schema import coerce, validate
 
 if TYPE_CHECKING:
@@ -167,6 +167,14 @@ class Calls:
                 "fix": (f"did you mean {', '.join(close)}? " if close else "") + "find tools with find_tools or GET /api/tools?q="}}
             await self._refused(name, arguments, origin, out["error"])
             return out
+        if (err := unavailable.refusal(self.hub.services, tool)) is not None:   # capability-enablement 1.5: off, not set up…
+            await self._refused(tool.name, arguments, origin, err)
+            return {"status": "error", "tool": tool.name, "error": err}
+        if tool.route is None and tool.state == "starts_on_use":    # set up but never run: start it, then read its tools
+            if (err := await unavailable.start_for(self.hub.services, self.catalog, tool)) is not None:
+                await self._refused(tool.name, arguments, origin, err)
+                return {"status": "error", "tool": tool.name, "error": err}
+            tool = await self.catalog.get(name) or tool
         mode = canonical(mode)
         arguments = coerce(tool.parameters, arguments if arguments is not None else {})
         arguments, filled = options.fill_defaults(tool.parameters, arguments) if isinstance(arguments, dict) else (arguments, [])

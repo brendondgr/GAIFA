@@ -1219,6 +1219,8 @@ Also `GET /api/tools/calls/{id}/result?offset=&limit=` pages a capped result. **
 type Risk = "read" | "write" | "generate" | "network" | "execute" | "destructive";   // plan 25.1
 interface ToolIndexItem { name: string; mod: string;                // "hub" for the hub's own tools
                           risk: Risk; core: boolean; summary: string; available: boolean; why?: string;
+                          state: "on" | "starts_on_use" | "off" | "not_set_up" | "cant_run" | "failed" | "broken" | "off_by_mod";   // capability-enablement 1.5: its mod's availability
+                          turn_on?: { tool: string; arguments: object; command: string };   // what turns its mod on ("" tool: none yet, the command)
                           group?: string }                          // mcp-client 4.1: a group within its mod ("mcp:blender"); else the mod
 interface Tool extends ToolIndexItem { description: string;
                           grant_key?: string;                       // "url:host" | "arg:<name>" | "const:<x>" (plan 25.2)
@@ -1234,7 +1236,9 @@ interface ToolCallResult { status: "needs_approval" | "denied" | "running" | "do
                            result?: any;                            // JSON over 8 KB: {truncated, preview, full}
                            outputs?: ToolOutput[];
                            error?: { code: string; detail: string; fix?: string; problems?: object[];
-                                     fixes?: ({ label: string; tool?: string; arguments?: object; service?: string; action?: "restart"; retry?: object; command?: string })[];   // plan 46.5
+                                     fixes?: ({ label: string; tool?: string; arguments?: object; service?: string; action?: "restart" | "enable"; retry?: object; command?: string;
+                                                setup?: string })[];   // plan 46.5; setup: a mod id to set up (capability-enablement 1.5)
+                                     state?: string; service?: string; turn_on?: object;   // capability_unavailable (capability-enablement 1.5): the mod's state and what turns it on
                                      log?: string[] };                // plan 46.5: the mod's lines around the failure
                            progress?: number; note?: string; job_id?: string; elapsed_s?: number;
                            live?: Live;                             // running: the job's live progress (plan 44.2); GET …/calls/{id}?wait=&changed=true answers at its next change

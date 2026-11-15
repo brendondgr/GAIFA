@@ -42,7 +42,7 @@ async def test_catalog_lists_manifest_source_and_hub_tools(th):
 async def test_index_is_small_and_names_and_search_work(th):
     full = (await th.client.get("/api/tools")).text
     index = (await th.client.get("/api/tools/index")).json()
-    assert set(index[0]) <= {"name", "mod", "risk", "core", "summary", "available", "why"}
+    assert set(index[0]) <= {"name", "mod", "risk", "core", "summary", "available", "why", "state", "turn_on"}
     assert len(json.dumps(index)) < len(full) / 2
     r = await th.client.get("/api/tools?names=fake_tools_render,hub_list_services")
     assert [t["name"] for t in r.json()] == ["fake_tools_render", "hub_list_services"]

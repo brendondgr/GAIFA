@@ -26,6 +26,8 @@ from utils.tools import options, views
 from utils.tools.grants import GRANT_KEY
 from utils.tools.grants import problems as grant_problems
 from utils.tools.schema import Route, clean, flatten, mark_files
+from utils.services.availability import availability
+from utils.tools.unavailable import turn_on
 
 if TYPE_CHECKING:
     from utils.server import Hub
@@ -71,12 +73,17 @@ class ToolDef:
     view: dict[str, Any] | None = None  # plan 46.1: how its result draws in Chat (utils/tools/views.py)
     mcp: bool = True                 # structured-memory 3.1: false keeps it out of /mcp (the chat and the hub's API still see it)
     group: str | None = None         # mcp-client 4.1: a tools_source row's group within its mod ("mcp:blender"); the chat's tool groups
+    state: str = "on"                # capability-enablement 1.5: its mod's availability status (utils/services/availability.py), or off_by_mod
+    turn_on: dict[str, Any] | None = None   # {tool, arguments, command}: what turns its mod on, when it isn't
+    off_fix: str | None = None       # capability-enablement 1.6: the mod's own fix for a tool it said is off
 
     def public(self, full: bool = True, view: str = "full") -> dict[str, Any]:
         out: dict[str, Any] = {"name": self.name, "mod": self.mod or "hub", "risk": self.risk, "core": self.core,
-                               "summary": summary_line(self.description), "available": self.available}
+                               "summary": summary_line(self.description), "available": self.available, "state": self.state}
         if self.why:
             out["why"] = self.why
+        if self.turn_on:
+            out["turn_on"] = self.turn_on
         if self.group:
             out["group"] = self.group
         if full:
@@ -154,10 +161,10 @@ class Catalog:
             return out
         async with self._lock:
             for svc in mgr.list():
-                if svc.m is None or svc.errors or not svc.eff.enabled:
+                if svc.m is None:
                     self._mods.pop(svc.id, None)
                     continue
-                out += await self._mod_tools(svc)
+                out += await self._mod_tools(svc)    # every mod's tools, whatever its state (capability-enablement 1.5)
             gone = set(self._mods) - {s.id for s in mgr.list()}
             for g in gone:
                 self._mods.pop(g, None)
@@ -189,11 +196,18 @@ class Catalog:
             except Exception as e:  # noqa: BLE001 - one mod's broken API must not break the catalog
                 self.errors[svc.id] = f"{type(e).__name__}: {e}"
                 log.warning("tools of %s: %s", svc.id, self.errors[svc.id])
-        why = (f"{svc.mod.name} is {svc.state}; a call starts it first" if svc.startable
-               else f"{svc.mod.name} can't start: {'; '.join(svc.errors)[:200]}")
+        av = availability(self.hub.services, svc)
+        if svc.up or av["status"] == "on":
+            why = self.errors.get(svc.id) or f"{svc.mod.name} is {svc.state}"
+        elif av["status"] == "starts_on_use":
+            why = f"{svc.mod.name} is stopped; a call starts it first"
+        else:
+            why = av["why"]
         tools = await self._restore(svc)
         for t in tools:
-            t.available, t.why = (False, why) if not svc.up else (False, self.errors.get(svc.id, why))
+            t.available, t.why = False, why
+            t.state = "on" if svc.up else av["status"]
+            t.turn_on = None if t.state == "on" else turn_on(av)
         return tools
 
     async def _build(self, svc: Service) -> list[ToolDef]:

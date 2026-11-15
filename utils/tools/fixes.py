@@ -75,6 +75,8 @@ def fixes_for(tool: ToolDef, args: dict[str, Any], error: dict[str, Any], name: 
         out.append({"label": "Free the GPU", "tool": "hub_free_gpu", "arguments": {}})
     elif code in ("mod_error", "upstream_error", "service_failed") and mod and mod != "hub":
         out.append({"label": f"Restart {name}", "service": mod, "action": "restart"})
+    elif code == "capability_unavailable":       # capability-enablement 1.5: unavailable.py made them; never Retry
+        return list(error.get("fixes") or [])
     elif code == "tool_unavailable" and mod:
         out.append({"label": f"Set it up: gaifa setup {mod}", "command": f"gaifa setup {mod}"})
         return out

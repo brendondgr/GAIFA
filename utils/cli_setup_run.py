@@ -55,6 +55,8 @@ class Runner:
         import os
         full = {**os.environ, **(env or {})}
         full["PATH"] = f"{Path(cli.CODE) / 'bin'}:{full.get('PATH', '')}"   # `gaifa` before ~/.local/bin is on PATH
+        full.setdefault("GAIFA_ROOT", str(cli.ROOT))      # a step's own scripts know this GAIFA's root and hub (the
+        full.setdefault("GAIFA_URL", cli.hub_url())       # fresh-clone check: a clone beside another GAIFA, 2026-11-16)
         if stream and log is None:
             return subprocess.run(["bash", "-c", cmd], cwd=cwd, env=full).returncode, ""
         if not echo and log is None:

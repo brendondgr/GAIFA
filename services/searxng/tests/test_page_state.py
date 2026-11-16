@@ -35,11 +35,11 @@ def test_managed(runtime, tmp_path, monkeypatch):
     rt.exists = rt.running = True
     monkeypatch.setenv("GAIFA_ROOT", str(tmp_path))
     (tmp_path / "data/state/searxng").mkdir(parents=True)
-    (tmp_path / "data/state/searxng/managed.json").write_text('{"port": 5200}')
-    src.save("managed", "http://127.0.0.1:5200")
+    (tmp_path / "data/state/searxng/managed.json").write_text('{"port": 9}')    # a port nothing listens on (5200 may be a real one)
+    src.save("managed", "http://127.0.0.1:9")
     with TestClient(app_with(runtime, "http://127.0.0.1:9", rt, tmp_path, monkeypatch)) as c:
         s = c.get("/v1/search-state").json()
-    assert (s["using"], s["url"]) == ("managed", "http://127.0.0.1:5200") and s["up"] is False   # its health: nothing listens in the test
+    assert (s["using"], s["url"]) == ("managed", "http://127.0.0.1:9") and s["up"] is False   # its health: nothing listens in the test
     assert s["actions"] == ["use_port", "remove_managed"] and s["managed"]["running"] is True
 
 

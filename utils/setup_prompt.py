@@ -32,7 +32,8 @@ Then:
 2. Run `bin/gaifa setup {mods} --json` with my answers (`--answers <file>`, or `--accept`, `--decline`, `--models`, `--set`).
    Exit code 2 means it needs me: show me the question, or the command to run myself (anything with `sudo` or a login is
    mine to run; give me the exact command), then go on with `--done <id>`.
-3. Run `bin/gaifa doctor` and stop when each mod shows as working under "what works" (and its check passed).
+3. Run `bin/gaifa doctor -v` (`-v` lists what works too) and stop when each mod shows as working under "what works"
+   (and its check passed); then run each mod's setup doc **Check** commands.
 4. If something fails, read the step's log (the report names it, under data/state/setup/logs/) and the "When it fails"
    part of the mod's setup doc, try the documented fix, and if it still fails run `bin/gaifa report` and give me its path.
 

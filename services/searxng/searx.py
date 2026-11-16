@@ -85,6 +85,10 @@ class Searx:
                     break
             if url is None and self.container and self.container.url and not port:
                 url, by = self.container.url, "container"
+        if self.container and self.container.url and url and self.container.url.rstrip("/") != url.rstrip("/"):
+            # a SearXNG container that isn't the one search uses (yours in Docker while GAIFA's own is chosen): never
+            # adjust it from here (the capability-enablement fresh-clone check, 2026-11-16)
+            self.container = None
         self.url, self.found_by = url, by
         self.answer = "none" if not url or not await self._answers(url) else ("yours_no_json" if await self._json_refused(url) else "yours")
         return {**self.found(), "answer": self.answer}

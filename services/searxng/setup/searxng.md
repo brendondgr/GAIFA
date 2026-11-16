@@ -103,6 +103,7 @@ Expect `"up":true,"json":true` and `"using":"yours"` (with your SearXNG's `url`)
 | What you see | What to check | The fix |
 |---|---|---|
 | `"using":"none"`; the SearXNG page says *No SearXNG answers* | `curl -s http://127.0.0.1:8080/healthz` (yours), `podman ps -a --filter name=gaifa-searxng` (GAIFA's) | start yours, or *Start GAIFA's own* on the SearXNG page (`POST /api/s/searxng/v1/managed`), or `gaifa setup searxng` and answer GAIFA's own |
+| you want GAIFA's own though one of yours answers (setup uses yours and asks nothing) | `curl -s "$(gaifa url api/s/searxng/v1/search-state)"` says `"using":"yours"` | *Start GAIFA's own* on the SearXNG page; or choose it, then start it: `curl -s -X POST -H 'content-type: application/json' -d '{"source":"managed"}' "$(gaifa url api/s/searxng/v1/source)"` and `curl -s -X POST -H 'content-type: application/json' -d '{}' "$(gaifa url api/s/searxng/v1/managed)"` |
 | `"json":false` | `curl -s "<url>/search?q=test&format=json" \| head -c 100` gives `403` | add `json` to `search.formats` (the Search settings tab, with a backup); GAIFA's own has it already |
 | GAIFA's own won't start: `no_runtime` | `podman --version; docker --version` | install podman (`sudo dnf install podman`, or `sudo apt install podman`), then *Start GAIFA's own* again |
 | `docker`: permission denied | `id -nG` lacks `docker` | use podman (rootless), or `sudo usermod -aG docker $USER` and log in again (yours to run) |

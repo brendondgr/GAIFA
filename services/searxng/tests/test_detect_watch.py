@@ -47,7 +47,11 @@ async def test_detect_env_probe_and_container(fake, folder, dead):
     assert (await c.detect())["found_by"] == "container" and c.url == fake.url
     d = Searx(FakeRuntime(folder, None), probes=(_dead(),))
     assert (await d.detect())["url"] is None
-    for s in (a, b, c, d):
+    # search uses another SearXNG (GAIFA's own on its port) than the container found: that container is never adjusted
+    other = Searx(rt, env_url=_dead())
+    f = await other.detect()
+    assert f["container"] is None and f["settings_file"] is None and f["can_adjust"] is False
+    for s in (a, b, c, d, other):
         await s.http.aclose()
 
 

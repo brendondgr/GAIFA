@@ -14,7 +14,10 @@ SOURCES = ("yours", "managed")
 
 
 def state_dir() -> Path:
-    return Path(os.environ.get("GAIFA_ROOT") or ".").resolve() / "data" / "state" / "searxng"
+    # GAIFA's root: GAIFA_ROOT, else the folder this mod sits in (services/searxng → its root), never the current folder,
+    # which a setup step runs in (the fresh-clone check found source.json written under services/searxng/data/)
+    root = os.environ.get("GAIFA_ROOT") or str(Path(__file__).resolve().parents[2])
+    return Path(root).resolve() / "data" / "state" / "searxng"
 
 
 def load(d: Path | None = None) -> dict[str, Any] | None:

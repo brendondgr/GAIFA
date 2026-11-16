@@ -206,6 +206,8 @@ class Searx:
             return
         await self.check_health()
         await self.read_settings()
+        if self.health["up"] and self.answer == "none":     # it came up after the first look (GAIFA's own starting)
+            self.answer = "yours_no_json" if await self._json_refused(self.url) else "yours"
         if self.health["up"]:
             await self.read_engines()
             if self._last_query_ts is None or time.monotonic() - self._last_query_ts >= self.query_s:

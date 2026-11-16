@@ -290,3 +290,13 @@ def test_the_choice_is_saved_and_the_endpoint_follows_it(client, fake, tmp_path,
     assert client.get("/v1/endpoint").json() == {"url": "http://127.0.0.1:5200", "found_by": "managed", "up": None}
     assert client.post("/v1/source", json={"source": "elsewhere"}).status_code == 422
     assert client.post("/v1/detect", json={}).json()["answer"] in ("yours", "yours_no_json", "none")
+
+
+async def test_the_answer_follows_a_searxng_that_comes_up_later(fake, folder, dead):
+    """GAIFA's own starts with the mod and may answer only after the first look (the fresh-clone check, 2026-11-16)."""
+    s = Searx(FakeRuntime(folder, None), env_url=fake.url, query_s=3600)
+    s.answer = "none"                    # what the first look said while it was starting
+    s.url = fake.url
+    await s.tick()
+    assert s.health["up"] and s.answer == "yours"
+    await s.http.aclose()

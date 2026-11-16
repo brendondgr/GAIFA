@@ -112,6 +112,10 @@ class JudgeStatus(_Model):
     fix: dict[str, Any] | None = Field(None, description="capability-enablement 3.6: when the decide mod isn't set up or is off, {kind, id, command}")
     models: list[dict[str, Any]] = Field(default_factory=list, description="capability-enablement 7.3: every model the decide mod has: "
                                          "{id, name, usable, problems, threshold, tuned, test, params}")
+    threshold: float | None = Field(None, description="7.4: the cutoff the judge uses (the model's own unless you set one)")
+    budget_s: float | None = Field(None, description="7.4: the time it gives the model (from its measured speed on the CPU unless you set one)")
+    tuned: bool | None = Field(None, description="7.4: whether the judge's eval measured this model's cutoff")
+    measured: str | None = Field(None, description="7.4: the model's measured time per judgement here, in words")
 
 
 class CallLimits(_Model):

@@ -102,8 +102,17 @@ export function JudgeModels({ api, st }) {
     msg ? h('div', { role: 'status', style: { color: T.mut } }, msg) : null);
 }
 
-export const judgeStatusText = st => (st.available ? `Judge: ${st.model} (decision model), answering.`
+export const judgeStatusText = st => (st.available ? `Judge: ${st.model} (decision model), answering.` + judgeTuning(st)
   : `Judge: ${st.model} (decision model) doesn’t answer: ${st.detail || 'unavailable'}. Auto isn’t offered until it does.`);
+
+/** How the judge is tuned for its model (capability-enablement 7.4): the measured time, the budget it gives, the cutoff. */
+export function judgeTuning(st) {
+  if (st?.threshold == null) return '';
+  const parts = [];
+  if (st.measured) parts.push(`${st.measured}, so it gets ${st.budget_s} s to answer`);
+  parts.push(`cutoff ${st.threshold}${st.tuned ? '' : ' (not tuned for this model)'}`);
+  return ' ' + parts.join('; ') + '.';
+}
 
 /** "Always allow"'s save: the list with the rule, and as `base` the list it was added to, so a rule added elsewhere
  *  since that list loaded stays (settings-that-stick 2.2). Returns `saveSettings`' arguments. */

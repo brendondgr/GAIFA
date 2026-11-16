@@ -246,8 +246,8 @@ export function sections(ctx = {}) {
       { id: 'judge', label: 'Auto judge', summary: () => { const j = d.judge || {}; return `${j.model || '—'} (decision model) · ${n((j.allow_commands || []).length + (j.ask_commands || []).length, 'command rule')}`; }, rows: [
         block('judgeModel', 'JudgeModelBlock', { label: 'Judge model', keys: ['judge.backend', 'judge.model', 'judge.url'], keywords: ['decide', 'decision model', 'd3-lite', 'auto mode'] }),
         field('context', 'judge.context', { label: 'The judge reads', hint: 'What it reads of the turn besides your words and the call.', control: 'segmented', choices: JUDGE_CONTEXTS }),
-        field('threshold', 'judge.threshold', { label: 'Threshold', hint: 'A decision model: every answer must clear it.', control: 'number', min: 0.01, max: 1, step: 0.01, width: 90 }),
-        field('timeout', 'judge.timeout_s', { label: 'Time limit', hint: 'Slower than this, the call asks you.', control: 'number', min: 0.1, max: 60, step: 0.5, unit: 's', width: 90 }),
+        field('threshold', 'judge.threshold', { label: 'Threshold', hint: 'A decision model: every answer must clear it. Reset, it is the model’s own cutoff (d3-lite: 0.35).', control: 'number', min: 0.01, max: 1, step: 0.01, width: 90 }),
+        field('timeout', 'judge.timeout_s', { label: 'Time limit', hint: 'Slower than this, the call asks you. Reset, 3 s, or longer when the model runs on the CPU (from its measured speed).', control: 'number', min: 0.1, max: 60, step: 0.5, unit: 's', width: 90 }),
         field('allowCommands', 'judge.allow_commands', { label: 'Always allow these commands in Auto', hint: 'They run without asking unless a fixed rule asks (secrets, sudo, removing a tree, piping into a shell, git push…). * matches any text in a word, a last * any further words.',
           control: 'list', check: checkCommandRule, placeholder: 'pytest *', keywords: ['command rules'] }),
         field('askCommands', 'judge.ask_commands', { label: 'Always ask before these', hint: 'They ask in Auto even when the fixed rules or the model would run them.', control: 'list', check: checkCommandRule, placeholder: 'git checkout *' }),

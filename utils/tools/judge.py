@@ -329,13 +329,64 @@ async def judge_call(cfg: Any, tool_name: str, arguments: dict[str, Any], origin
     (judge_context.load), used when `[agent.judge] context` is trail or full."""
     call, folder = call_for(tool_name, arguments, limits, origin)
     said = (origin or {}).get("said") or []
-    j = await judge(call, said if isinstance(said, list) else [said], folder, config_from(cfg.agent.judge),
-                    context=steps)
+    jc = config_from(cfg.agent.judge)
+    if jc.backend == "decide":                     # capability-enablement 7.4: the chosen model's own cutoff and speed
+        jc = for_model(jc, await model_facts(jc), getattr(cfg.agent.judge, "model_fields_set", set()))
+    j = await judge(call, said if isinstance(said, list) else [said], folder, jc, context=steps)
+    j.detail = {**j.detail, "threshold": jc.threshold, "budget_s": jc.timeout_s}
     j.detail = {**j.detail, "summary": summary(call)}
     return j
 
 
 _status: dict[str, Any] = {}
+_facts: dict[str, Any] = {}
+ASKED = 3                # the judge asks its model three questions in one call (QUESTIONS)
+MAX_BUDGET_S = 60.0
+
+
+def budget(test: dict[str, Any] | None, default: float) -> float:
+    """The time the judge gives its model to answer, from the model's last test here (capability-enablement 7.4): on the
+    CPU, three questions at the measured time each, twice over, plus a second, never under `default` and at most a
+    minute; on a GPU (or untested) `default`. So Auto doesn't fail closed on every call on a machine without a GPU."""
+    if not test or test.get("device") != "cpu" or not test.get("per_answer_s"):
+        return default
+    return min(MAX_BUDGET_S, max(default, round(float(test["per_answer_s"]) * ASKED * 2 + 1, 1)))
+
+
+def for_model(jc: JudgeConfig, facts: dict[str, Any] | None, user_set: set[str] | frozenset[str]) -> JudgeConfig:
+    """The judge for the model it uses: the model's own cutoff (its adapter's or card's) unless you set `threshold`, and
+    a budget from its measured speed unless you set `timeout_s`. Any decide model may be the judge; these only tune it."""
+    if not facts:
+        return jc
+    from dataclasses import replace
+    out = replace(jc)
+    if "threshold" not in user_set and facts.get("threshold"):
+        out.threshold = float(facts["threshold"])
+    if "timeout_s" not in user_set:
+        out.timeout_s = budget(facts.get("test"), jc.timeout_s)
+    return out
+
+
+async def model_facts(jc: JudgeConfig, client: httpx.AsyncClient | None = None, max_age_s: float = 30) -> dict[str, Any] | None:
+    """The decide mod's facts for the judge's model ({threshold, tuned, test, …} from GET /v1/models), cached; None
+    when the mod doesn't answer (the judge then keeps its own settings)."""
+    if _facts.get("url") == jc.url and time.time() - _facts.get("ts", 0) < max_age_s:
+        return (_facts.get("models") or {}).get(jc.model)
+    own = client is None
+    client = client or httpx.AsyncClient(timeout=httpx.Timeout(2))
+    try:
+        r = await client.get(f"{jc.url.rstrip('/')}/v1/models")
+        r.raise_for_status()
+        models = {m.get("id"): m for m in r.json().get("models", []) if m.get("id")}
+    except (httpx.HTTPError, ValueError):
+        models = None
+    finally:
+        if own:
+            await client.aclose()
+    if models is None:
+        return None
+    _facts.update(url=jc.url, ts=time.time(), models=models)
+    return models.get(jc.model)
 
 
 def relay_choices(data: list[dict[str, Any]]) -> tuple[list[str], set[str]]:
@@ -367,6 +418,12 @@ async def status(cfg: Any, client: httpx.AsyncClient | None = None, max_age_s: f
                          for m in d.get("models", []) if m.get("id")]
         m = next((m for m in d.get("models", []) if m.get("id") == jc.model), None)
         out["available"] = bool(m and m.get("usable"))
+        if m:                                       # 7.4: what the judge uses for this model, and why
+            eff = for_model(jc, m, getattr(cfg.agent.judge, "model_fields_set", set()))
+            out["threshold"], out["budget_s"], out["tuned"] = eff.threshold, eff.timeout_s, bool(m.get("tuned"))
+            t = m.get("test") or {}
+            out["measured"] = (f"{t['per_answer_s']:.2f} s a question on {'the CPU' if t.get('device') == 'cpu' else 'your GPU'}"
+                               if t.get("per_answer_s") is not None else None)
         out["detail"] = "" if out["available"] else ("; ".join((m or {}).get("problems") or []) or
                                                      f"the decide mod has no model {jc.model}")
     except (httpx.HTTPError, ValueError) as e:

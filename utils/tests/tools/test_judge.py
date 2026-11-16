@@ -192,3 +192,63 @@ def test_the_judge_never_asks_a_chat_model():
                                                                          url="http://relay"), client_for(fake.handler)))
     assert (j.verdict, j.source) == ("ask", "fail-closed") and "decision model" in j.reason and fake.bodies == []
     assert (JudgeConfig().backend, JudgeConfig().model) == ("decide", "d3-lite")
+
+
+# ---- capability-enablement 7.4: any decide model as the judge, its own cutoff, a budget from its speed ----------
+
+def test_the_budget_follows_the_measured_speed():
+    from utils.tools.judge import MAX_BUDGET_S, budget
+    assert budget(None, 3.0) == 3.0                                            # untested: the setting
+    assert budget({"device": "cuda", "per_answer_s": 0.06}, 3.0) == 3.0        # a GPU: the setting
+    assert budget({"device": "cpu", "per_answer_s": 0.11}, 3.0) == 3.0         # a quick CPU: never under it
+    assert budget({"device": "cpu", "per_answer_s": 2.0}, 3.0) == 13.0         # three questions, twice over, +1 s
+    assert budget({"device": "cpu", "per_answer_s": 12}, 3.0) == MAX_BUDGET_S
+
+
+def test_any_decide_model_is_the_judge_with_its_own_cutoff():
+    from utils.tools.judge import JudgeConfig, for_model
+    jc = JudgeConfig(model="fake-small", threshold=0.35, timeout_s=3.0)
+    facts = {"threshold": 0.6, "tuned": False, "test": {"device": "cpu", "per_answer_s": 2.0, "passed": True}}
+    out = for_model(jc, facts, set())
+    assert out.model == "fake-small" and out.threshold == 0.6 and out.timeout_s == 13.0
+    assert jc.threshold == 0.35                                                # the config itself is untouched
+    mine = for_model(jc, facts, {"threshold", "timeout_s"})                    # what you set wins
+    assert mine.threshold == 0.35 and mine.timeout_s == 3.0
+    assert for_model(jc, None, set()) is jc                                    # the mod doesn't answer: as configured
+
+
+def test_judge_call_uses_the_models_facts_and_a_failed_test_stays_selectable():
+    from types import SimpleNamespace
+
+    import httpx
+
+    from utils.config import JudgeCfg
+    from utils.tools import judge as J
+
+    models = {"models": [
+        {"id": "d3-lite", "usable": True, "threshold": 0.35, "tuned": True, "test": None},
+        {"id": "fake-small", "usable": True, "threshold": 0.6, "tuned": False,
+         "test": {"passed": False, "device": "cpu", "per_answer_s": 2.0, "sentence": "fake-small on the CPU: 2.00 s per answer"}}]}
+    seen: list[dict] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path.endswith("/v1/models"):
+            return httpx.Response(200, json=models)
+        seen.append({"within": req.headers.get(J.WITHIN_HEADER), "model": __import__("json").loads(req.content).get("model")})
+        return httpx.Response(200, json={"answers": {k: {"probs": {"yes": 0.7, "no": 0.3}, "top": "yes", "p": 0.7}
+                                                     for k in ("run", "request", "user", "none")}})
+
+    real = httpx.AsyncClient
+    J._facts.clear(), J._status.clear()
+    cfg = SimpleNamespace(agent=SimpleNamespace(judge=JudgeCfg(model="fake-small")))
+    try:
+        httpx.AsyncClient = lambda *a, **k: real(*a, transport=httpx.MockTransport(handler), **{x: y for x, y in k.items() if x != "transport"})
+        st = run(J.status(cfg, max_age_s=0))
+        assert "fake-small" in st["choices"] and st["available"] is True        # its test failed: still selectable
+        assert st["threshold"] == 0.6 and st["budget_s"] == 13.0 and st["tuned"] is False
+        assert st["measured"] == "2.00 s a question on the CPU"
+        j = run(J.judge_call(cfg, "web_fetch", {"url": "https://example.com/x"}, {"said": ["fetch example.com/x"]}, None))
+        assert j.detail.get("threshold") == 0.6 and j.detail.get("budget_s") == 13.0
+    finally:
+        httpx.AsyncClient = real
+        J._facts.clear(), J._status.clear()

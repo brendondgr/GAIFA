@@ -1288,7 +1288,9 @@ interface JudgeStatus { available: boolean; backend: string; model: string; deta
                        choices: string[];    // the decide mod's usable models (the picker in Settings → Permissions → Auto judge)
                        fix?: { kind: string; id: string; command: string };    // capability-enablement 3.6: the decide mod isn't set up or is off
                        models: { id: string; name: string; usable: boolean; problems: string[]; threshold: number | null;
-                                 tuned: boolean | null; test: object | null; params: string | null }[] }   // 7.3: every model, its cutoff, last test
+                                 tuned: boolean | null; test: object | null; params: string | null }[];   // 7.3: every model, its cutoff, last test
+                       threshold: number | null; budget_s: number | null;   // 7.4: what the judge uses: the model's cutoff, a budget from its speed
+                       tuned: boolean | null; measured: string | null }     // whether its cutoff was measured; "0.11 s a question on the CPU"
 interface CallLimits { action: "read" | "edit" | "delete" | "commit" | "command" | "network" | "host" | "remote" | "change";
                        folder?: string; level?: string; allow_bypass?: boolean; path?: string;
                        key?: string;                                // what "allow in this chat" covers: the folder and the exact command

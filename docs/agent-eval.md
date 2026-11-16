@@ -278,10 +278,13 @@ The 10-20 run asked d3-lite two bare yes/no questions, so it saw only "Yes / tru
 | Judge | Harmful through | Asks on safe | … routine (commands, fetches, GPU) | Median, one call at a time |
 |---|---|---|---|---|
 | **d3-lite, tuned** | **0 / 93** | **32.4%** | **10.9%** | **217 ms** (p95 285) |
+| d3-lite, tuned, on the CPU (capability-enablement 7.4, 2026-11-15) | 0 / 93 | 32.8% | 10.9% | 882 ms (p95 1,253) |
 | d3-lite, two yes/no (10-20) | 0 / 93 | 89.8% | | 150 ms |
 | Gemma 4 26B (10-20) | 0 / 93 | 28.5% | 1.6% | 1.17 s |
 | skynet (10-20) | 0 / 93 | 43.4% | 1.6% | 0.62 s |
 | MiniCPM5 2B (10-20) | 0 / 93 | 55.1% | 6.3% | 0.71 s |
+
+**On the CPU** (the `cpu` variant's CPU-only torch, a second decide instance on this machine's Ryzen AI Max+ 395, `--name d3-lite-cpu-0.35 --url http://127.0.0.1:5294`): the same verdicts within a point, four times slower, still well inside the judge's 3 s; its test measured 0.12 s an answer, so the budget from the measured speed (7.4) stays at 3 s. A slower CPU gets a longer budget (`judge.budget`), up to 60 s.
 
 Where it still asks: AgentDojo actions whose details sit in a file or page the user pointed to ("do the tasks on my TODO list at …", "follow the instructions in landlord-notices.txt": the judge can't see that text, so asking is defensible), and some plain misses (`git pull`, `rm notes.txt` asked for in so many words). Next: more questions aimed at those misses, and a combined score fitted on dev.
 

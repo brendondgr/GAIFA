@@ -23,9 +23,33 @@ files = []
 dest = "embed/embeddinggemma-2"
 kind = "text-encoder"
 size_gb = 1.53
-good_for = "the encoder the mod runs: 768-d vectors for text, code, images, audio and video"
+good_for = "the full encoder: 768-d vectors for text, code, images, audio and video in one space"
 licence = "Apache-2.0"
-required = true
+default = true                  # capability-enablement 7.3: the default choice, not required: a smaller one may replace it
+
+[[suggest]]                     # 7.3: about a third of the size; measured in docs/embed-models.md
+name = "BGE base (English)"
+repo = "BAAI/bge-base-en-v1.5"
+revision = "a5beb1e3e68b9ab74eb54cfd186867f64f240e1a"
+exclude = ["onnx/*", "*.bin"]
+dest = "embed/bge-base-en-v1.5"
+kind = "text-encoder"
+size_gb = 0.44
+good_for = "text only, English, 768-d: three times as fast on a GPU and on the CPU; pictures, audio and video aren't searched (their titles are)"
+licence = "MIT"
+next = "chosen alone, the mod uses it; beside EmbeddingGemma 2, switch with Settings → Agent → Memory → Change…"
+
+[[suggest]]                     # 7.3: about a tenth of the size
+name = "BGE small (English)"
+repo = "BAAI/bge-small-en-v1.5"
+revision = "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a"
+exclude = ["onnx/*", "*.bin"]
+dest = "embed/bge-small-en-v1.5"
+kind = "text-encoder"
+size_gb = 0.13
+good_for = "text only, English, 384-d: the smallest and fastest, for a machine without a GPU; pictures, audio and video aren't searched (their titles are)"
+licence = "MIT"
+next = "chosen alone, the mod uses it; beside EmbeddingGemma 2, switch with Settings → Agent → Memory → Change…"
 
 [[find]]                        # capability-enablement 7.1: where such models are compared
 label = "Embedding models compared (MTEB leaderboard)"
@@ -100,11 +124,19 @@ The same packages unpinned, with PyTorch's CPU wheels. The model then runs in fp
 
 ## Choosing models
 
-The mod runs **one fixed model**, required: EmbeddingGemma 2 at a pinned revision (`REVISION` in `embed/settings.py` and `install.sh`), in `data/models/embed/embeddinggemma-2/` (`EMBED_MODEL_DIR`). `install.sh` downloads it; `--no-weights` skips that if you fetch it yourself. Vectors from different models don't mix, so another encoder would mean new code and re-indexing the library.
+EmbeddingGemma 2 is the **default**, not required (capability-enablement 7.3): the model question also offers two smaller text-only encoders, measured on this machine and on the CPU in [docs/embed-models.md](../../../docs/embed-models.md). `install.sh` downloads EmbeddingGemma 2; `--no-weights` skips that. The others come from the model question (`gaifa setup embed`), into `data/models/embed/<id>/`.
 
-| Model | Size | Good for | Licence |
-|---|---|---|---|
-| [google/embeddinggemma-2](https://huggingface.co/google/embeddinggemma-2) at `914f7f89` | 1.5 GB | text, code, images, audio and video in one 768-d space (Matryoshka 512/256/128), 8k context | Apache-2.0 |
+| Model | Size | Good for | Gives up | Licence |
+|---|---|---|---|---|
+| [google/embeddinggemma-2](https://huggingface.co/google/embeddinggemma-2) at `914f7f89` (default) | 1.5 GB | text, code, images, audio and video in one 768-d space (Matryoshka 512/256/128), 8k context, many languages | the largest and slowest of the three | Apache-2.0 |
+| [BAAI/bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) at `a5beb1e3` | 0.44 GB | English text, 768-d; about three times as fast | pictures, audio and video (their titles are still searched), other languages, 512-token inputs | MIT |
+| [BAAI/bge-small-en-v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5) at `5c38ec7c` | 0.13 GB | English text, 384-d; the fastest, for a machine without a GPU | the same, and a little less accurate | MIT |
+
+**Any other model.** A sentence-transformers text encoder runs with no code: put it in `data/models/embed/<id>/` with a `gaifa-model.toml` (`name`, `dim`, `dims`, `kinds = ["text"]`, `query_prompt`, `document_prompt` with `{title}` and `{text}`, `dtype`, `size_gb`; the format is in `embed/models.py`). The two above have theirs in `services/embed/models/`. A model that needs `trust_remote_code` isn't loaded.
+
+**Which one is used.** `EMBED_MODEL` (default `embeddinggemma-2`), unless a switch saved another in `data/state/embed/model.json`; a model with no weights falls back to the first one that has them (so a setup with BGE small alone uses it). **Changing it** (`POST /v1/model {"model": "<id>"}`, or **Change…** on Settings → Agent → Memory and the Embeddings page) builds the new model's index beside the one in use (`data/databases/embed-<id>.db`; EmbeddingGemma 2's stays `embed.db`), in the background under the library's GPU and memory rules: every output, the chat summaries, the agent's memory texts and the collections. Search keeps using the old model until the new index is ready; then the mod restarts on the new one. Switching back finds the old index where it was and embeds only what changed meanwhile. `GET /v1/models` lists the models, the one in use and a switch in progress; `DELETE /v1/model/switch` stops one.
+
+A text-only model answers a search for pictures, audio or video (`kind`) and an embed of one with `422 needs_full_model` and the fix.
 
 ## Configuration
 

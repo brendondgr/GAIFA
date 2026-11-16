@@ -27,7 +27,7 @@ FIND = {"label", "url", "note"}
 OPTION = {"value", "label", "adds"}
 CONFIG_KEY = re.compile(r"^(services\.[a-z][a-z0-9-]{1,31}\.env\.[A-Z][A-Z0-9_]*|agent\.judge\.model)$")
 STEP = {"run", "what", "ask", "interactive", "skip_if", "optional", "next", "ask_if"}
-SUGGEST = {"name", "repo", "revision", "files", "dest", "kind", "op", "body", "size_gb", "good_for", "licence", "required", "gated", "next", "start_op", "start_body", "skip_if"}
+SUGGEST = {"name", "repo", "revision", "files", "exclude", "dest", "kind", "op", "body", "size_gb", "good_for", "licence", "required", "default", "gated", "next", "start_op", "start_body", "skip_if"}
 
 
 @dataclass
@@ -51,12 +51,14 @@ class Suggest:
     repo: str = ""                  # a Hugging Face repo…
     revision: str = ""
     files: list[str] = field(default_factory=list)   # empty: the whole repo
+    exclude: list[str] = field(default_factory=list) # glob patterns left out of a whole-repo download (onnx/*, *.bin)
     dest: str = ""                  # "hf-cache", or a folder under data/models/
     kind: str = "other"             # the registry kind it's registered as (llm, tts, image, …)
     op: str = ""                    # …or a mod route that downloads and registers it ("POST /v1/load")
     body: dict[str, Any] = field(default_factory=dict)
     licence: str = ""
     required: bool = False          # the engine can't run without it
+    default: bool = False           # chosen when the person doesn't answer, but another may replace it (capability-enablement 7.3)
     gated: bool = False             # accept the repo's terms on Hugging Face first
     next: str = ""                  # what the person still has to do once it's chosen (joins the report)
     start_op: str = ""              # a mod route run after the download, such as launching it ("POST /api/instances")
@@ -220,6 +222,8 @@ def _suggest(i: int, d: Any) -> tuple[Suggest | None, str | None]:
             return None, f"{where}: `dest`, `files`, `revision` and `kind` go with `repo`, not `op` (the mod registers what it downloads)"
     if not _strs(d.get("files", [])) and d.get("files", []) != []:
         return None, f"{where}: `files` must be a list of file names"
+    if (not _strs(d.get("exclude", [])) and d.get("exclude", []) != []) or (d.get("exclude") and (d.get("files") or op)):
+        return None, f"{where}: `exclude` is a list of glob patterns for a whole-repo download (no `files`)"
     for key in ("revision", "licence", "next", "skip_if"):
         if not isinstance(d.get(key, ""), str):
             return None, f"{where}: `{key}` must be a string"
@@ -228,13 +232,14 @@ def _suggest(i: int, d: Any) -> tuple[Suggest | None, str | None]:
         return None, f"{where}: `start_op` must look like \"POST /api/instances\""
     if not isinstance(d.get("start_body", {}), dict) or (d.get("start_body") and not so):
         return None, f"{where}: `start_body` is a table, and needs `start_op`"
-    for key in ("required", "gated"):
+    for key in ("required", "default", "gated"):
         if not isinstance(d.get(key, False), bool):
             return None, f"{where}: `{key}` must be true or false"
     return Suggest(name=d["name"].strip(), size_gb=float(d["size_gb"]), good_for=d["good_for"].strip(),
                    repo=repo.strip(), revision=d.get("revision", "").strip(), files=list(d.get("files", [])),
+                   exclude=list(d.get("exclude", [])),
                    dest=posixpath.normpath(d["dest"].strip()) if repo else "", kind=d.get("kind", "other").strip(), op=op.strip(), body=dict(d.get("body", {})),
-                   licence=d.get("licence", "").strip(), required=d.get("required", False), gated=d.get("gated", False),
+                   licence=d.get("licence", "").strip(), required=d.get("required", False), default=d.get("default", False), gated=d.get("gated", False),
                    next=d.get("next", "").strip(), start_op=so.strip() if so else "", start_body=dict(d.get("start_body", {})),
                    skip_if=d.get("skip_if", "").strip()), None
 

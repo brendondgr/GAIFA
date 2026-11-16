@@ -67,6 +67,9 @@ class D3Lite:
     PARAMS = "0.85B"
     INPUTS = ("text", "image", "video")
     WEIGHTS = "model-00001-of-00001.safetensors"
+    FAMILY = "d3"
+    THRESHOLD = 0.35        # the Auto judge's cutoff, measured on its eval (docs/agent-eval.md; capability-enablement 7.3)
+    TUNED = True
     # Every code file at REVISION (the d3 runtime imports d3_fast.py and d3_kernels.py by path from the folder),
     # and the manifest the runtime checks the weights, tokenizer and configs against (verify = full | fast).
     PINNED = {

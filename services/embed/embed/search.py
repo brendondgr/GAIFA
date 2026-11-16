@@ -16,7 +16,7 @@ from typing import Any
 
 import numpy as np
 
-from .encoder import Encoder, prompt
+from .encoder import Encoder
 from .hubclient import THREAD_ID, Hub, HubError
 from .library import Library, signature
 
@@ -130,7 +130,7 @@ def lines_of(text: str, first_line: int, size: int = 200) -> list[list[tuple[int
 
 
 async def _closest(lib: Library, q: np.ndarray, texts: list[str]) -> np.ndarray:
-    vecs = await lib.encode([("text", prompt(t, "document")) for t in texts], 768, {"text": 32}, "Search: the matching lines")
+    vecs = await lib.encode([("text", lib.enc.prompt(t, "document")) for t in texts], None, {"text": 32}, "Search: the matching lines")
     return vecs @ q
 
 
@@ -165,7 +165,7 @@ async def search(lib: Library, enc: Encoder, query: str, kind: str | None = None
     m = lib.store.matrix()
     if not len(m.ids):
         return []
-    q = (await lib.encode([("text", prompt(query, "query"))], 768, {"text": 1}, "Search"))[0]
+    q = (await lib.encode([("text", lib.enc.prompt(query, "query"))], None, {"text": 1}, "Search"))[0]
     scores = m.vectors @ q
     kinds = {r["id"]: r["kind"] for r in lib.store.all()}
     hits: list[tuple[int, float]] = []

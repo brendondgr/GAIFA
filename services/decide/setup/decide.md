@@ -23,9 +23,9 @@ files = []
 dest = "decide/d3-lite"
 kind = "other"
 size_gb = 1.73
-good_for = "the decision model the mod runs: yes/no, choice and score questions over text, images and video"
+good_for = "yes/no, choice and score questions over text, images and video; the Auto judge's default (its cutoff measured)"
 licence = "Apache-2.0"
-required = true
+default = true                  # capability-enablement 7.3: the default, not required; any decision model may be set up beside it
 
 [[find]]                        # capability-enablement 7.1: where such models are compared
 label = "Decision models compared (JEV decision index)"
@@ -119,13 +119,15 @@ On start the mod registers the model with the hub (`POST /api/models`, kind `oth
 
 ## Choosing models
 
-The mod runs **fixed, pinned weights**, not any model: a decision model's code runs with `trust_remote_code`, so each one is added in code (`decide/models/`) after its code is read, at one revision. Today there is one, **d3-lite** (required; `install.sh` downloads it into `data/models/decide/d3-lite/`):
+**d3-lite** is the default (`install.sh` downloads it into `data/models/decide/d3-lite/`), not a requirement: any decision model you want may be set up here and made the Auto judge (capability-enablement 7.3). Its machine test and the judge's eval advise; they never block it.
 
 | Model | Size | Good for | Licence |
 |---|---|---|---|
-| [vllm-sr/d3-lite](https://huggingface.co/vllm-sr/d3-lite) at `03560c26` | 1.7 GB | yes/no, choice and score questions over text, images and video | Apache-2.0 |
+| [vllm-sr/d3-lite](https://huggingface.co/vllm-sr/d3-lite) at `03560c26` | 1.7 GB | yes/no, choice and score questions over text, images and video; the judge's cutoff (0.35) measured on its eval | Apache-2.0 |
 
-Adding another decision model means a new module in `decide/models/` with its pinned files, and the reading described above.
+**Smaller?** d3-lite (0.85B) is the smallest decision model GAIFA has an adapter for; a smaller one from the JEV decision index (linked from the model question) would need its card or adapter first. On a machine without a GPU the weaker choice is the `cpu` variant (`gaifa setup decide --accel decide=cpu`), which installs a CPU-only torch: measured here on 2026-11-15, d3-lite loaded in 8.3 s and answered in 0.11 s a question (against 0.04 s on the GPU), quick enough for the Auto judge. (This machine’s ROCm torch on the CPU took 9.5 s a question: no MKL; the variant’s own torch is the one to use.)
+
+**Another model.** A decision model's code runs with `trust_remote_code`, so no model runs before its code is read at one revision and pinned. A model of a family that has an adapter (d3) needs only a card (`gaifa-decide.toml`: the family, repository, revision, the code's hashes and its judge cutoff); a new family needs an adapter. How, with the card's format: [README.md, Adding a decision model](../README.md#adding-a-decision-model). `GET /v1/models` lists every model the mod has (cards and folders no adapter reads, with why), each with its cutoff, whether the judge's eval tuned it and its last test on this machine.
 
 ## Configuration
 

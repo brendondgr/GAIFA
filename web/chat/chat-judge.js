@@ -73,6 +73,35 @@ export function JudgeModelPick({ st, value, onChange }) {
   return h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 12.5 } },
     h(JudgeModelSelect, { choices: modelChoices(st, model), model, sel, onPick: m => onChange(judgePick(m)) }));
 }
+/** One decide model in words (capability-enablement 7.3): its cutoff, whether the judge's eval tuned it, its last test here. */
+export function judgeModelLine(m) {
+  if (!m) return '';
+  if (!m.usable) return `${m.name || m.id}: can’t be used yet: ${(m.problems || []).join('; ') || 'not set up'}`;
+  const cut = m.threshold != null ? `cutoff ${m.threshold}` : 'cutoff 0.35';
+  const tuned = m.tuned ? `${cut}, measured on the judge’s eval` : `${cut}, not tuned for this model`;
+  const t = m.test;
+  const tested = !t ? 'not tested on this machine' : `${t.passed === false ? 'test failed' : 'tested'}: ${t.sentence || ''}`.trim();
+  return `${m.name || m.id} · ${tuned} · ${tested}`;
+}
+
+/** Every decide model under the judge's picker: what each is, its last test, and Test to measure it here (7.3). Any
+ *  usable one can be picked, whatever its test says. */
+export function JudgeModels({ api, st }) {
+  const React = R(), [busy, setBusy] = React.useState(null), [msg, setMsg] = React.useState(null), [fresh, setFresh] = React.useState({});
+  const models = (st?.models || []).map(m => fresh[m.id] ? { ...m, test: fresh[m.id] } : m);
+  if (!models.length) return null;
+  const test = async id => {
+    setBusy(id); setMsg(null);
+    try { const r = await api.callService('decide', 'POST', '/v1/selftest', { json: { model: id } }); setFresh(f => ({ ...f, [id]: r.json })); }
+    catch (e) { setMsg(`${id}: the test failed: ${errText(e)}`); } finally { setBusy(null); }
+  };
+  return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 } },
+    models.map(m => h('div', { key: m.id, style: { display: 'flex', alignItems: 'center', gap: 8, color: m.id === st.model ? 'inherit' : T.mut } },
+      h('span', { style: { flex: 1, minWidth: 0 } }, (m.id === st.model ? '● ' : '○ ') + judgeModelLine(m)),
+      m.usable && api?.callService ? h(Btn, { sm: true, label: busy === m.id ? 'Testing…' : 'Test', disabled: !!busy, onClick: () => test(m.id) }) : null)),
+    msg ? h('div', { role: 'status', style: { color: T.mut } }, msg) : null);
+}
+
 export const judgeStatusText = st => (st.available ? `Judge: ${st.model} (decision model), answering.`
   : `Judge: ${st.model} (decision model) doesn’t answer: ${st.detail || 'unavailable'}. Auto isn’t offered until it does.`);
 

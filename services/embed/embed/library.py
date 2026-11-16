@@ -31,7 +31,8 @@ import numpy as np
 
 from . import chunks as chunking
 from . import media
-from .encoder import Encoder, prompt
+from .encoder import Encoder
+from .models import db_name
 from .gpu import slot_for, take
 from .gpu_slot import GpuCancelled, GpuSlot, Lease
 from .hubclient import Hub, HubError
@@ -285,12 +286,12 @@ class Library:
         self._in_chats = True
         try:
             while (rows := self.store.chats_pending(limit)):
-                vecs = await self._embed("text", [prompt(r["summary"], "document", r["title"]) for r in rows])
+                vecs = await self._embed("text", [self.enc.prompt(r["summary"], "document", r["title"]) for r in rows])
                 for r, v in zip(rows, vecs):
                     self.store.finish_chat(r["thread_id"], r["summary"], v)
                 n += len(rows)
             while (rows := self.store.texts_pending(limit)):          # structured-memory 2.1: the text collections
-                vecs = await self._embed("text", [prompt(r["text"], "document", r["title"] or None) for r in rows])
+                vecs = await self._embed("text", [self.enc.prompt(r["text"], "document", r["title"] or None) for r in rows])
                 for r, v in zip(rows, vecs):
                     self.store.finish_text(r["ns"], r["id"], r["text"], v)
                 n += len(rows)
@@ -311,7 +312,7 @@ class Library:
         have = self.enc.estimate_gb(self.enc.parts) if self.enc.loaded and self.enc.parts is not None else 0
         await self.hub.acquire(self.enc.estimate_gb(want) - have, f"indexing ({self.enc.key(want)})")
 
-    async def encode(self, items: list[tuple[str, Any]], dim: int = 768, batch: dict[str, int] | None = None,
+    async def encode(self, items: list[tuple[str, Any]], dim: int | None = None, batch: dict[str, int] | None = None,
                      label: str = "Search") -> np.ndarray:
         """Someone is waiting for these vectors (a search): one `interactive` lease around the encode."""
         try:
@@ -336,7 +337,7 @@ class Library:
                     self.state = "indexing"
                 self.gpu_wait = None
                 await self._room({kind})
-                vecs = await asyncio.to_thread(self.enc.embed, [(kind, v) for v in values], 768, batch)
+                vecs = await asyncio.to_thread(self.enc.embed, [(kind, v) for v in values], None, batch)
         except GpuCancelled as e:
             raise Stop() from e
         finally:
@@ -355,7 +356,7 @@ class Library:
         title = str(rec.get("title") or "")
         out: list[Chunk] = []
         if text := meta_text(rec):
-            v = await self._embed("text", [prompt(text, "document", None)])
+            v = await self._embed("text", [self.enc.prompt(text, "document", None)])
             out.append(Chunk("meta", v[0], chunking.snippet(text)))
         if kind in ("text", "document"):
             out += await self._text(rec["id"], title)
@@ -385,7 +386,7 @@ class Library:
         out: list[Chunk] = []
         for i in range(0, len(pieces), self.s.index_batch_text):
             group = pieces[i:i + self.s.index_batch_text]
-            vecs = await self._embed("text", [prompt(p.text, "document", title) for p in group])
+            vecs = await self._embed("text", [self.enc.prompt(p.text, "document", title) for p in group])
             out += [Chunk("text", v, chunking.snippet(p.text), text=p.text, page=p.page, line=p.line, offset=p.offset)
                     for p, v in zip(group, vecs)]
         return out
@@ -399,6 +400,8 @@ class Library:
         return await self.hub.file(rec["id"], preview=preview)
 
     async def _image(self, rec: dict[str, Any], preview: bool) -> list[Chunk]:
+        if not self.enc.info.reads("image"):          # a text-only model (7.3): the output's title and words only
+            return []
         data = await self._bytes(rec, "model3d" if preview else "image", preview)
         if data is None:
             return []
@@ -407,6 +410,8 @@ class Library:
         return [Chunk("image", v[0], "the 3D model's preview" if preview else "")]
 
     async def _media(self, rec: dict[str, Any], kind: str) -> list[Chunk]:
+        if not self.enc.info.reads(kind):
+            return []
         data = await self._bytes(rec, kind)
         if data is None:
             return []
@@ -449,5 +454,6 @@ class Library:
 
 
 def open_library(settings: Settings, enc: Encoder, hub: Hub) -> Library:
-    return Library(Store(Path(settings.databases) / "embed.db"), enc, hub, settings)
+    """The library of the model in use: each model has its own index (capability-enablement 7.3)."""
+    return Library(Store(Path(settings.databases) / db_name(enc.info.id), enc.info.dim), enc, hub, settings)
 

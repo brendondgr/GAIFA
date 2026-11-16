@@ -16,11 +16,14 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
 
 from . import media
-from .encoder import DIMS, KINDS, Encoder, GemmaBackend, parts_for, prompt
+from . import models
+from .encoder import KINDS, Encoder, GemmaBackend, parts_for
+from .switch import Switch, SwitchError
 from .gpu import slot_for, take
 from .gpu_slot import GpuCancelled, GpuSlot
+from .models import NeedsFullModel
 from .hubclient import Hub, HubError
-from .settings import MODEL_ID, REPO, REVISION, Settings
+from .settings import REPO, REVISION, Settings
 from .worker import WorkerBackend, WorkerDied
 from .api_chats import add_chat_routes
 from .api_texts import add_text_routes
@@ -60,8 +63,8 @@ class Input(BaseModel):
 
 class EmbedRequest(BaseModel):
     inputs: list[Input] = Field(min_length=1, description="What to embed; every kind lands in the same space")
-    dim: Literal[768, 512, 256, 128] = Field(768, description="Matryoshka size: the leading values, normalized "
-                                             "again. Queries and the documents they're scored against must match")
+    dim: int | None = Field(None, description="The vector size: the model's own when left out; EmbeddingGemma 2 can be "
+                            "cut to 512, 256 or 128 (Matryoshka). Queries and the documents they're scored against must match")
     task: Literal["query", "document"] = Field("document", description="query: a search query (gets the query "
                                                "prompt); document: what is searched. Media take no prompt")
 
@@ -78,8 +81,11 @@ def _error(e: HubError) -> JSONResponse:
 def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | None = None,
                library: Library | None = None, gpu: GpuSlot | None = None) -> FastAPI:
     """`library`: the index to run (tests pass their own); by default one is opened when `settings.index`."""
-    enc = encoder or Encoder(WorkerBackend(functools.partial(GemmaBackend, settings.model_dir, settings.device)),
-                             settings.state_dir)
+    enc = encoder or make_encoder(settings, model_info(settings))
+    if enc.info.id == models.GEMMA and str(enc.info.folder) == ".":   # an encoder given without its folder (tests)
+        enc.info = models.gemma(settings.model_dir)
+    info_ = enc.info
+    model_id = info_.id
     hub = hub or Hub(settings.hub_url)
     lib = library or (open_library(settings, enc, hub) if settings.index else None)
     gpu = gpu or (lib.gpu if lib is not None else slot_for(hub))     # the GPU slot (plan 31.3)
@@ -95,12 +101,17 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
                 await asyncio.to_thread(enc.unload)
 
     async def register() -> None:
-        if (settings.model_dir / "model.safetensors").is_file():
+        if info_.id == models.GEMMA and (settings.model_dir / "model.safetensors").is_file():
             path = f"embed/{settings.model_dir.name}"
             res = await hub.register_model({"path": path, "name": "EmbeddingGemma 2", "kind": "text-encoder",
                                             "tags": ["embedding", "multimodal"],
                                             "source": {"type": "huggingface", "repo": REPO, "revision": REVISION}})
             log.info("models registry: %s %s", path, res)
+        elif info_.id != models.GEMMA and models.weights(info_.folder):
+            src = info_.extra.get("repo")
+            res = await hub.register_model({"path": f"embed/{info_.id}", "name": info_.name, "kind": "text-encoder",
+                                            "tags": ["embedding"], **({"source": {"type": "huggingface", "repo": src}} if src else {})})
+            log.info("models registry: embed/%s %s", info_.id, res)
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -116,8 +127,10 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
             lib.store.close()
 
     app = FastAPI(title="Embeddings", version="0.1.0", lifespan=lifespan,
-                  description="EmbeddingGemma 2: text, code, images, audio and video in one 768-d space")
+                  description="EmbeddingGemma 2 (or another model): text, code, images, audio and video in one space")
     app.state.library = lib
+    switch = Switch(lib, lambda i: make_encoder(settings, i), on_done=hub.restart_me) if lib is not None else None
+    app.state.switch = switch
     if lib is not None:
         add_library_routes(app, lib, enc)
         add_chat_routes(app, lib, enc)
@@ -129,7 +142,7 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
         want = enc.needs(kinds)
         if want is not None and enc.loaded:
             more = enc.estimate_gb(want) - enc.estimate_gb(enc.parts or frozenset())
-            await hub.acquire(more, f"EmbeddingGemma 2 {enc.key(want)}")
+            await hub.acquire(more, f"{info_.name} {enc.key(want)}")
 
     @app.get("/health")
     def health() -> dict:
@@ -137,9 +150,11 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
 
     @app.get("/v1/info", summary="The model, its sizes, what is loaded and on which device")
     def info() -> dict:
-        return {"model": MODEL_ID, "repo": REPO, "revision": REVISION, "path": str(settings.model_dir),
-                "weights": (settings.model_dir / "model.safetensors").is_file(), "dims": list(DIMS),
-                "kinds": list(KINDS), "tasks": ["query", "document"], "loaded": enc.key(enc.parts) if enc.loaded else None,
+        gem = info_.id == models.GEMMA
+        return {"model": model_id, "name": info_.name, "repo": REPO if gem else info_.extra.get("repo"),
+                "revision": REVISION if gem else info_.extra.get("revision"), "path": str(info_.folder),
+                "weights": models.weights(info_.folder), "dim": info_.dim, "dims": list(info_.dims),
+                "kinds": list(info_.kinds), "full": info_.full, "tasks": ["query", "document"], "loaded": enc.key(enc.parts) if enc.loaded else None,
                 "device": enc.backend.device if enc.loaded else None, "dtype": enc.backend.dtype if enc.loaded else None,
                 "limits": {"inputs": settings.max_inputs, "audio_s": settings.audio_max_s,
                            "video_frames": settings.video_max_frames}}
@@ -148,8 +163,13 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
     def status() -> dict:
         if day["date"] != date.today():
             day.update(date=date.today(), inputs=0)
-        stats: list[dict] = [{"label": "Inputs today", "value": day["inputs"], "reset": "daily"}]
+        stats: list[dict] = [{"label": "Model", "value": info_.name}, {"label": "Inputs today", "value": day["inputs"], "reset": "daily"}]
         jobs: list[dict] = []
+        sw = switch.status() if switch else None       # capability-enablement 7.3: a model switch is a job on the page
+        if sw and sw["state"] == "building":
+            total = (sw.get("done") or 0) + (sw.get("pending") or 0)
+            jobs.append({"id": "switch", "label": f"Building {sw['name']}'s index ({sw.get('pending') or 0} to go); search uses {info_.name} until it's ready",
+                         "state": "running", "progress": round((sw.get("done") or 0) / max(1, total), 3), "route": "#/settings/agent"})
         if lib is not None:
             c = lib.store.counts()
             stats.append({"label": "Indexed", "value": c["done"]})
@@ -172,7 +192,7 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
             await asyncio.to_thread(enc.load, parts_for(kinds))
         except HubError as e:
             return _error(e)
-        except (FileNotFoundError, WorkerDied) as e:
+        except (FileNotFoundError, WorkerDied, NeedsFullModel) as e:
             return backend_error(e)
         return {"loaded": enc.key(enc.parts), "device": enc.backend.device, "dtype": enc.backend.dtype,
                 "memory_gb": enc.estimate_gb(enc.parts)}
@@ -184,7 +204,9 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
     async def prepare(inp: Input, task: str) -> media.Prepared:
         kind = inp.kind
         if kind == "text":
-            return media.Prepared("text", prompt(inp.text or "", task, inp.title), {"chars": len(inp.text or "")})
+            return media.Prepared("text", enc.prompt(inp.text or "", task, inp.title), {"chars": len(inp.text or "")})
+        if not info_.reads(kind):                       # a text-only model (7.3)
+            raise models.NeedsFullModel(kind, info_.name)
         rec, data = await hub.output(getattr(inp, kind), MAX_BYTES[kind])
         if rec.get("kind") not in ACCEPTS[kind]:
             other = rec.get("kind")
@@ -211,10 +233,15 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
             return JSONResponse({"detail": f"{len(body.inputs)} inputs; at most {settings.max_inputs} per call",
                                  "code": "too_many", "fix": "split the inputs over several calls"}, 413)
         t0 = time.perf_counter()
+        if body.dim is not None and body.dim not in info_.dims:
+            return JSONResponse({"detail": f"{info_.name} gives vectors of {', '.join(map(str, info_.dims))}",
+                                 "code": "bad_dim", "fix": "leave dim out for the model's own size"}, 422)
         try:
             prepared = [await prepare(i, body.task) for i in body.inputs]
         except HubError as e:
             return _error(e)
+        except NeedsFullModel as e:
+            return backend_error(e)
         batch = {"text": settings.batch_text, "image": settings.batch_media, "audio": 1, "video": 1}
         t1 = time.perf_counter()
         try:
@@ -225,13 +252,13 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
             return JSONResponse({"detail": str(e), "code": "gpu_cancelled", "fix": "embed again"}, 409)
         except HubError as e:
             return _error(e)
-        except (FileNotFoundError, WorkerDied) as e:
+        except (FileNotFoundError, WorkerDied, NeedsFullModel) as e:
             return backend_error(e)
         day["inputs"] += len(prepared)
         if lib is not None:
             lib.last_api = time.time()
         t2 = time.perf_counter()
-        return {"model": MODEL_ID, "dim": body.dim, "task": body.task,
+        return {"model": model_id, "dim": body.dim or info_.dim, "task": body.task,
                 "vectors": [[round(float(x), 6) for x in v] for v in vecs],
                 "inputs": [{"kind": p.kind, **p.info} for p in prepared],
                 "device": enc.backend.device, "dtype": enc.backend.dtype,
@@ -247,23 +274,83 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
             async with take(gpu, enc, settings.device, "Embed: test"):
                 await make_room({"text"})
                 t0 = time.perf_counter()
-                first = await asyncio.to_thread(enc.embed, [("text", "a red bicycle")], 768, batch)
+                first = await asyncio.to_thread(enc.embed, [("text", "a red bicycle")], None, batch)
                 first_s = time.perf_counter() - t0
                 t1 = time.perf_counter()
-                await asyncio.to_thread(enc.embed, [("text", t) for t in texts], 768, batch)
+                await asyncio.to_thread(enc.embed, [("text", t) for t in texts], None, batch)
                 many_s = time.perf_counter() - t1
         except GpuCancelled as e:
             return JSONResponse({"detail": str(e), "code": "gpu_cancelled", "fix": "test again"}, 409)
         except HubError as e:
             return _error(e)
-        except (FileNotFoundError, WorkerDied) as e:
+        except (FileNotFoundError, WorkerDied, NeedsFullModel) as e:
             return backend_error(e)
         dev = enc.backend.device
         rate = len(texts) / many_s if many_s > 0 else 0.0
         gb = enc.estimate_gb(frozenset())
         where = "your GPU" if dev not in ("cpu", None) else "the CPU"
-        return {"passed": len(first) == 1, "model": MODEL_ID, "device": dev, "dtype": enc.backend.dtype,
+        return {"passed": len(first) == 1, "model": model_id, "device": dev, "dtype": enc.backend.dtype,
                 "first_s": round(first_s, 3), "forty_s": round(many_s, 3), "texts_per_s": round(rate, 1), "memory_gb": gb,
-                "sentence": f"{MODEL_ID} on {where}: {rate:.0f} texts a second, {gb:.1f} GB"}
+                "sentence": f"{info_.name} on {where}: {rate:.0f} texts a second, {gb:.1f} GB"}
+
+    @app.get("/v1/models", summary="The models this mod can run, the one in use and a switch in progress")
+    def list_models() -> dict:
+        have = models.available(settings.models_root)
+        if not any(m.id == info_.id for m in have):
+            have.insert(0, info_)
+        return {"model": info_.id, "models": [{**m.public(), "in_use": m.id == info_.id} for m in have],
+                "switch": switch.status() if switch else None}
+
+    @app.post("/v1/model", summary="Change the model: builds its index beside this one, then restarts on it")
+    async def change_model(body: ModelChoice) -> Any:
+        """Search keeps using the model in use until the new index is ready (capability-enablement 7.3)."""
+        if switch is None:
+            return JSONResponse({"detail": "the library is off (EMBED_INDEX=0)", "code": "no_library",
+                                 "fix": "set EMBED_MODEL and restart the mod"}, 409)
+        try:
+            info = model_info(settings, body.model)
+        except (FileNotFoundError, ValueError, KeyError) as e:
+            return JSONResponse({"detail": str(e), "code": "no_model",
+                                 "fix": "GET /v1/models lists the models this mod has; set one up with gaifa setup embed"}, 404)
+        try:
+            return {"switch": switch.start(info)}
+        except SwitchError as e:
+            return JSONResponse({"detail": e.detail, "code": e.code, "fix": e.fix}, 409)
+
+    @app.delete("/v1/model/switch", summary="Stop a model switch; the model in use stays")
+    def cancel_switch() -> dict:
+        return {"cancelled": bool(switch and switch.cancel())}
 
     return app
+
+
+class ModelChoice(BaseModel):
+    model: str = Field(pattern=r"^[a-z0-9][a-z0-9._-]{0,63}$", description="A model folder's id (GET /v1/models)")
+
+
+def model_info(settings: Settings, mid: str | None = None) -> models.ModelInfo:
+    """The model `mid`, else the one in use: the last finished switch, else EMBED_MODEL. A model that can't be read
+    falls back to EmbeddingGemma 2 (logged) so the mod still starts."""
+    want = mid or models.chosen(settings.state_dir, settings.model)
+    folder = settings.model_dir if want == settings.model_dir.name else settings.models_root / want
+    if mid is not None:
+        return models.read(folder)
+    try:
+        info = models.read(folder)
+    except (OSError, ValueError, KeyError) as e:
+        log.warning("embed model %s can't be read (%s): using EmbeddingGemma 2", want, e)
+        info = models.gemma(settings.model_dir)
+    if not models.weights(info.folder):            # set up with another model alone: the first one that's there
+        there = [m for m in models.available(settings.models_root) if models.weights(m.folder)]
+        if there:
+            log.info("embed model %s has no weights: using %s", info.id, there[0].id)
+            return there[0]
+    return info
+
+
+def make_encoder(settings: Settings, info: models.ModelInfo) -> Encoder:
+    if info.backend == "gemma":
+        factory = functools.partial(GemmaBackend, info.folder, settings.device)
+    else:
+        factory = functools.partial(models.TextBackend, info, settings.device)
+    return Encoder(WorkerBackend(factory), settings.state_dir, info)

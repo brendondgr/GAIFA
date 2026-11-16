@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from .encoder import Encoder
 from .hubclient import HubError
 from .library import Library
+from .models import NeedsFullModel
 from .search import index_recent, index_scope, origin_thread, scope, search
 from .worker import WorkerDied
 
@@ -44,6 +45,8 @@ def _ids(refs: list[str]) -> list[str]:
 
 def backend_error(e: Exception) -> JSONResponse:
     """The encoder failed: no weights, or its worker died (the next call starts a new one)."""
+    if isinstance(e, NeedsFullModel):
+        return JSONResponse({"detail": str(e), "code": e.code, "fix": e.fix}, 422)
     if isinstance(e, FileNotFoundError):
         return JSONResponse({"detail": str(e), "code": "no_weights", "fix": "run services/embed/install.sh"}, 503)
     log.error("%s", e)
@@ -64,6 +67,9 @@ def add_library_routes(app: FastAPI, lib: Library, enc: Encoder) -> None:
     async def search_route(body: SearchBody, x_gaifa_origin: str | None = Header(None)) -> Any:
         """Hits are ranked by cosine score (higher is closer; ~0.5 is unrelated). Snippets are the files' own
         words, so they come as untrusted data. A search within a collection or a chat indexes its outputs first."""
+        media = {"image": "image", "model3d": "image", "audio": "audio", "video": "video"}.get(body.kind or "")
+        if media and not enc.info.reads(media):         # a text-only model (capability-enablement 7.3)
+            return backend_error(NeedsFullModel(media, enc.info.name))
         thread = origin_thread(x_gaifa_origin) if body.thread_only else None
         if body.thread_only and not thread:
             return JSONResponse({"detail": "thread_only needs a chat: this call didn't come from one", "code": "no_thread",
@@ -77,7 +83,7 @@ def add_library_routes(app: FastAPI, lib: Library, enc: Encoder) -> None:
             hits = await search(lib, enc, body.query, body.kind, ids, body.limit)
         except HubError as e:
             return JSONResponse(e.body(), e.status)
-        except (FileNotFoundError, WorkerDied) as e:
+        except (FileNotFoundError, WorkerDied, NeedsFullModel) as e:
             return backend_error(e)
         c = store.counts()
         out: dict[str, Any] = {"results": hits, "searched": len(ids) if ids is not None else c["done"]}

@@ -23,6 +23,9 @@ class FakeModel:
     PARAMS = "0"
     INPUTS = ("text", "image")
     WEIGHTS = "weights.bin"
+    FAMILY = "fake"
+    THRESHOLD = 0.5
+    TUNED = False
     calls: list[dict[str, Any]] = []        # every ask, shared, for the tests to inspect
     loads: list[str] = []
 

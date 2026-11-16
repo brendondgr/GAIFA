@@ -35,7 +35,7 @@ export function planSections(plan) {
 /** The plan's questions as form fields: [{id, kind, text, choices, required}]. */
 export function questions(plan) {
   return (plan?.questions || []).map(q => ({ id: q.id, kind: q.kind || (q.choices ? 'choice' : 'yes-no'), text: q.text || q.id,
-    choices: Array.isArray(q.choices) ? q.choices : null, required: q.required || [], find: q.find || [] }));
+    choices: Array.isArray(q.choices) ? q.choices : null, required: q.required || [], picked: q.default || q.required || [], find: q.find || [] }));
 }
 
 /** Does a host fix read as a command to run (something to copy), rather than advice? */
@@ -48,7 +48,7 @@ export function answersFrom(qs, values) {
   const out = { accept: [], decline: [], models: {}, values: {} };
   for (const q of qs) {
     const v = values[q.id];
-    if (q.kind === 'models') { const [setup] = q.id.split('/'); out.models[setup] = Array.isArray(v) && v.length ? v : (q.required.length ? q.required : ['none']); }
+    if (q.kind === 'models') { const [setup] = q.id.split('/'); out.models[setup] = Array.isArray(v) && v.length ? v : ((q.picked || q.required || []).length ? (q.picked || q.required) : ['none']); }
     else if (q.kind === 'yes-no' || q.kind === 'licence') (v === false ? out.decline : out.accept).push(q.id);
     else if (v != null && v !== '') out.values[q.id] = v;
   }
@@ -144,9 +144,9 @@ export async function open(env, ids) {
       if (q.kind === 'models' && q.choices) return h('fieldset', { style: 'border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:4px' },
         h('legend', { style: 'font-weight:600;font-size:12.5px;margin-bottom:4px' }, q.text),
         ...(q.find || []).map(f => h('div', { style: 'font-size:12px;' + MUT }, 'Compared: ', h('a', { href: f.url, target: '_blank', rel: 'noopener' }, f.label), f.note ? ` (${f.note})` : '')),   // capability-enablement 7.1
-        ...q.choices.map(c => { const cb = h('input', { type: 'checkbox', checked: q.required.includes(c) || undefined, onchange: e => {
-          const cur = new Set(values[q.id] || q.required); e.target.checked ? cur.add(c) : cur.delete(c); values[q.id] = [...cur]; } });
-          if (q.required.includes(c)) cb.checked = true;
+        ...q.choices.map(c => { const cb = h('input', { type: 'checkbox', checked: q.picked.includes(c) || undefined, onchange: e => {
+          const cur = new Set(values[q.id] || q.picked); e.target.checked ? cur.add(c) : cur.delete(c); values[q.id] = [...cur]; } });
+          if (q.picked.includes(c)) cb.checked = true;
           return h('label', { style: 'display:flex;gap:6px;align-items:center;font-size:12.5px' }, cb, c); }));
       if (q.choices) { const sel = h('select', { onchange: e => { values[q.id] = e.target.value; }, style: 'font:inherit' }, ...q.choices.map(c => h('option', { value: c }, c)));
         values[q.id] = q.choices[0]; return h('label', { style: 'display:flex;flex-direction:column;gap:4px;font-size:12.5px' }, q.text, sel); }

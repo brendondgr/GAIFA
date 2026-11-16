@@ -194,6 +194,17 @@ class Hub:
         if r.status_code >= 400:
             log.warning("memory acquire answered %s: %s", r.status_code, r.text[:200])
 
+    async def restart_me(self) -> bool:
+        """Ask the hub to restart this mod (a finished model switch, capability-enablement 7.3); False without a hub."""
+        if not self.url:
+            return False
+        try:
+            async with self._client(read=5) as c:
+                await c.post(f"/api/services/{self.service}/restart")
+        except httpx.HTTPError:                          # the restart ends this process: no answer is expected
+            pass
+        return True
+
     async def register_model(self, entry: dict[str, Any]) -> str:
         """POST /api/models; an existing entry (409 model_exists) is fine."""
         if not self.url:

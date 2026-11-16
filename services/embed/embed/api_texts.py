@@ -15,7 +15,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from .api_library import backend_error
-from .encoder import Encoder, prompt
+from .encoder import Encoder
+from .models import NeedsFullModel
 from .hubclient import HubError
 from .library import Library
 from .worker import WorkerDied
@@ -70,10 +71,10 @@ def add_text_routes(app: FastAPI, lib: Library, enc: Encoder) -> None:
             rows = [r for r in store.texts(ns, body.ids) if r["state"] == "done" and r["vector"]]
             if not rows:
                 return {"results": [], "pending": store.text_counts(ns)["pending"]}
-            q = (await lib.encode([("text", prompt(body.query, "query"))], 768, {"text": 1}, f"Search {ns}"))[0]
+            q = (await lib.encode([("text", lib.enc.prompt(body.query, "query"))], None, {"text": 1}, f"Search {ns}"))[0]
         except HubError as e:
             return JSONResponse(e.body(), e.status)
-        except (FileNotFoundError, WorkerDied) as e:
+        except (FileNotFoundError, WorkerDied, NeedsFullModel) as e:
             return backend_error(e)
         m = np.frombuffer(b"".join(r["vector"] for r in rows), dtype=np.float16).reshape(len(rows), -1).astype(np.float32)
         scores = m @ q

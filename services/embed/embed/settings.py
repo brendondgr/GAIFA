@@ -16,7 +16,9 @@ REVISION = "914f7f89142e33e77833254d9c9b90c3cef7303b"   # what install.sh downlo
 @dataclass
 class Settings:
     port: int = 5104
-    model_dir: Path = HERE / "data" / MODEL_ID
+    model_dir: Path = HERE / "data" / MODEL_ID      # EmbeddingGemma 2's folder
+    models_dir: Path | None = None                 # every model's folder (capability-enablement 7.3); model_dir's parent
+    model: str = MODEL_ID                           # the default model (EMBED_MODEL); a finished switch saves another
     state_dir: Path = HERE / "data" / "state"
     hub_url: str | None = None
     device: str = "auto"              # auto (the GPU when torch sees one) | cuda | cpu
@@ -32,6 +34,10 @@ class Settings:
     index_audio_max_s: float = 3600.0 # longer audio is indexed up to here (30 s windows)
     index_batch_text: int = 8         # chunks of ~800 tokens a batch (32 of them peaked at 7.5 GB)
 
+    @property
+    def models_root(self) -> Path:
+        return self.models_dir or self.model_dir.parent
+
     @classmethod
     def from_env(cls, port: int | None = None) -> "Settings":
         e = os.environ
@@ -39,6 +45,8 @@ class Settings:
         return cls(
             port=port or int(e.get("GAIFA_PORT", d.port)),
             model_dir=Path(e.get("EMBED_MODEL_DIR", d.model_dir)),
+            models_dir=Path(e["EMBED_MODELS_DIR"]) if e.get("EMBED_MODELS_DIR") else None,
+            model=e.get("EMBED_MODEL") or d.model,
             state_dir=Path(e.get("EMBED_STATE_DIR", d.state_dir)),
             hub_url=(e.get("GAIFA_URL") or "").rstrip("/") or None,
             device=e.get("EMBED_DEVICE", d.device),

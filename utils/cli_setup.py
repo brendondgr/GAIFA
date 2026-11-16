@@ -118,7 +118,7 @@ def sizes(envs: list[setupdocs.Env]) -> tuple[float, float, dict[str, float]]:
     for e in envs:
         images.update(e.setup.images)
     env = sum(e.setup.disk_gb or 0 for e in envs) + sum(images.values())
-    req = sum(s.size_gb for e in envs for s in e.setup.suggest if s.required)
+    req = sum(s.size_gb for e in envs for s in e.setup.suggest if s.required or s.default)
     return round(env, 2), round(req, 2), images
 
 
@@ -140,10 +140,11 @@ def plan(envs: list[setupdocs.Env], checks: list[host_mod.Check], hub: list[str]
             finds = [{"label": f.label, "url": f.url, "note": f.note} for f in e.setup.find]   # capability-enablement 7.1
             questions.append({"id": f"{e.id}/models", "kind": "models", "text": f"Which models for {e.title}?", **({"find": finds} if finds else {}),
                               "choices": names, "required": [s.name for s in e.setup.suggest if s.required],
+                              "default": [s.name for s in e.setup.suggest if s.required or s.default],
                               "answer_with": f'--models "{e.id}=<names, comma-separated, or none>"'})
             for s in e.setup.suggest:
                 suggestions.append({"setup": e.id, "mod": e.mod, "name": s.name, "size_gb": s.size_gb, "good_for": s.good_for,
-                                    "licence": s.licence or None, "required": s.required, "gated": s.gated,
+                                    "licence": s.licence or None, "required": s.required, "default": s.default, "gated": s.gated,
                                     "source": s.repo or f"{e.mod} {s.op}"})
         for c in e.setup.config:
             qid = f"{e.id}/config:{c.key}" + (f"@{c.when}" if c.when else "")
@@ -175,9 +176,9 @@ def plan_text(p: dict[str, Any]) -> str:
         out.append(f"  {s['id']:24} {s['run']}")
         out.append(f"  {'':24}   {s['what']}" + (f"  [asks: {s['ask']}]" if s["ask"] else "") + ("  [you run it: it prompts]" if s["interactive"] else ""))
     if p["suggestions"]:
-        out += ["", "Models (you choose; required ones are preselected):"]
+        out += ["", "Models (you choose; required and default ones are preselected):"]
         for s in p["suggestions"]:
-            out.append(f"  {s['setup']:24} {s['name']} ({s['size_gb']:.2f} GB){' required' if s['required'] else ''}{' gated' if s['gated'] else ''}: {s['good_for']}")
+            out.append(f"  {s['setup']:24} {s['name']} ({s['size_gb']:.2f} GB){' required' if s['required'] else ' default' if s.get('default') else ''}{' gated' if s['gated'] else ''}: {s['good_for']}")
         for q in p["questions"]:                  # capability-enablement 7.1: where such models are compared
             for f in q.get("find") or []:
                 out.append(f"  {q['id'].split('/')[0]:24} compared: {f['label']}: {f['url']}" + (f" ({f['note']})" if f.get("note") else ""))

@@ -23,6 +23,7 @@ from typing import Any, Protocol
 import numpy as np
 
 from . import device
+from .models import GEMMA, ModelInfo, NeedsFullModel, gemma
 
 log = logging.getLogger("embed")
 
@@ -149,8 +150,9 @@ class GemmaBackend:
 class Encoder:
     """The loaded state and the one lock every load, unload and encode takes."""
 
-    def __init__(self, backend: Backend, state_dir: Path | None = None):
+    def __init__(self, backend: Backend, state_dir: Path | None = None, info: ModelInfo | None = None):
         self.backend = backend
+        self.info = info or gemma(Path("."))                # capability-enablement 7.3: the model in use
         self.parts: frozenset[str] | None = None           # None = unloaded
         self.lock = threading.Lock()
         self.busy = False
@@ -158,7 +160,8 @@ class Encoder:
         self.last_used = time.time()
         self.counts = {k: 0 for k in KINDS}
         self.ms = {k: 0.0 for k in KINDS}                   # total encode time per kind, for the speed stats
-        self.state_file = state_dir / "memory.json" if state_dir else None
+        name = "memory.json" if self.info.id == GEMMA else f"memory-{self.info.id}.json"
+        self.state_file = state_dir / name if state_dir else None
         self.measured: dict[str, float] = self._read_measured()
 
     @property
@@ -176,7 +179,13 @@ class Encoder:
         return "+".join(["text", *sorted(parts)])
 
     def estimate_gb(self, parts: frozenset[str]) -> float:
+        if self.info.id != GEMMA:                           # another model: measured, else from its size on disk
+            return self.measured.get(self.key(frozenset())) or round(max(0.5, 2 * (self.info.size_gb or 0.5) + 0.3), 1)
         return self.measured.get(self.key(parts)) or DEFAULT_GB[tuple(sorted(parts))]
+
+    def prompt(self, text: str, task: str, title: str | None = None) -> str:
+        """The model's own prefixes for a query or a document."""
+        return self.info.prompt(text, task, title)
 
     def needs(self, kinds: set[str]) -> frozenset[str] | None:
         """The parts to load for these kinds (the union with what's loaded), or None when nothing changes."""
@@ -236,19 +245,24 @@ class Encoder:
             self.parts = None
             return was
 
-    def embed(self, items: list[tuple[str, Any]], dim: int, batch: dict[str, int]) -> np.ndarray:
-        """`items` are (kind, prepared input) with text already prompted; returns (n, dim) unit vectors, in order.
-        Inputs of one kind go to the model together, in batches of `batch[kind]`."""
-        if dim not in DIMS:
-            raise ValueError(f"dim must be one of {DIMS}")
+    def embed(self, items: list[tuple[str, Any]], dim: int | None, batch: dict[str, int]) -> np.ndarray:
+        """`items` are (kind, prepared input) with text already prompted; returns (n, dim) unit vectors, in order
+        (`dim` None: the model's own size). Inputs of one kind go to the model together, in batches of `batch[kind]`."""
+        full = self.info.dim
+        dim = dim or full
+        if dim not in self.info.dims:
+            raise ValueError(f"dim must be one of {self.info.dims}")
         kinds = {k for k, _ in items}
+        for k in kinds:
+            if not self.info.reads(k):
+                raise NeedsFullModel(k, self.info.name)
         with self.lock:
             want = self.needs(kinds)
             if want is not None:
                 self._load(want)
             self.busy = True
             try:
-                out = np.zeros((len(items), FULL_DIM), dtype=np.float32)
+                out = np.zeros((len(items), full), dtype=np.float32)
                 for kind in KINDS:
                     idx = [i for i, (k, _) in enumerate(items) if k == kind]
                     if not idx:
@@ -262,7 +276,7 @@ class Encoder:
                         raise
                     self.ms[kind] += (time.perf_counter() - t) * 1000
                     self.counts[kind] += len(idx)
-                    out[idx] = vecs[:, :FULL_DIM]
+                    out[idx] = vecs[:, :full]
             finally:
                 self.busy = False
                 self.last_used = time.time()
@@ -278,10 +292,11 @@ class FakeBackend:
     device = "cpu"
     dtype = "float32"
 
-    def __init__(self):
+    def __init__(self, dim: int = FULL_DIM):
         self.parts: frozenset[str] | None = None
         self.loads: list[frozenset[str]] = []
         self.batches: list[tuple[str, int]] = []
+        self.dim = dim
 
     def load(self, parts: frozenset[str]) -> None:
         self.parts = parts
@@ -291,15 +306,15 @@ class FakeBackend:
         self.parts = None
 
     @staticmethod
-    def _word(w: str) -> np.ndarray:
+    def _word(w: str, dim: int = FULL_DIM) -> np.ndarray:
         rng = np.random.default_rng(int(hashlib.sha256(w.encode()).hexdigest()[:8], 16))
-        v = rng.standard_normal(FULL_DIM).astype(np.float32)
+        v = rng.standard_normal(dim).astype(np.float32)
         return v / np.linalg.norm(v)
 
     @classmethod
-    def vector(cls, seed: str) -> np.ndarray:
+    def vector(cls, seed: str, dim: int = FULL_DIM) -> np.ndarray:
         words = re.findall(r"[a-z0-9]+", seed.lower()) or [seed]
-        v = np.sum([cls._word(w) for w in words], axis=0)
+        v = np.sum([cls._word(w, dim) for w in words], axis=0)
         return v / np.linalg.norm(v)
 
     def encode(self, kind: str, items: list[Any], batch_size: int) -> np.ndarray:
@@ -308,12 +323,12 @@ class FakeBackend:
             raise RuntimeError(f"{kind} needs the {PART[kind]} encoder")
         for i in range(0, len(items), batch_size):
             self.batches.append((kind, len(items[i:i + batch_size])))
-        return np.stack([self.vector(self.label(kind, x)) for x in items])
+        return np.stack([self.vector(self.label(kind, x), self.dim) for x in items])
 
     @staticmethod
     def label(kind: str, x: Any) -> str:
         if kind == "text":                                  # the words after the prompt
-            return re.sub(r"^(task: [^|]*\| query: |title: [^|]*\| text: )", "", x)
+            return re.sub(r"^(task: [^|]*\| query: |title: [^|]*\| text: |query: |passage: )", "", x)
         if kind == "image":
             return (getattr(x, "info", {}) or {}).get("label") or str(x.size)
         if kind == "audio":

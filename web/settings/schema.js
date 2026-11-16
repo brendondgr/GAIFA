@@ -225,7 +225,8 @@ export function sections(ctx = {}) {
           choices: c => (c.reading?.choices?.decide || []).map(x => ({ value: x, label: x })), when: () => ['auto', 'decide'].includes(d.web?.relevance), keywords: ['decide'] }),
       ] },
       { id: 'instructions', label: 'Instructions', summary: () => 'AGENT.md', rows: [block('instructions', 'InstructionsCard', { label: 'Instructions', card: true, keywords: ['AGENT.md', 'standing instructions'] })] },
-      { id: 'memory', label: 'Memory', summary: () => 'What the agent knows, recall and fading', rows: [block('memory', 'MemoryCard', { label: 'Memory', card: true, keywords: ['remember', 'recall', 'facts', 'projects', 'fade'] })] },
+      { id: 'memory', label: 'Memory', summary: () => 'What the agent knows, recall and fading', rows: [block('memory', 'MemoryCard', { label: 'Memory', card: true, keywords: ['remember', 'recall', 'facts', 'projects', 'fade'] }),
+        ...(mods.some(m => m.id === 'embed') ? [block('embedModel', 'EmbedModelBlock', { label: 'Search by meaning uses', keywords: ['embed', 'embedding model', 'EmbeddingGemma', 'BGE', 'change model'] })] : [])] },
       { id: 'skills', label: 'Skills', summary: () => 'Loaded when needed; each is a slash command', rows: [block('skills', 'SkillsCard', { label: 'Skills', card: true, keywords: ['slash commands', 'SKILL.md'] })] },
       { id: 'learning', label: 'Learning', summary: () => `Learn from chats ${onOff(d.learning?.enabled)} · nightly at ${d.learning?.nightly_at || '—'}`, rows: [
         field('learn', 'learning.enabled', { label: 'Learn from chats', hint: 'Card edits, answers and thumbs become preferences that fill your cards; each chat can turn it off in its header.', control: 'toggle', keywords: ['preferences', 'learner'] }),

@@ -60,7 +60,9 @@ class LocalBackend:
 
     def __init__(self, adapters: dict[str, type], models_dir: Path, device: str = "auto", batch_size: int = 8,
                  verify: str = "full"):
-        self.adapters = adapters
+        from .models import with_cards
+
+        self.adapters = with_cards(adapters, models_dir)     # cards are rebuilt here: a worker can't unpickle them
         self.models_dir = models_dir
         self.want = device
         self.batch_size = batch_size

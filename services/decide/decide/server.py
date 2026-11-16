@@ -4,6 +4,7 @@ generated text), the models, load and unload, status. Images and videos come fro
 from __future__ import annotations
 
 import asyncio
+import json
 import contextlib
 import functools
 import logging
@@ -18,7 +19,7 @@ from pydantic import BaseModel, Field, model_validator
 from .engine import Decider, LocalBackend
 from .gpu_slot import GpuCancelled, GpuSlot
 from .hubclient import Hub, HubError
-from .models import ADAPTERS
+from .models import ADAPTERS, unknown_folders, with_cards
 from .settings import Settings
 from .worker import WorkerBackend, WorkerDied
 
@@ -109,9 +110,29 @@ def _err(status: int, detail: str, code: str, fix: str | None = None, data: dict
 
 def create_app(settings: Settings, decider: Decider | None = None, hub: Hub | None = None,
                adapters: dict[str, type] | None = None, gpu: GpuSlot | None = None) -> FastAPI:
-    adapters = adapters or ADAPTERS
+    base = adapters or ADAPTERS
+    adapters = with_cards(base, settings.models_dir)       # capability-enablement 7.3: cards for more models of a family
+    tests_file = settings.state_dir / "selftest.json"     # each model's last test on this machine (7.3)
+
+    def tests() -> dict[str, Any]:
+        try:
+            return json.loads(tests_file.read_text())
+        except (OSError, ValueError):
+            return {}
+
+    def save_test(mid: str, result: dict[str, Any]) -> None:
+        try:
+            have = tests()
+            have[mid] = {**result, "at": time.time()}
+            tests_file.parent.mkdir(parents=True, exist_ok=True)
+            tmp = tests_file.with_suffix(".part")
+            tmp.write_text(json.dumps(have))
+            tmp.replace(tests_file)
+        except OSError as e:
+            log.warning("couldn't keep the test result: %s", e)
+
     if decider is None:
-        factory = functools.partial(LocalBackend, adapters, settings.models_dir, settings.device,
+        factory = functools.partial(LocalBackend, base, settings.models_dir, settings.device,
                                     settings.batch_size, settings.verify)
         decider = Decider(WorkerBackend(factory), settings.state_dir)
     dec = decider
@@ -182,16 +203,20 @@ def create_app(settings: Settings, decider: Decider | None = None, hub: Hub | No
     def health() -> dict:
         return {"status": "ok"}
 
-    @app.get("/v1/models", summary="The decision models: revision, inputs, weights present, loaded")
+    @app.get("/v1/models", summary="The decision models: revision, inputs, weights present, loaded, the judge's cutoff, the last test")
     def models() -> dict:
         out = []
+        last = tests()
         for mid, cls in adapters.items():
             problems = cls.check(settings.models_dir / cls.FOLDER)
             out.append({"id": mid, "name": cls.NAME, "repo": cls.REPO, "revision": cls.REVISION,
                         "license": cls.LICENSE, "params": cls.PARAMS, "inputs": list(cls.INPUTS),
                         "path": f"decide/{cls.FOLDER}", "usable": not problems, "problems": problems,
                         "loaded": dec.model == mid, "default": mid == settings.default_model,
-                        "memory_estimate_gb": dec.estimate_gb(mid)})
+                        "memory_estimate_gb": dec.estimate_gb(mid),
+                        "family": getattr(cls, "FAMILY", None), "threshold": getattr(cls, "THRESHOLD", 0.35),
+                        "tuned": bool(getattr(cls, "TUNED", False)), "test": last.get(mid)})
+        out += unknown_folders(adapters, settings.models_dir)      # folders no adapter reads: shown with the fix
         return {"models": out, "question_types": ["yesno", "choice", "score"]}
 
     @app.get("/v1/status", summary="Load state, busy, stats (architecture §4.6)")
@@ -343,9 +368,11 @@ def create_app(settings: Settings, decider: Decider | None = None, hub: Hub | No
         where = "your GPU" if dev not in ("cpu", None) else "the CPU"
         gb = dec.estimate_gb(mid)
         per = next_s / 10
-        return {"passed": "q" in first, "model": mid, "device": dev, "dtype": getattr(dec.backend, "dtype", None),
-                "load_s": round(load_s, 2), "first_s": round(first_s, 3), "next10_s": round(next_s, 3),
-                "per_answer_s": round(per, 3), "memory_gb": gb,
-                "sentence": f"{mid} on {where}: {per:.2f} s per answer, {gb:.1f} GB"}
+        result = {"passed": "q" in first, "model": mid, "device": dev, "dtype": getattr(dec.backend, "dtype", None),
+                  "load_s": round(load_s, 2), "first_s": round(first_s, 3), "next10_s": round(next_s, 3),
+                  "per_answer_s": round(per, 3), "memory_gb": gb,
+                  "sentence": f"{mid} on {where}: {per:.2f} s per answer, {gb:.1f} GB"}
+        save_test(mid, result)                  # shown beside the model (Settings → Permissions → Auto judge, 7.3)
+        return result
 
     return app

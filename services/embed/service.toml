@@ -19,6 +19,8 @@ install = "install.sh"
 
 [run.env]
 EMBED_MODEL_DIR = "{models}/embed/embeddinggemma-2"
+# EMBED_MODEL = "bge-small-en-v1.5"  # capability-enablement 7.3: another model folder under {models}/embed/ as the default;
+                                     # a switch from the page (POST /v1/model) is saved in the state folder's model.json
 EMBED_STATE_DIR = "{root}/data/state/embed"
 EMBED_DEVICE = "auto"               # auto (the variant: GAIFA_DEVICE) | cuda | xpu | mps | cpu (bf16 on CUDA/ROCm and xpu, else fp32, never fp16)
 HF_HOME = "{hf_home}"

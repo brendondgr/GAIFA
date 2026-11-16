@@ -110,6 +110,8 @@ class JudgeStatus(_Model):
     detail: str = ""
     choices: list[str] = Field(default_factory=list, description="Models the backend offers that the judge could use (Settings → Agent)")
     fix: dict[str, Any] | None = Field(None, description="capability-enablement 3.6: when the decide mod isn't set up or is off, {kind, id, command}")
+    models: list[dict[str, Any]] = Field(default_factory=list, description="capability-enablement 7.3: every model the decide mod has: "
+                                         "{id, name, usable, problems, threshold, tuned, test, params}")
 
 
 class CallLimits(_Model):

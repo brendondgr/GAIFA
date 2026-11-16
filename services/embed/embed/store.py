@@ -63,7 +63,9 @@ class Matrix:
 
 
 class Store:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, dim: int = DIM):
+        self.dim = dim                                  # the model's vector size (capability-enablement 7.3)
+        self.path = path
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
         self.db.row_factory = sqlite3.Row
@@ -125,7 +127,7 @@ class Store:
                     'INSERT INTO chunks (output_id, kind, page, line, "offset", start_s, end_s, snippet, vector, text) '
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     [(oid, c.kind, c.page, c.line, c.offset, c.start_s, c.end_s, c.snippet[:400],
-                      np.asarray(c.vector, dtype=np.float16)[:DIM].tobytes(), c.text) for c in chunks])
+                      np.asarray(c.vector, dtype=np.float16)[:self.dim].tobytes(), c.text) for c in chunks])
                 still = sig is None or row["sig"] == sig
                 self.db.execute("UPDATE outputs SET state = ?, chunks = ?, error = NULL, indexed_ts = ? WHERE id = ?",
                                 (state if still else "pending", len(chunks), time.time(), oid))
@@ -192,8 +194,8 @@ class Store:
                 return self._matrix[1]
             rows = self.db.execute("SELECT id, output_id, kind, vector FROM chunks ORDER BY id").fetchall()
             version = self.version
-        vecs = (np.frombuffer(b"".join(r["vector"] for r in rows), dtype=np.float16).reshape(len(rows), DIM)
-                .astype(np.float32) if rows else np.zeros((0, DIM), np.float32))
+        vecs = (np.frombuffer(b"".join(r["vector"] for r in rows), dtype=np.float16).reshape(len(rows), self.dim)
+                .astype(np.float32) if rows else np.zeros((0, self.dim), np.float32))
         m = Matrix(np.array([r["id"] for r in rows], dtype=np.int64), [r["output_id"] for r in rows],
                    [r["kind"] for r in rows], vecs)
         with self.lock:
@@ -217,7 +219,7 @@ class Store:
         """Done only if the summary is still the one embedded (a newer one stays pending)."""
         with self.lock:
             self.db.execute("UPDATE chats SET state = 'done', vector = ? WHERE thread_id = ? AND summary = ?",
-                            (np.asarray(vector, dtype=np.float16)[:DIM].tobytes(), tid, summary))
+                            (np.asarray(vector, dtype=np.float16)[:self.dim].tobytes(), tid, summary))
 
     def delete_chat(self, tid: str) -> bool:
         with self.lock:
@@ -246,7 +248,7 @@ class Store:
     def finish_text(self, ns: str, tid: str, text: str, vector: np.ndarray) -> None:
         with self.lock:
             self.db.execute("UPDATE texts SET state = 'done', vector = ? WHERE ns = ? AND id = ? AND text = ?",
-                            (np.asarray(vector, dtype=np.float16)[:DIM].tobytes(), ns, tid, text))
+                            (np.asarray(vector, dtype=np.float16)[:self.dim].tobytes(), ns, tid, text))
 
     def delete_texts(self, ns: str, ids: list[str] | None = None) -> int:
         with self.lock:
@@ -262,6 +264,26 @@ class Store:
         out = {"pending": 0, "done": 0}
         out.update({r["state"]: r["n"] for r in self._rows("SELECT state, COUNT(*) AS n FROM texts WHERE ns = ? GROUP BY state", (ns,))})
         return out
+
+    def copy_from(self, other: "Store") -> dict[str, int]:
+        """What another model's index holds that isn't an output (capability-enablement 7.3): chat summaries and
+        texts (to be embedded here, unless this index already has the same words embedded) and collections."""
+        n = {"chats": 0, "texts": 0, "collections": 0}
+        have = {r["thread_id"]: r for r in self.chats()}
+        for r in other.chats():
+            h = have.get(r["thread_id"])
+            if h is None or h["summary"] != r["summary"] or not h["vector"]:
+                self.put_chat(r["thread_id"], r["title"], r["summary"], r["created_ts"], r["updated_ts"])
+                n["chats"] += 1
+        for r in other._rows("SELECT ns, id, title, text, meta FROM texts"):
+            self.put_text(r["ns"], r["id"], r["title"], r["text"], r["meta"])      # same words and a vector: kept
+            n["texts"] += 1
+        mine = {c["name"] for c in self.collections()}
+        for c in other.collections():
+            if c["name"] not in mine:
+                self.save_collection(c["name"], c["outputs"])
+                n["collections"] += 1
+        return n
 
     def queued(self) -> bool:
         """Chat summaries or texts waiting to be embedded (they go between outputs)."""

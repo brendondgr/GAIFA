@@ -941,3 +941,16 @@ def test_a_server_that_doesnt_answer_stops_with_why(root: Path, capsys, monkeypa
                              FakeRunner(), FakeProbe())
     p = out(capsys)
     assert rc != 0 and "nothing answers at http://127.0.0.1:9/v1" in json.dumps(p)
+
+
+def test_a_suggestions_exclude_leaves_files_out(root: Path, capsys) -> None:
+    """capability-enablement 7.3: a whole-repo download without its duplicate weights (onnx/*, *.bin)."""
+    doc = root / "services" / "tts" / "setup" / "env.md"
+    doc.write_text(TTS.replace('required = true', 'required = true\nexclude = ["onnx/*", "*.bin"]'))
+    runner = FakeRunner()
+    assert cli_setup.cmd_setup(args("tts", yes=True, accept=["tts-kokoro/2"], models=["tts-kokoro=Kokoro 82M"]), runner, FakeProbe()) == 0
+    capsys.readouterr()
+    dl = next(c for c, _, _ in runner.ran if "hf download" in c)
+    assert ' --exclude "onnx/*" --exclude "*.bin"' in dl
+    from utils.setupdocs.block import _suggest
+    assert _suggest(0, {"name": "x", "good_for": "y", "size_gb": 1, "repo": "a/b", "dest": "d", "files": ["f"], "exclude": ["*.bin"]})[1]

@@ -353,7 +353,7 @@ async def status(cfg: Any, client: httpx.AsyncClient | None = None, max_age_s: f
     key = (jc.backend, jc.model, jc.url)
     if _status.get("key") == key and time.time() - _status.get("ts", 0) < max_age_s:
         return _status["value"]
-    out = {"available": False, "backend": jc.backend, "model": jc.model, "detail": "", "choices": []}
+    out = {"available": False, "backend": jc.backend, "model": jc.model, "detail": "", "choices": [], "models": []}
     own = client is None
     client = client or httpx.AsyncClient(timeout=httpx.Timeout(3))
     try:
@@ -361,6 +361,10 @@ async def status(cfg: Any, client: httpx.AsyncClient | None = None, max_age_s: f
         r.raise_for_status()
         d = r.json()
         out["choices"] = [m.get("id") for m in d.get("models", []) if m.get("usable")]
+        # capability-enablement 7.3: every model the mod has, each with its cutoff, whether the judge's eval tuned it and
+        # its last test here; any usable one may be the judge
+        out["models"] = [{k: m.get(k) for k in ("id", "name", "usable", "problems", "threshold", "tuned", "test", "params")}
+                         for m in d.get("models", []) if m.get("id")]
         m = next((m for m in d.get("models", []) if m.get("id") == jc.model), None)
         out["available"] = bool(m and m.get("usable"))
         out["detail"] = "" if out["available"] else ("; ".join((m or {}).get("problems") or []) or

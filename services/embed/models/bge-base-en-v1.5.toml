@@ -1,0 +1,11 @@
+# What the embed mod needs to know about BGE base (capability-enablement 7.3): read when its folder,
+# data/models/embed/bge-base-en-v1.5/, has no gaifa-model.toml of its own. Format: embed/models.py.
+name = "BGE base (English)"
+repo = "BAAI/bge-base-en-v1.5"
+revision = "a5beb1e3e68b9ab74eb54cfd186867f64f240e1a"
+dim = 768
+kinds = ["text"]
+query_prompt = "Represent this sentence for searching relevant passages: "
+document_prompt = "{text}"
+dtype = "float32"
+size_gb = 0.44

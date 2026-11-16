@@ -138,7 +138,7 @@ def create_app(runtime: Runtime | None = None, env_url: str | None = None, watch
         url = body.url or (sx.url if body.source == "yours" else None)
         if body.source == "yours" and not url:
             return error(409, "no_searxng", "no SearXNG of yours was found", "give its URL, or start GAIFA's own")
-        saved = src.save(body.source, url)
+        saved = src.save(body.source, url) if body.source == "yours" or url else src.save("managed", None)
         if body.source == "yours" and url != sx.url:
             sx.env_url = url
             await sx.detect()
@@ -148,6 +148,27 @@ def create_app(runtime: Runtime | None = None, env_url: str | None = None, watch
     @app.get("/v1/found", summary="What was found: URL, container, compose folder, settings file")
     def found() -> dict:
         return sx.found()
+
+    @app.get("/v1/search-state", summary="Which SearXNG search uses, whether it answers, and GAIFA's own (the page's card)")
+    async def search_state() -> dict:
+        """capability-enablement 5.4: `using` yours | managed | none, its `url` and `up`, what detect last found, GAIFA's own
+        container, and the buttons that make sense now (`actions`)."""
+        chosen = src.load() or {}
+        m = await mg.state()
+        if chosen.get("source") == "managed" and m.get("exists"):
+            using = "managed"
+        elif sx.url and sx.answer != "none":
+            using = "yours" if chosen.get("source") != "managed" else "managed"
+        else:
+            using = "none"
+        url = chosen.get("url") if using == "managed" else sx.url if using == "yours" else None
+        up = bool(sx.health.get("up")) if url and url == sx.url else (m.get("running") if using == "managed" else False)
+        actions = {"yours": ["start_managed", "use_port"], "managed": ["use_port", "remove_managed"],
+                   "none": ["start_managed", "use_port"]}[using]
+        if using != "managed" and m.get("exists"):
+            actions.append("remove_managed")
+        return {"using": using, "url": url, "up": up, "answer": sx.answer, "json": sx.answer != "yours_no_json",
+                "managed": m, "runtime": m.get("runtime"), "actions": actions}
 
     @app.get("/v1/managed", summary="GAIFA's own SearXNG: whether it exists and runs, its URL, the runtime and image")
     async def managed_state() -> dict:

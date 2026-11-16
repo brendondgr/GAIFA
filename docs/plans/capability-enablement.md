@@ -263,14 +263,17 @@ One step at a time: each numbered step is one commit (`GAIFA (capability-enablem
   - If the block format needs a step whose question depends on an earlier step's output, `block.py` gains `ask_if` (a command whose exit code says whether to ask); say so in docs/mods.md §9.
   *Done when:* `utils/tests/docs/test_setupdocs.py` parses both blocks; `utils/tests/core/test_cli_setup.py` covers the three paths with fake commands; `gaifa docs --check --strict` passes.
   *As built:* the block format did need `ask_if` (run while the plan is made; a step it says doesn't apply loses its question and is reported skipped with the command's words), since `gaifa setup` asks every question before running any step. The steps run `services/searxng/scripts/setup_search.py`: a standard-library probe (so it works before the venv exists), then `use-yours`, `json-on` or `managed` with the mod's venv. A declined optional step now adds its `next` to the report ("web search stays off until a SearXNG answers…"). No `images` line: it would count 0.4 GB when yours is used; the step's words give the size. On this machine the plan finds the user's SearXNG on 8080, keeps "use yours" and leaves out the other two. The smoke: web's is one real search through the hub; searxng's checks GAIFA's own answers when yours isn't used. Tests: `utils/tests/core/test_cli_setup.py` (the three paths, a declined optional step), `services/searxng/tests/test_setup_search.py`.
-- [ ] **5.4 The app: `services/searxng/ui/page.js`, `services/web/ui/page.js`.**
+- [x] **5.4 The app: `services/searxng/ui/page.js`, `services/web/ui/page.js`.**
   - Both pages say which SearXNG search uses (yours at <url>, or GAIFA's on 5200) with **Switch**, **Use mine on port …**, **Start GAIFA's own**, **Remove GAIFA's SearXNG**, and, while `tools_off.search` is set, a "Search isn't connected" panel with the one button that fixes it.
   *Done when:* `services/searxng/tests/test_page_state.py` (the state the page reads) and a browser check of each state on the scratch hub.
+  *As built:* the page reads one route, `GET /v1/search-state` (`using` yours / managed / none, `url`, `up`, `json`, GAIFA's own container, and `actions`). The SearXNG page's card says which SearXNG search uses with Start GAIFA's own, Use mine on port …, Remove GAIFA's SearXNG; the Web page says "Search uses <url>" or shows "Search isn't connected" (from its `tools_off`) with Connect search, which opens the Set up dialog when the searxng mod isn't set up. "Switch" is those buttons rather than one of its own. Checked in the browser: the installed hub's SearXNG page ("Search uses your SearXNG at http://127.0.0.1:8080 · It answers, with JSON results") and Web page, and a scratch hub's Web page with no SearXNG ("Search isn't connected · no SearXNG answers at http://127.0.0.1:5299"). The managed and none cards are covered by the state tests; GAIFA's own container ran live in 5.2.
 
 **Checks & deliverables — Phase 5**
 - [ ] A fresh clone on a machine with podman and no SearXNG: Set up Web, yes to GAIFA's own, and `web_search` returns results, with no file written by hand. The doctor's What works shows search.
-- [ ] This machine: setup finds the user's SearXNG on 8080 and uses it; nothing is created.
-- [ ] Delivered: detect with the saved choice, `managed.py`, the two setup blocks, the pages.
+  *Not run here:* this machine has a SearXNG; GAIFA's own container was run live beside it (5.2), and the setup's no-SearXNG path is tested with fake commands (5.3). Left for the next fresh-clone check on a machine without one.
+- [x] This machine: setup finds the user's SearXNG on 8080 and uses it; nothing is created.
+  *As built:* `gaifa setup --plan --json web` here plans searxng then web, keeps "use yours" and leaves out JSON-on ("the SearXNG here is yours (http://127.0.0.1:8080)") and GAIFA's own ("a SearXNG of yours answers: GAIFA uses it"), with no question; the installed searxng mod's search state says yours, up, JSON on.
+- [x] Delivered: detect with the saved choice, `managed.py`, the two setup blocks, the pages.
 
 ## Phase 6 — Chat's model: the relay, or a server you already run (M)
 

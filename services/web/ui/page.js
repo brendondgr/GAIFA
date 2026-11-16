@@ -95,6 +95,26 @@ function reader(el, ctx) {
   url.focus();
 }
 
+/** "Search isn't connected" with the one button that fixes it, or the line saying which SearXNG search uses. */
+export async function searchState(el, ctx) {
+  const { ui } = ctx;
+  let st;
+  try { st = (await ctx.call('GET', '/v1/status')).json; } catch { return; }
+  const off = st?.tools_off?.search, sx = st?.searxng || {};
+  const box = off
+    ? ui.card(ui.row(ui.badge('search off', 'red'), ui.text("Search isn't connected")), ui.text(off.why, { muted: true }),
+        ui.row(ui.button('Connect search', async () => {
+          let sx = null;
+          try { sx = await ctx.api.getService('searxng'); } catch { ctx.toast('The searxng mod isn\'t in this GAIFA: it finds or starts the SearXNG search uses', 'error'); return; }
+          const st = sx?.availability?.status;
+          if (st === 'not_set_up' || st === 'cant_run') globalThis.dispatchEvent?.(new CustomEvent('gaifa:setup', { detail: { ids: ['searxng'] } }));
+          else location.hash = '#/s/searxng';
+        }, { kind: 'primary', small: true }),
+          ui.text('Reading pages works without it.', { muted: true })))
+    : ui.text(`Search uses ${sx.url || 'SearXNG'}${sx.from ? ` (${sx.from})` : ''}.`, { muted: true });
+  el.prepend(box);
+}
+
 export default {
   tabs: [{ id: 'read', label: 'Read a page', icon: 'search' }],
 
@@ -105,6 +125,7 @@ export default {
       import('/mod-kit.js').then(k => k.requireRunning(el, ctx, 'Read a page'));
       return;
     }
+    searchState(el, ctx);     // capability-enablement 5.4: which SearXNG search uses, or why it is off
     reader(el, ctx);
   },
 };

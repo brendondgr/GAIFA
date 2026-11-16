@@ -40,8 +40,45 @@ function healthCard(ctx, h, found) {
       ui.button('Look again', async () => { await ctx.call('POST', '/v1/detect'); ctx.refresh(); }, { small: true, kind: 'ghost' })));
 }
 
+// capability-enablement 5.4: which SearXNG search uses (yours, or GAIFA's own on 5200), with what changes it
+export function sourceWords(s) {
+  if (!s) return { title: '', body: '' };
+  if (s.using === 'managed') return { title: `Search uses GAIFA's own SearXNG at ${s.url}`, body: `A container (${s.runtime || 'podman'}) GAIFA started; ${s.up ? 'it answers' : 'it doesn\'t answer right now'}.` };
+  if (s.using === 'yours') return { title: `Search uses your SearXNG at ${s.url}`, body: s.json ? (s.up ? 'It answers, with JSON results.' : 'It doesn\'t answer right now.') : 'It refuses JSON results, which search needs: turn the JSON format on under Search settings.' };
+  return { title: 'No SearXNG answers: web search is off', body: 'Start GAIFA\'s own (a container on 127.0.0.1:5200), or point it at yours.' };
+}
+
+function sourceCard(ctx, s) {
+  const { ui } = ctx;
+  const w = sourceWords(s);
+  const port = ui.input({ placeholder: '8080', style: 'width:90px' });
+  const act = async (fn, ok) => { try { const r = await fn(); if (r && r.status >= 400) throw r.json || { detail: `HTTP ${r.status}` }; if (ok) ctx.toast(ok, 'success'); } catch (e) { ctx.toast(e.detail || String(e), 'error'); } ctx.refresh(); };
+  const buttons = [];
+  if (s.actions.includes('start_managed')) buttons.push(ui.button("Start GAIFA's own", () => act(async () => {
+    if (!(await ctx.confirm({ title: "Start GAIFA's own SearXNG?", body: 'A container from SearXNG\'s image (about 0.4 GB the first time), on 127.0.0.1:5200, settings in data/state/searxng/managed/. Search then uses it instead of yours.' }))) return null;
+    await ctx.call('POST', '/v1/source', { json: { source: 'managed' } });
+    return ctx.call('POST', '/v1/managed', { json: {} });
+  }, "GAIFA's own SearXNG is running"), { small: true }));
+  if (s.actions.includes('use_port')) buttons.push(ui.row(ui.text('Use mine on port', { muted: true }), port, ui.button('Use it', () => act(async () => {
+    const p = parseInt(port.value, 10);
+    if (!p) throw { detail: 'Give the port your SearXNG listens on' };
+    const d = await ctx.call('POST', '/v1/detect', { json: { port: p } });
+    if (d.json.answer === 'none' || !d.json.url) throw { detail: `No SearXNG answers on port ${p}` };
+    return ctx.call('POST', '/v1/source', { json: { source: 'yours', url: d.json.url } });
+  }, 'Search uses your SearXNG'), { small: true, kind: 'ghost' })));
+  if (s.actions.includes('remove_managed')) buttons.push(ui.button("Remove GAIFA's SearXNG", () => act(async () => {
+    if (!(await ctx.confirm({ title: "Remove GAIFA's own SearXNG?", body: 'Its container and its image go; its settings folder stays. Search uses yours if one answers, else it\'s off.', danger: true }))) return null;
+    return ctx.call('DELETE', '/v1/managed', { query: { image: true } });
+  }, "Removed GAIFA's SearXNG"), { small: true, kind: 'ghost' }));
+  return ui.card(ui.row(ui.badge(s.using === 'none' ? 'off' : s.up ? 'up' : 'down', s.using === 'none' ? 'dim' : s.up ? 'green' : 'red'), ui.text(w.title)),
+    ui.text(w.body, { muted: true }), ui.row(...buttons));
+}
+
 async function engines(el, ctx) {
   const { ui } = ctx;
+  const state = await ctx.call('GET', '/v1/search-state').catch(() => null);
+  if (state?.json) el.append(sourceCard(ctx, state.json));
+  if (state?.json?.using === 'none') return;
   const [health, found, list] = await Promise.all([ctx.call('GET', '/v1/health'), ctx.call('GET', '/v1/found'), ctx.call('GET', '/v1/engines')]);
   const all = list.json.engines;
   let show = 'on';

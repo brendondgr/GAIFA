@@ -1,4 +1,5 @@
-"""The generated parts: a model doc's block and the index in docs/setup/README.md."""
+"""The generated parts: a model doc's block, the index in docs/setup/README.md, the support matrix in docs/platforms.md
+and the table in docs/turning-things-on.md (capability-enablement 8.3)."""
 
 from __future__ import annotations
 
@@ -189,5 +190,37 @@ def platforms_matrix(envs: list[Env], page: Path) -> str:
             marks = {a: ("✓" if o in var.tested else "○") for var in v.setup.effective_variants() if o in var.os for a in [var.accel]}
             cells.append(" · ".join(f"{RUNS_ON[a]} {marks[a]}" for a in ACCELS if a in marks) or "—")
         out.append(f"| `{v.mod}` | [{v.title}]({link(page, v.path)}) | " + " | ".join(cells) + " |")
+    out.append(END)
+    return "\n".join(out)
+
+
+def turning_on(envs: list[Env], page: Path, root: Path) -> str:
+    """The table in docs/turning-things-on.md (capability-enablement 8.3): each mod, what it gives, recommended, its size
+    (environments and default models), what a chat can't do without it (its manifest's `[agent] provides`), the command
+    and where its models are compared."""
+    import tomllib
+    out = [START]
+    by_mod: dict[str, list[Env]] = {}
+    for v in envs:
+        by_mod.setdefault(v.mod, []).append(v)
+    if not by_mod:
+        out += ["*No setup docs yet.*", END]
+        return "\n".join(out)
+    out += ["| Mod | What it gives you | Recommended | Size | Without it, a chat can't… | Turn it on | Models compared |",
+            "|---|---|---|---|---|---|---|"]
+    for mod in sorted(by_mod, key=lambda m: (not any(v.setup.recommended for v in by_mod[m] if v.id == m), m)):
+        vs = sorted(by_mod[mod], key=lambda v: v.id)
+        own = next((v for v in vs if v.id == mod), None)
+        gives = (own.setup.summary or own.title) if own else " · ".join(v.setup.summary for v in vs if v.setup.summary) or vs[0].title
+        own = own or vs[0]
+        try:
+            provides = str((tomllib.loads((root / "services" / mod / "service.toml").read_text()).get("agent") or {}).get("provides") or "")
+        except (OSError, tomllib.TOMLDecodeError):
+            provides = ""
+        disk = sum(v.setup.disk_gb or 0 for v in vs) + sum(s.size_gb for v in vs for s in v.setup.suggest if s.required or s.default)
+        finds = ", ".join(f"[{f.label}]({f.url})" for v in vs for f in v.setup.find) or "—"
+        rec = "yes" if any(v.setup.recommended for v in vs if v.id == mod) else "—"
+        out.append(f"| [`{mod}`]({link(page, own.path)}) | {gives} | {rec} | {gb(disk * 1e9) if disk else '—'} | "
+                   f"{provides or '—'} | `gaifa setup {mod}` | {finds} |")
     out.append(END)
     return "\n".join(out)

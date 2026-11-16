@@ -95,9 +95,17 @@ Paths (`paths.models`, `paths.databases`, `paths.outputs`) must stay inside the 
 | 6 | `comfy` (Images & Video) | [ComfyUI](../../services/comfy/setup/comfyui.md) | yes |
 | 7 | `tts` (Speech) | [Kokoro](../../services/tts/setup/kokoro.md), [Breeze TTS 2](../../services/tts/setup/breeze.md) | yes |
 | 8 | `gen3d` (3D Generate) | [the base](../../services/gen3d/setup/gen3d.md) (the server, the image, every engine's runtime), then the engines: [CubeArt](../../services/gen3d/setup/cubeart.md), [Hunyuan3D 2.1](../../services/gen3d/setup/img3d.md), [SAM 3D Objects](../../services/gen3d/setup/sam3do.md) | yes; two of its engines run in ComfyUI (6) |
-| 9 | `web` (Web search) | [web](../../services/web/setup/web.md) (SearXNG runs outside GAIFA) | no |
-| 9b | `searxng` (optional: watches and adjusts that SearXNG) | [searxng](../../services/searxng/setup/searxng.md) | no |
-| 10 | `stt` (Speech to Text) | [faster-whisper](../../services/stt/setup/stt.md) | no; much faster with one |
+| 9 | `searxng` (search: your SearXNG, or GAIFA's own in a container) | [searxng](../../services/searxng/setup/searxng.md) | no |
+| 10 | `web` (Web: pages and search) | [web](../../services/web/setup/web.md) | no |
+| 11 | `stt` (Speech to Text) | [faster-whisper](../../services/stt/setup/stt.md) | no; much faster with one |
+| 12 | `workspace` (your folders, the sandbox) | [workspace](../../services/workspace/setup/workspace.md) | no; the sandbox needs podman |
+| 13 | `decide` (decisions: the Auto judge) | [decide](../../services/decide/setup/decide.md) | no; quicker with one |
+| 14 | `embed` (search by meaning) | [embed](../../services/embed/setup/embed.md) | no; quicker with one |
+| 15 | `mcp` (other MCP servers' tools) | [mcp](../../services/mcp/setup/mcp.md), [Blender](../../services/mcp/setup/blender.md) | no |
+| 16 | `calendar` | [calendar](../../services/calendar/setup/linux.md) | no |
+| 17 | `voice` (voice mode on a speech-to-speech model) | [llama.cpp](../../services/voice/setup/llama-cpp.md) | yes |
+
+Mods 9, 10 and 12–16 are the set recommended for chat (`gaifa setup --recommended`; [turning-things-on.md](../turning-things-on.md) says what each gives and what its state means).
 
 The relay comes first because the LLM mods publish themselves to it and the agent talks to models through it. ComfyUI comes before 3D Generate because TRELLIS.2 and SAM 3D Body run as ComfyUI workflows, and its setup pulls the image both use. The setup docs say so in their blocks (`after`: `lcpp`, `vllm` and `agent` after `relay`, 3D Generate's base after `comfyui` and each of its engines after the base), so `gaifa setup <ids>` puts them in this order and sets up what a choice needs. Skip any mod you don't want: a mod that isn't installed yet (its command doesn't exist) isn't autostarted, and the hub shows it as "not installed: run gaifa setup <id>" (plan 23.12).
 

@@ -237,3 +237,22 @@ def test_a_recommended_mods_doc_has_check_and_when_it_fails(root: Path) -> None:
 def test_every_recommended_mod_here_has_them() -> None:
     root = Path(__file__).resolve().parents[3]
     assert setupdocs.sync(root, check=True).unguided == {}
+
+
+def test_the_turning_on_table(root: Path) -> None:
+    """capability-enablement 8.3: docs/turning-things-on.md's table, made by gaifa docs: each mod, what it gives,
+    recommended first, the size with default models, what a chat can't do without it, the command."""
+    d = root / "services" / "rec" / "setup"
+    d.mkdir(parents=True)
+    (d.parent / "service.toml").write_text('id = "rec"\n[agent]\nprovides = "do the rec thing"\n')
+    (d / "rec.md").write_text('<!-- gaifa-setup\nid = "rec"\ntitle = "Rec"\nsummary = "Rec: things"\nrecommended = true\ndisk_gb = 1.0\n'
+                              '[[suggest]]\nname = "M"\nrepo = "a/b"\ndest = "rec/m"\nsize_gb = 0.5\ngood_for = "x"\ndefault = true\n-->\n\n# Rec\n')
+    page = root / "docs" / "turning-things-on.md"
+    page.parent.mkdir(parents=True, exist_ok=True)
+    page.write_text(f"# Turning things on\n\n{render.START}\n{render.END}\n\nhand text\n")
+    report = setupdocs.sync(root, check=True)
+    assert "docs/turning-things-on.md" in report.stale
+    setupdocs.sync(root)
+    text = page.read_text()
+    assert "| [`rec`](../services/rec/setup/rec.md) | Rec: things | yes | 1.5 GB | do the rec thing | `gaifa setup rec` | — |" in text
+    assert text.endswith("hand text\n") and setupdocs.sync(root, check=True).stale == []

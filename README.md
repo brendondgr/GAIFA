@@ -217,6 +217,14 @@ Four mods (the relay, the llama.cpp launcher, speech and 3D) are git submodules 
 
 `gaifa setup` does the whole install: the hub (`uv sync`, then `gaifa install`, which writes and starts the `gaifa` systemd user service and links `gaifa` into `~/.local/bin`), the host checks (it prints any `sudo` fixes for you to run; it never runs them), then the mods you pick from a list. It asks every question first (licences, which models), installs each mod, downloads the models you chose, asks for the agent's model once your relay has some, and checks each mod. If it stops, run it again: it resumes. Open <http://127.0.0.1:7000> when it's done.
 
+**With your coding agent.** Paste what this prints into Claude Code or Codex; it reads the mods' setup docs, runs the same commands with your answers and checks each mod:
+
+```bash
+bin/gaifa setup --prompt web searxng workspace decide embed
+```
+
+`bin/gaifa setup --recommended` sets up the set recommended for chat without a list. What each mod gives, how to turn one on from the app or from a chat, and what *not set up*, *off*, *stopped* and *failed* mean: [docs/turning-things-on.md](docs/turning-things-on.md).
+
 To set up only some mods: `bin/gaifa setup relay agent tts`; to see the plan first: `--plan`. An AI agent can run the same process for you (`--plan --json`, answers in a file, one JSON report; the `gaifa-setup` skill): the steps and questions are the same as yours. The guide behind it, and each mod's own setup doc, are in [docs/setup/](docs/setup/README.md).
 
 To use every mod's tools from Claude Code, add the hub as an MCP server:

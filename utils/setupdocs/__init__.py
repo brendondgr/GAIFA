@@ -214,4 +214,9 @@ def sync(root: Path, ids: list[str] | None = None, check: bool = False) -> Repor
         text = page.read_text()
         if BLOCK.search(text):
             _put(page, BLOCK.sub(lambda _m: render.platforms_matrix(envs, page), text, count=1), check, report, page.relative_to(root).as_posix())
+    guide = root / "docs" / "turning-things-on.md"           # capability-enablement 8.3
+    if guide.exists():
+        text = guide.read_text()
+        if BLOCK.search(text):
+            _put(guide, BLOCK.sub(lambda _m: render.turning_on(envs, guide, root), text, count=1), check, report, guide.relative_to(root).as_posix())
     return report

@@ -24,9 +24,11 @@ if __package__:   # imported as utils.cli_setup (tests); as a script's helper it
     from utils import cli_setup_host as host_mod
     from utils import cli_setup_repos as repos_mod
     from utils import cli_setup_run as run_mod
+    from utils import cli_setup_recommend as rec_mod
     from utils import cli_setup_variant as variant_mod
     from utils import setupdocs
 else:
+    import cli_setup_recommend as rec_mod  # type: ignore[no-redef]
     import cli_setup_host as host_mod  # type: ignore[no-redef]
     import cli_setup_repos as repos_mod  # type: ignore[no-redef]
     import cli_setup_run as run_mod  # type: ignore[no-redef]
@@ -197,6 +199,9 @@ def plan_text(p: dict[str, Any]) -> str:
         out += ["", "Then each check: " + "; ".join(c["run"] for c in p["checks"])]
     if p.get("smokes"):
         out += ["Then each smoke (real work): " + "; ".join(s["run"] for s in p["smokes"])]
+    if p.get("recommended_left_out"):          # capability-enablement 8.1
+        out += ["", "Recommended for chat, not chosen and not set up:"] + [f"  {x['mod']}" + (f": without it, a chat can't {x['provides']}" if x["provides"] else "")
+                                                                         for x in p["recommended_left_out"]]
     bad = [c for c in p["host"] if not c["ok"]]
     out += ["", f"Host: {len(p['host']) - len(bad)} checks ok" + (", to fix first: " + ", ".join(c["id"] for c in bad if c["id"] in p["blocking"]) if p["blocking"] else "")
             + ("" if not bad or p["blocking"] else f" ({', '.join(c['id'] for c in bad)}: advice)") + "  (gaifa setup host)"]
@@ -256,18 +261,30 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
             found = host_mod.checks(probe, root)
             emit(args, {"stage": "host", "host": [c.dump() for c in found]}, host_mod.text(found) + "\n(GPU checks matter only for mods that use the GPU)")
             return 1 if host_mod.blocking(found, gpu=False) else 0
+        rec = rec_mod.recommended_mods(root, offered)        # capability-enablement 8.1: the set recommended for chat
+        take = rec_mod.for_chat(root, offered)                # with the agent when it isn't set up (it's required for a chat)
+        if not targets and getattr(args, "recommended", False):
+            targets = list(take)
         if not targets:
             if not run_mod.interactive(args):
-                emit(args, {"stage": "choose", "choices": [{"id": e.id, "mod": e.mod, "summary": e.setup.summary, "gpu": e.setup.gpu, "disk_gb": e.setup.disk_gb, "after": e.setup.after} for e in offered.values()], "problems": problems,
-                            "unavailable": subs["failed"]},
+                emit(args, {"stage": "choose", "choices": [{"id": e.id, "mod": e.mod, "summary": e.setup.summary, "gpu": e.setup.gpu, "disk_gb": e.setup.disk_gb, "after": e.setup.after,
+                                                            "recommended": e.mod in rec} for e in offered.values()], "recommended": rec, "problems": problems,
+                            "unavailable": subs["failed"], "answer_with": "gaifa setup --recommended, or gaifa setup <mod>…"},
+                     "Recommended for chat (gaifa setup --recommended):\n" + "\n".join(f"  {m}" for m in rec) + "\n\nEvery setup:\n" +
                      "\n".join(f"  {e.id:24} {e.setup.summary}" for e in offered.values()))
                 return 0
-            ids = sorted(offered, key=lambda i: (offered[i].mod, i))
+            ids = sorted(offered, key=lambda i: (offered[i].mod not in take, offered[i].mod, i))
+            first = True
             for n, i in enumerate(ids, 1):
                 e = offered[i]
-                print(f"  {n:2}. {i:24} {'GPU ' if e.setup.gpu else '    '}{(e.setup.disk_gb or 0):5.1f} GB  {e.setup.summary}")
-            pick = input("Which? numbers or ids, comma-separated: ")
-            targets = [ids[int(x) - 1] if x.strip().isdigit() else x.strip() for x in pick.split(",") if x.strip()]
+                if n == 1 and e.mod in take:
+                    print("Recommended for chat (Enter takes them):")
+                if e.mod not in take and first:
+                    print("\nThe rest:")
+                    first = False
+                print(f"  {n:2}. {'[x]' if e.mod in take else '[ ]'} {i:24} {'GPU ' if e.setup.gpu else '    '}{(e.setup.disk_gb or 0):5.1f} GB  {e.setup.summary}")
+            pick = input("Which? numbers or ids, comma-separated (Enter: the recommended): ")
+            targets = [ids[int(x) - 1] if x.strip().isdigit() else x.strip() for x in pick.split(",") if x.strip()] or list(take)
         lost = [t for t in targets if any(repos_mod.wanted([t], f["mod"]) and t not in offered for f in subs["failed"])]
         if lost:
             targets = [t for t in targets if t not in lost]
@@ -306,6 +323,8 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
         p["unavailable"] = unavailable
         p["checkouts"] = subs
         p["smokes"] = [{"setup": e.id, "run": e.setup.smoke} for e in envs if e.setup.smoke] if getattr(args, "smoke", False) else []
+        p["recommended"] = rec                  # 8.1: the set for chat, and those left out that aren't set up
+        p["recommended_left_out"] = rec_mod.left_out(root, {e.mod for e in envs}, offered)
         applies(p, envs, root, runner)          # capability-enablement 5.3: steps whose ask_if says they don't apply here
         _last["plan"] = p
         if args.plan:
@@ -321,6 +340,7 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
             if input("\nRun it? [y/N] ").strip().lower() not in ("y", "yes"):
                 return 1
         report = {"stage": "report", **run_mod.execute(envs, p, args, answers, root, code, runner)}
+        report["next"] += rec_mod.next_lines(p["recommended_left_out"])
         ok = not report["failed"]
         emit(args, report, ("Done: " if ok else "Not done: ") + f"{len(report['done'])} steps and models, {len(report['failed'])} failed" +
              "".join(f"\n  failed {f['step']}: see {f['doc']}" for f in report["failed"]) +
@@ -372,4 +392,5 @@ def add_parser(sub: Any) -> None:
     p.add_argument("--from-scratch", action="store_true", help="forget which steps a previous run finished")
     p.add_argument("--accel", action="append", metavar="ID=ACCEL", help="the variant for a setup or mod: rocm, cuda, xpu, mps, vulkan or cpu (repeatable; default: the best this machine has)")
     p.add_argument("--prompt", action="store_true", help="print a prompt to paste into your own coding agent (Claude Code, Codex) so it sets these mods up for you")
+    p.add_argument("--recommended", action="store_true", help="the mods recommended for chat (no list): web, search, workspace, decide, embed, … (capability-enablement 8.1)")
     p.add_argument("--smoke", action="store_true", help="after the checks, run each setup's smoke: real work (an image, a sentence spoken) that proves the GPU path")

@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from utils.services.model import ServiceError
+from utils.paths import write_atomic
 
 CODE = Path(__file__).resolve().parents[1]           # the checkout: bin/gaifa lives here, whatever GAIFA_ROOT is
 ID = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
@@ -116,7 +117,7 @@ class SetupJobs:
         return {"id": sid, "name": svc.mod.name if svc else sid, "provides": (m.agent.provides if m else None) or "",
                 "description": m.description if m else "", "folder": f"services/{sid}", "port": svc.eff.port if svc else None,
                 "recommended": recommended(d) if d.is_dir() else False,
-                "installed": mgr.installed(svc) if svc is not None else False}
+                "installed": mgr.installed(svc) if svc is not None else False, "last_test": self.last_test(sid)}
 
     # ---- a setup ----------------------------------------------------------------------------
 
@@ -254,8 +255,46 @@ class SetupJobs:
         log.write_text(out)
         svc = self.hub.services.services.get(sid) if self.hub.services else None
         device = ((svc.status or {}).get("device") if svc is not None else None) or None
-        return {"id": sid, "passed": rc == 0, "seconds": secs, "device": device, "run": env.setup.smoke,
-                "log": str(log.relative_to(self.root)), "output": out[-2000:]}
+        measured = _measured(out)                # capability-enablement 7.2: the mod's own numbers, when its test gives them
+        device = measured.get("device") or device
+        passed = rc == 0
+        out_ = {"id": sid, "passed": passed, "seconds": secs, "device": device, "run": env.setup.smoke,
+                "log": str(log.relative_to(self.root)), "output": out[-2000:],
+                "sentence": measured.get("sentence") or (f"{sid}: test {'passed' if passed else 'failed'} in {secs} s"), "measured": measured}
+        gpu_expected = bool(env.setup.gpu) and any(v.accel != "cpu" for v in env.setup.effective_variants())
+        advice = []                              # advice, never a gate: the mod stays set up either way
+        if not passed or (gpu_expected and device == "cpu"):
+            if gpu_expected:
+                advice.append(f"try the CPU variant: gaifa setup {sid} --accel {sid}=cpu" if not passed else
+                              f"it ran on the CPU though a GPU was expected: check the GPU setup (gaifa hardware), or keep the CPU")
+            if len(env.setup.suggest) > 1:
+                advice.append("pick a smaller model (its setup's model question)")
+            advice.append(f"have your coding agent look: gaifa setup --prompt {sid} (the log is {out_['log']})")
+        out_["advice"] = advice
+        out_["at"] = time.time()
+        write_atomic(logs / "test.json", json.dumps({k: v for k, v in out_.items() if k != "output"}))  # shown beside the model (7.3, 7.4)
+        return out_
+
+    def last_test(self, sid: str) -> dict[str, Any] | None:
+        """The mod's last test result (without its output), or None."""
+        try:
+            return json.loads((self.state_dir / "logs" / sid / "test.json").read_text())
+        except (OSError, ValueError):
+            return None
+
+
+def _measured(out: str) -> dict[str, Any]:
+    """The last JSON object a test printed that has a `sentence` (a mod's /v1/selftest), else {}."""
+    for line in reversed(out.splitlines()):
+        line = line.strip()
+        if line.startswith("{") and '"sentence"' in line:
+            try:
+                v = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(v, dict):
+                return v
+    return {}
 
 
 def _needs(report: Any) -> dict[str, Any]:

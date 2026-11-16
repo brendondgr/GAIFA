@@ -108,7 +108,7 @@ export async function open(env, ids) {
       acts.push(h('button', { type: 'button', style: BTN(true), onclick: () => { close(); env.go?.(`#/s/${job.ids[0]}`); } }, `Open ${job.ids[0]}`));
       acts.push(h('button', { type: 'button', style: BTN(false), onclick: async () => {
         for (const id of job.ids) {
-          try { const t = await api.testSetup(id); toast?.(`${id}: ${t.passed ? 'passed' : 'failed'} in ${t.seconds} s${t.device ? ` on ${t.device}` : ''}`, t.passed ? 'success' : 'error'); }
+          try { const t = await api.testSetup(id); toast?.((t.sentence || `${id}: ${t.passed ? "passed" : "failed"} in ${t.seconds} s`) + ((t.advice || []).length ? ` · ${t.advice[0]}` : ""), t.passed ? "success" : "error"); }
           catch (e) { if (e?.code !== 'no_test') fail(e); }
         } } }, 'Test on this machine'));
     }

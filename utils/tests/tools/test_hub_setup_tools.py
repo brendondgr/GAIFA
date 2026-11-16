@@ -93,7 +93,7 @@ async def test_refused_unattended_and_absent_from_mcp(hub):
 async def test_the_test_tool(hub):
     app, c, fake = hub
     out = await call(c, "hub_setup_test", {"id": "fresh"})
-    assert out["status"] == "done" and out["result"]["passed"] is True and set(out["result"]) == {"id", "passed", "seconds", "device", "log"}
+    assert out["status"] == "done" and out["result"]["passed"] is True and set(out["result"]) == {"id", "passed", "seconds", "device", "log", "sentence", "advice"}
 
 
 async def test_a_mod_not_set_up_now_names_hub_setup(hub):

@@ -9,7 +9,7 @@ gpu = true
 disk_gb = 6.6
 needs = ["uv"]
 check = "gaifa start embed && gaifa check embed"
-smoke = "gaifa start embed >/dev/null && curl -fsS -H 'content-type: application/json' -d '{\"inputs\": [{\"text\": \"a red bicycle\"}]}' \"$(gaifa url api/s/embed/v1/embed)\" | tee /dev/stderr | grep -q '\"dim\": *768'"   # plan 39: real work, run by gaifa setup --smoke and the field test
+smoke = "gaifa start embed >/dev/null && r=$(curl -fsS -X POST -H 'content-type: application/json' -d '{}' \"$(gaifa url api/s/embed/v1/selftest)\") && echo \"$r\" && echo \"$r\" | grep -q '\"passed\": *true'"   # plan 39, capability-enablement 7.2: real work, measured (one sentence)
 
 [[steps]]
 run = "gaifa install embed"

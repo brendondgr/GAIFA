@@ -9,7 +9,7 @@ gpu = true
 disk_gb = 6.6
 needs = ["uv"]
 check = "gaifa start decide && gaifa check decide"
-smoke = "gaifa start decide >/dev/null && curl -fsS -H 'content-type: application/json' -d '{\"input\": \"The sky is blue.\", \"questions\": [{\"id\": \"q\", \"type\": \"yesno\", \"question\": \"Is this about the sky?\"}]}' \"$(gaifa url api/s/decide/v1/decide)\" | tee /dev/stderr | grep -q '\"q\"'"   # plan 39: real work, run by gaifa setup --smoke and the field test
+smoke = "gaifa start decide >/dev/null && r=$(curl -fsS -X POST -H 'content-type: application/json' -d '{}' \"$(gaifa url api/s/decide/v1/selftest)\") && echo \"$r\" && echo \"$r\" | grep -q '\"passed\": *true'"   # plan 39, capability-enablement 7.2: real work, measured (one sentence)
 
 [[steps]]
 run = "gaifa install decide"

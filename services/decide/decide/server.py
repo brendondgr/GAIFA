@@ -313,4 +313,39 @@ def create_app(settings: Settings, decider: Decider | None = None, hub: Hub | No
         return {"model": mid, "revision": cls.REVISION, "answers": answers, "device": dec.backend.device,
                 "ms": round((time.perf_counter() - t0) * 1000, 1), "model_ms": round(ms, 1)}
 
+    @app.post("/v1/selftest", summary="Test the model on this machine: the first answer, ten more, the device and memory")
+    async def selftest(body: LoadRequest | None = None) -> Any:
+        """capability-enablement 7.2: real work, measured: load (if needed), one answer, then ten; says it in one sentence.
+        Advice, never a gate: a slow or CPU result is reported with what could help."""
+        mid, err = resolve(body.model if body else None)
+        if err:
+            return err
+        q = [{"id": "q", "type": "yesno", "question": "Is this about the sky?"}]
+        try:
+            async with (contextlib.nullcontext() if on_cpu() else gpu.slot(f"{mid}: test", est_s=5)):
+                await make_room(mid)
+                t0 = time.perf_counter()
+                if dec.model != mid:
+                    await asyncio.to_thread(dec.load, mid)
+                load_s = time.perf_counter() - t0
+                t1 = time.perf_counter()
+                first, _ = await asyncio.to_thread(dec.ask, mid, "The sky is blue today.", q, None, None)
+                first_s = time.perf_counter() - t1
+                t2 = time.perf_counter()
+                for i in range(10):
+                    await asyncio.to_thread(dec.ask, mid, f"Sentence {i}: the sea is calm.", q, None, None)
+                next_s = time.perf_counter() - t2
+        except HubError as e:
+            return JSONResponse(e.body(), status_code=e.status)
+        except (PermissionError, FileNotFoundError, WorkerDied, RuntimeError) as e:
+            return backend_error(e)
+        dev = dec.backend.device
+        where = "your GPU" if dev not in ("cpu", None) else "the CPU"
+        gb = dec.estimate_gb(mid)
+        per = next_s / 10
+        return {"passed": "q" in first, "model": mid, "device": dev, "dtype": getattr(dec.backend, "dtype", None),
+                "load_s": round(load_s, 2), "first_s": round(first_s, 3), "next10_s": round(next_s, 3),
+                "per_answer_s": round(per, 3), "memory_gb": gb,
+                "sentence": f"{mid} on {where}: {per:.2f} s per answer, {gb:.1f} GB"}
+
     return app

@@ -269,6 +269,7 @@ needs = ["podman", "espeak-ng"]             # host commands that must exist
 after = ["tts"]                             # setup ids to do first
 check = "gaifa check tts"                   # proves it works
 smoke = "scripts/smoke.sh"                  # version 3: real work (one clip spoken); run by `gaifa setup --smoke` and the field test
+                                            # a smoke that prints a JSON line with "sentence" (a mod's POST /v1/selftest) has it shown as what it measured (capability-enablement 7.2)
 
 [[steps]]                                   # run in order, with bash, in the mod's folder
 run = "scripts/install-runtime.sh"

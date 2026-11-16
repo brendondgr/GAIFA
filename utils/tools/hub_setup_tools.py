@@ -106,7 +106,7 @@ async def setup_test(hub: Hub, args: dict[str, Any]) -> Any:
         t = await hub.setup.test(str(args["id"]))
     except ServiceError as e:
         raise ToolError(e.code, e.detail, "this mod has no test; say it is set up and running instead") from None
-    return {k: t[k] for k in ("id", "passed", "seconds", "device", "log")}
+    return {k: t[k] for k in ("id", "passed", "seconds", "device", "log", "sentence", "advice") if k in t}
 
 
 def specs(obj: Any) -> list[tuple[str, str, dict[str, Any], Any, str]]:

@@ -479,7 +479,8 @@ interface ServiceSummary {
 // capability-enablement 3.3: methods getSetupPlan(ids) → SetupPlan, startSetup(ids, answers) → SetupJob, getSetupJob() → SetupJob | null,
 // cancelSetup() → SetupJob | null, testSetup(id) → SetupTest, getSetupPrompt(ids) → string (area `setup`; events {type: "setup", job})
 interface SetupAbout { id: string; name: string; provides: string; description: string; folder: string; port: number | null;
-                       recommended: boolean; installed: boolean }
+                       recommended: boolean; installed: boolean;
+                       last_test: SetupTest | null }   // 7.2: the last test on this machine, without its output
 interface SetupJob { id: string; ids: string[]; state: "running" | "done" | "failed" | "needs_you" | "cancelled";
                      started_ts: number; finished_ts: number | null;
                      lines: string[];              // the last progress lines
@@ -489,7 +490,11 @@ interface SetupJob { id: string; ids: string[]; state: "running" | "done" | "fai
                      started: { id: string; state: string; error?: string }[] }   // done: each mod started after setup
 interface SetupJobView { job: SetupJob | null }   // GET and DELETE /api/setup/job
 interface SetupPrompt { text: string }   // GET /api/setup/prompt?ids=: paste into your own coding agent (3.2)
-interface SetupTest { id: string; passed: boolean; seconds: number; device: string | null; run: string; log: string; output: string }
+interface SetupTest { id: string; passed: boolean; seconds: number; device: string | null; run: string; log: string; output: string;
+                      sentence: string;             // 7.2: what it measured ("d3-lite on your GPU: 0.04 s per answer, 7.7 GB")
+                      measured: object;             // the mod's own numbers (its POST /v1/selftest), {} when its test gives none
+                      advice: string[];             // failed, or on the CPU though a GPU was expected: what could help; never a gate
+                      at: number | null }           // when it ran
 
 interface Availability {
   status: "on" | "starts_on_use" | "off" | "not_set_up" | "cant_run" | "failed" | "broken";

@@ -30,13 +30,14 @@ class FakeGaifa:
         self.rc = 0
         self.hold: asyncio.Event | None = None
         self.answers: list[dict] = []
+        self.smoke_out = "spoke one sentence\n"
 
     async def __call__(self, args, root: Path, on_line, on_proc):
         self.calls.append(args)
         if args[:2] == ["setup", "--plan"]:
             return 0, json.dumps(PLAN)
         if args[0] == "__smoke__":
-            return (0, "spoke one sentence\n") if args[1] == "fresh" else (1, "boom\n")
+            return (0, self.smoke_out) if args[1] == "fresh" else (1, "boom\n")
         f = Path(args[args.index("--answers") + 1])
         self.answers.append(json.loads(f.read_text()))
         assert oct(f.stat().st_mode & 0o777) == "0o600"
@@ -147,8 +148,21 @@ async def test_a_mods_test(hub):
     t = r.json()
     assert t["passed"] is True and t["run"] == "echo hi" and t["log"] == "data/state/setup/logs/fresh/test.log"
     assert fake.calls[-1] == ["__smoke__", "fresh", "echo hi"]
+    assert t["sentence"] == "fresh: test passed in " + str(t["seconds"]) + " s" and t["advice"] == []
+    # capability-enablement 7.2: a mod's /v1/selftest prints its numbers and one sentence; the test reads them
+    fake.smoke_out = '{"passed":true,"device":"cuda:0","per_answer_s":0.12,"sentence":"m on cuda:0: 0.12 s per answer, 1.1 GB"}\n'
+    t = (await c.post("/api/setup/test", params={"id": "fresh"})).json()
+    assert t["sentence"] == "m on cuda:0: 0.12 s per answer, 1.1 GB" and t["device"] == "cuda:0" and t["measured"]["per_answer_s"] == 0.12
+    last = app.state.hub.setup.last_test("fresh")
+    assert last["sentence"] == t["sentence"] and "output" not in last and last["at"] > 0
     r = await c.post("/api/setup/test", params={"id": "nosuch"})
     assert r.status_code == 404 and r.json()["code"] == "no_test"
+
+
+def test_measured_and_advice_words():
+    from utils.setup_jobs import _measured
+    assert _measured('noise\n{"sentence": "a", "x": 1}\n{"sentence": "b"}\n') == {"sentence": "b"}
+    assert _measured("{not json, \"sentence\"\n") == {} and _measured("") == {}
 
 
 def test_refused_from_the_network():

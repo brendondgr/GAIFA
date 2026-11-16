@@ -51,6 +51,7 @@ class SetupAbout(_Model):
     port: int | None
     recommended: bool
     installed: bool
+    last_test: dict[str, Any] | None = Field(None, description="capability-enablement 7.2: the mod's last test on this machine (its sentence, numbers and advice)")
 
 
 class SetupPlan(BaseModel):
@@ -68,6 +69,10 @@ class SetupTest(_Model):
     run: str
     log: str
     output: str = ""
+    sentence: str = Field("", description="capability-enablement 7.2: what it measured, in one sentence")
+    measured: dict[str, Any] = Field(default_factory=dict, description="The mod's own numbers (its /v1/selftest)")
+    advice: list[str] = Field(default_factory=list, description="When it failed or ran on the CPU though a GPU was expected: what could help")
+    at: float | None = Field(None, description="When it ran")
 
 
 def _jobs(request: Request) -> Any:

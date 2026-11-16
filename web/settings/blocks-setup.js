@@ -45,7 +45,7 @@ export function StatusCell({ x, ctx }) {
     w.action ? h('button', { type: 'button', disabled: busy, title: w.action.title, style: smallBtn(true), onClick: () => run(() => act(ctx.api, x.id, w.action.id)) }, w.action.label) : null,
     x.testable && (w.status === 'on' || w.status === 'starts_on_use') ? h('button', { type: 'button', disabled: busy, style: smallBtn(false),
       onClick: () => run(async () => { const t = await ctx.api.testSetup(x.id);
-        ctx.toast?.(`${x.name}: test ${t.passed ? 'passed' : 'failed'} in ${t.seconds} s${t.device ? ` on ${t.device}` : ''}`, t.passed ? 'success' : 'error'); }) },
+        ctx.toast?.((t.sentence || `${x.name}: test ${t.passed ? "passed" : "failed"} in ${t.seconds} s`) + ((t.advice || []).length ? ` · ${t.advice[0]}` : ""), t.passed ? "success" : "error"); }) },
       busy ? 'Testing…' : 'Test on this machine') : null);
 }
 

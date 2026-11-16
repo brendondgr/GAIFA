@@ -237,4 +237,33 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
                 "device": enc.backend.device, "dtype": enc.backend.dtype,
                 "ms": {"prepare": round((t1 - t0) * 1000, 1), "encode": round((t2 - t1) * 1000, 1)}}
 
+    @app.post("/v1/selftest", summary="Test the encoder on this machine: the first text, forty more, the device and memory")
+    async def selftest() -> Any:
+        """capability-enablement 7.2: real work, measured: one text (loading the model if needed), then forty; says it in
+        one sentence (texts a second). Advice, never a gate."""
+        batch = {"text": settings.batch_text, "image": settings.batch_media, "audio": 1, "video": 1}
+        texts = [f"a short sentence about thing number {i}" for i in range(40)]
+        try:
+            async with take(gpu, enc, settings.device, "Embed: test"):
+                await make_room({"text"})
+                t0 = time.perf_counter()
+                first = await asyncio.to_thread(enc.embed, [("text", "a red bicycle")], 768, batch)
+                first_s = time.perf_counter() - t0
+                t1 = time.perf_counter()
+                await asyncio.to_thread(enc.embed, [("text", t) for t in texts], 768, batch)
+                many_s = time.perf_counter() - t1
+        except GpuCancelled as e:
+            return JSONResponse({"detail": str(e), "code": "gpu_cancelled", "fix": "test again"}, 409)
+        except HubError as e:
+            return _error(e)
+        except (FileNotFoundError, WorkerDied) as e:
+            return backend_error(e)
+        dev = enc.backend.device
+        rate = len(texts) / many_s if many_s > 0 else 0.0
+        gb = enc.estimate_gb(frozenset())
+        where = "your GPU" if dev not in ("cpu", None) else "the CPU"
+        return {"passed": len(first) == 1, "model": MODEL_ID, "device": dev, "dtype": enc.backend.dtype,
+                "first_s": round(first_s, 3), "forty_s": round(many_s, 3), "texts_per_s": round(rate, 1), "memory_gb": gb,
+                "sentence": f"{MODEL_ID} on {where}: {rate:.0f} texts a second, {gb:.1f} GB"}
+
     return app

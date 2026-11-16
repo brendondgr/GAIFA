@@ -2,7 +2,8 @@
 fork, cancel, compaction, the context meter, models, settings, status and the widget.
 
 Environment: AGENT_DB, AGENT_DATA, AGENT_LLM_URL, AGENT_MODEL, AGENT_FALLBACK_MODEL,
-AGENT_MAX_STEPS, AGENT_MAX_FAILS (capability-enablement 2.3), GAIFA_URL, GAIFA_PORT.
+AGENT_MAX_STEPS, AGENT_MAX_FAILS (capability-enablement 2.3), AGENT_LLM_KEY and AGENT_WINDOW (6.1: a direct endpoint's key
+and window), GAIFA_URL, GAIFA_PORT.
 """
 
 from __future__ import annotations
@@ -247,7 +248,8 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         store = Store(db)
-        hub, llm = HubAPI(hub_url), LLM(llm_url)
+        hub, llm = HubAPI(hub_url), LLM(llm_url, key=os.environ.get("AGENT_LLM_KEY") or None,
+                                        direct_window=int(os.environ.get("AGENT_WINDOW", "8192")))
         agent = Agent(cfg, store, hub, llm)
         app.state.agent = agent
         api_projects.install(agent)                                  # plan projects: what deleting one also removes
@@ -352,7 +354,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         return {"status": "ok"}
 
     @app.get("/v1/status", summary="Status for GAIFA: threads, messages and tokens today, running turns")
-    def status(request: Request) -> dict:
+    async def status(request: Request) -> dict:
         agent = A(request)
         today = time.mktime(time.localtime()[:3] + (0, 0, 0, 0, 0, -1))
         s = agent.store.stats(today)
@@ -371,7 +373,8 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
             {"label": "Threads", "value": s["threads"]},
             {"label": "Memories to review", "value": review},          # structured-memory 5.1
             {"label": "Messages today", "value": s["messages"], "reset": "daily"},
-            {"label": "Tokens today", "value": s["tokens"], "reset": "daily"}], "jobs": jobs}
+            {"label": "Tokens today", "value": s["tokens"], "reset": "daily"}], "jobs": jobs,
+            "llm": await agent.llm.status()}           # capability-enablement 6.1: where Chat's model is, and whether it answers
 
     @app.get("/v1/widgets/messages", summary="Messages per day (dashboard widget)")
     def widget_messages(request: Request, rng: str = Query("7d", alias="range")) -> dict:
@@ -458,7 +461,8 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         ids = [m["id"] for m in model_list(await agent.llm.models(max_age=10))]
         if ids and model not in ids:
             near = difflib.get_close_matches(model, ids, n=3, cutoff=0.4)
-            raise HTTPException(400, f"the relay doesn't serve {model!r}" + (f"; did you mean {', '.join(near)}?" if near else ""))
+            who = "the relay" if agent.llm.kind() == "relay" else agent.llm.base          # capability-enablement 6.1
+            raise HTTPException(400, f"{who} doesn't serve {model!r}" + (f"; did you mean {', '.join(near)}?" if near else ""))
 
     @app.post("/v1/threads", status_code=201, summary="Start a thread")
     async def new_thread(body: NewThread, request: Request) -> dict:

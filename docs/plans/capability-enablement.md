@@ -277,10 +277,11 @@ One step at a time: each numbered step is one commit (`GAIFA (capability-enablem
 
 ## Phase 6 — Chat's model: the relay, or a server you already run (M)
 
-- [ ] **6.1 The agent takes a direct endpoint: `services/agent/agent/llm.py`, `server.py`, `services/agent/service.toml`.**
+- [x] **6.1 The agent takes a direct endpoint: `services/agent/agent/llm.py`, `server.py`, `services/agent/service.toml`.**
   - `AGENT_LLM_URL` may be any OpenAI-compatible `/v1`; new `AGENT_LLM_KEY` (in `services/agent/.env`, never in `config.toml` or a log) is sent as a bearer token when set. Without the relay's facts in `/v1/models`, the agent uses what the endpoint gives and safe defaults (window from `AGENT_WINDOW`, default 8192; tools assumed; vision off), and says so on its page.
   - `GET /v1/status` gains `llm = {"url", "kind": "relay" | "direct", "answers", "models", "detail"}`, probed at most every 30 s. The model check (`server.py:453`) says "<url> doesn't serve …" for a direct endpoint.
   *Done when:* `services/agent/tests/test_llm_direct.py`: a fake OpenAI server with and without a key; a chat turn through it; the status for an endpoint that is down.
+  *As built:* relay or direct is read from `/v1/models` (the relay's rows carry `relay`); `meta()` gives the assumed facts (`assumed: true`) only for a direct endpoint. The key goes on every call (models, chat), and a 401/403 says to set `AGENT_LLM_KEY`. "Says so on its page" is the status's `detail`, which Settings → LLMs shows in 6.3.
 - [ ] **6.2 Setup asks how Chat reaches a model: `services/agent/setup/agent.md`, `utils/cli_setup.py`, `utils/setupdocs/block.py`.**
   - The agent's block drops `after = ["relay"]` for a first question with two answers: **GAIFA's relay** (the default: local engines, your provider keys, usage charts; adds the `relay` setup to the run) or **A server I already run** (its URL, such as `http://127.0.0.1:9090/v1`, and a key if it needs one; probed at `/v1/models` before going on, and its models are the choices for `AGENT_MODEL`). The question says what a direct endpoint doesn't get (section 2). `block.py` gains what that needs: a choice that adds a setup (`adds = ["relay"]`).
   *Done when:* `utils/tests/core/test_cli_setup.py`: both answers with a fake endpoint; the plan's JSON lists the question; a direct answer installs no relay.

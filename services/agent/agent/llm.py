@@ -331,11 +331,49 @@ def _python_calls(text: str, known: set[str]) -> list[tuple[str, dict[str, Any]]
 
 
 class LLM:
-    def __init__(self, base_url: str, timeout: float = 1800) -> None:
+    def __init__(self, base_url: str, timeout: float = 1800, key: str | None = None, direct_window: int = 8192) -> None:
         self.base = base_url.rstrip("/")
         self.timeout = timeout       # seconds without a byte from the model, not counting a wait for the GPU (_guarded)
         self.client = httpx.AsyncClient(trust_env=False, timeout=httpx.Timeout(None, connect=10))
         self._models: tuple[float, list[dict[str, Any]]] = (0.0, [])
+        self.key = key or None       # capability-enablement 6.1: AGENT_LLM_KEY, a bearer token for a direct endpoint
+        self.direct_window = direct_window   # AGENT_WINDOW: a direct endpoint's window when it says none
+        self._status: tuple[float, dict[str, Any]] = (0.0, {})
+
+    def headers(self) -> dict[str, str]:
+        """The chat's own headers (the relay's GPU lease and cloud rule), and the key for a direct endpoint."""
+        return {**_headers(), **({"Authorization": f"Bearer {self.key}"} if self.key else {})}
+
+    def kind(self, models: list[dict[str, Any]] | None = None) -> str:
+        """relay: GAIFA's relay (its /v1/models rows carry `relay`); direct: any other OpenAI-compatible server."""
+        rows = self._models[1] if models is None else models
+        if rows:
+            return "relay" if any(isinstance(m.get("relay"), dict) for m in rows) else "direct"
+        return "relay" if self.base.startswith(("http://127.0.0.1:4000", "http://localhost:4000")) else "direct"
+
+    async def status(self, max_age: float = 30) -> dict[str, Any]:
+        """{url, kind, answers, models, detail}: probed at most every `max_age` s (capability-enablement 6.1)."""
+        ts, cached = self._status
+        if cached and time.time() - ts < max_age:
+            return cached
+        try:
+            r = await self.client.get(self.base + "/models", headers=self.headers(), timeout=8)
+            r.raise_for_status()
+            rows = r.json().get("data") or []
+            self._models = (time.time(), rows)
+            out = {"answers": True, "models": [m.get("id") for m in rows if m.get("id")], "detail": ""}
+        except httpx.HTTPStatusError as e:
+            out = {"answers": False, "models": [], "detail": f"{self.base} answered HTTP {e.response.status_code}" +
+                   (" (a key is needed: AGENT_LLM_KEY)" if e.response.status_code in (401, 403) else "")}
+        except (httpx.HTTPError, ValueError) as e:
+            out = {"answers": False, "models": [], "detail": f"nothing answers at {self.base} ({type(e).__name__})"}
+        kind = self.kind()
+        if kind == "direct" and out["answers"]:
+            out["detail"] = (f"a server of yours: no relay facts, so a {self.direct_window:,}-token window, tools on and "
+                             "pictures off are assumed")
+        out = {"url": self.base, "kind": kind, **out}
+        self._status = (time.time(), out)
+        return out
 
     async def close(self) -> None:
         await self.client.aclose()
@@ -345,7 +383,7 @@ class LLM:
         if cached and time.time() - ts < max_age:
             return cached
         try:
-            r = await self.client.get(self.base + "/models", timeout=8)
+            r = await self.client.get(self.base + "/models", headers=self.headers(), timeout=8)
             r.raise_for_status()
             data = r.json().get("data") or []
         except (httpx.HTTPError, ValueError):
@@ -370,9 +408,14 @@ class LLM:
         return model if model in served else None
 
     async def meta(self, model: str) -> dict[str, Any]:
-        for m in await self.models():
+        rows = await self.models()
+        for m in rows:
             if m.get("id") == model:
-                return m.get("meta") or {}
+                if m.get("meta"):
+                    return m["meta"]
+                break
+        if rows and self.kind(rows) == "direct":          # capability-enablement 6.1: safe defaults without the relay's facts
+            return {"context_length": self.direct_window, "tools": True, "vision": False, "assumed": True}
         return {}
 
     async def _guarded(self, work: Awaitable[Any], progress: list[float]) -> Any:
@@ -399,7 +442,7 @@ class LLM:
         """A non-streaming request (the fallback when a streamed reply came back empty)."""
         try:
             r = await self._guarded(self.client.post(self.base + "/chat/completions", json={**body, "stream": False},
-                                                     headers=_headers()), [time.monotonic()])
+                                                     headers=self.headers()), [time.monotonic()])
         except httpx.HTTPError as e:
             raise LLMError(f"{type(e).__name__}: {e}"[:400], retryable=True) from None
         if r.status_code >= 400:
@@ -436,7 +479,7 @@ class LLM:
 
         async def consume() -> None:
             nonlocal t_think, checked
-            async with self.client.stream("POST", self.base + "/chat/completions", json=body, headers=_headers()) as r:
+            async with self.client.stream("POST", self.base + "/chat/completions", json=body, headers=self.headers()) as r:
                 if r.status_code >= 400:
                     text = (await r.aread()).decode(errors="replace")[:600]
                     raise LLMError(f"HTTP {r.status_code}: {_detail(text)}", r.status_code,

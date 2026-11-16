@@ -186,8 +186,11 @@ def models_for(args: argparse.Namespace, answers: Answers, e: Any) -> list[Any]:
         return [known[n] for n in rejoin(answers.models[e.mod], set(known)) if n in known]
     if not interactive(args):
         raise Stop("question", id=f"{e.id}/models", kind="models", choices=list(known),
+                   **({"find": [{"label": f.label, "url": f.url, "note": f.note} for f in e.setup.find]} if e.setup.find else {}),
                    required=[s.name for s in e.setup.suggest if s.required], answer_with=f'--models "{e.id}=<names>" (or none)')
     print(f"\nModels for {e.title} (to add your own, see its setup doc's Choosing models):")
+    for f in e.setup.find:                    # capability-enablement 7.1: where models of this kind are compared
+        print(f"  compared: {f.label}: {f.url}" + (f" ({f.note})" if f.note else ""))
     for i, s in enumerate(e.setup.suggest, 1):
         print(f"  {i}. {s.name} ({s.size_gb:.2f} GB){' required' if s.required else ''}{' gated' if s.gated else ''}: {s.good_for}")
     default = ",".join(str(i) for i, s in enumerate(e.setup.suggest, 1) if s.required) or "none"

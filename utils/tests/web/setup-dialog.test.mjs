@@ -56,3 +56,8 @@ test('only a command gets a Copy button', () => {
   assert.equal(d.isCommand('loginctl enable-linger me'), true);
   assert.equal(d.isCommand('move the clone under your home folder: the ComfyUI toolbox only sees $HOME'), false);
 });
+
+test('capability-enablement 7.1: a model question carries where such models are compared', () => {
+  const qs = d.questions({ questions: [{ id: 'embed/models', kind: 'models', text: 'Which?', choices: ['a'], required: [], find: [{ label: 'MTEB', url: 'https://huggingface.co/spaces/mteb/leaderboard' }] }] });
+  assert.equal(qs[0].find[0].label, 'MTEB');
+});

@@ -17,12 +17,13 @@ from dataclasses import dataclass, field
 from typing import Any
 
 TOP = {"id", "title", "models", "scan", "summary", "gpu", "disk_gb", "images", "needs", "after", "check", "steps", "suggest", "config",
-       "variants", "smoke", "recommended", "choose"}
+       "variants", "smoke", "recommended", "choose", "find"}
 VARIANT = {"accel", "os", "tested", "env", "steps", "check", "smoke", "note", "needs"}
 ACCELS = ("rocm", "cuda", "xpu", "mps", "vulkan", "cpu")        # utils/hardware ACCELS, in the order they're tried
 OSES = ("linux", "wsl", "darwin")
 CONFIG = {"key", "text", "choices", "required", "restart", "when", "secret"}
 CHOOSE = {"id", "text", "default", "options"}
+FIND = {"label", "url", "note"}
 OPTION = {"value", "label", "adds"}
 CONFIG_KEY = re.compile(r"^(services\.[a-z][a-z0-9-]{1,31}\.env\.[A-Z][A-Z0-9_]*|agent\.judge\.model)$")
 STEP = {"run", "what", "ask", "interactive", "skip_if", "optional", "next", "ask_if"}
@@ -75,6 +76,14 @@ class Config:
 
 
 @dataclass
+class Find:
+    """capability-enablement 7.1: where models of this kind are compared (a leaderboard), shown with the model question."""
+    label: str
+    url: str
+    note: str = ""
+
+
+@dataclass
 class Option:
     value: str
     label: str
@@ -119,6 +128,7 @@ class Setup:
     suggest: list[Suggest] = field(default_factory=list)
     config: list[Config] = field(default_factory=list)   # values asked after install (choices come from it)
     choose: list[Choose] = field(default_factory=list)   # capability-enablement 6.2: choices before install
+    find: list[Find] = field(default_factory=list)       # capability-enablement 7.1: where its models are compared
     variants: list[Variant] = field(default_factory=list)   # version 3; empty: see `effective_variants`
     smoke: str = ""                                          # version 3: real work, run with --smoke
     recommended: bool = False                                # capability-enablement 1.4: offered first, pre-ticked; a chat without it says so
@@ -254,6 +264,20 @@ def _config(i: int, d: Any) -> tuple[Config | None, str | None]:
                   when=when.strip(), secret=d.get("secret", False)), None
 
 
+def _find(i: int, d: Any) -> tuple[Find | None, str | None]:
+    where = f"find[{i}]"
+    if not isinstance(d, dict) or set(d) - FIND:
+        return None, f"{where}: a table with label, url and an optional note ([[find]])"
+    label, url, note = d.get("label"), d.get("url"), d.get("note", "")
+    if not isinstance(label, str) or not label.strip() or len(label) > 80:
+        return None, f"{where}: `label` must be a short string (at most 80 characters)"
+    if not isinstance(url, str) or not url.startswith("https://") or " " in url:
+        return None, f"{where}: `url` must be an https:// link"
+    if not isinstance(note, str):
+        return None, f"{where}: `note` must be a string"
+    return Find(label.strip(), url.strip(), note.strip()), None
+
+
 def _choose(i: int, d: Any) -> tuple[Choose | None, str | None]:
     where = f"choose[{i}]"
     if not isinstance(d, dict):
@@ -356,7 +380,7 @@ def read(data: dict[str, Any]) -> tuple[Setup | None, str | None]:
             return None, "`smoke` must be a non-empty command"
         out.smoke = data["smoke"].strip()
     for key, fn, into in (("steps", _step, out.steps), ("suggest", _suggest, out.suggest), ("config", _config, out.config),
-                          ("variants", _variant, out.variants), ("choose", _choose, out.choose)):
+                          ("variants", _variant, out.variants), ("choose", _choose, out.choose), ("find", _find, out.find)):
         v = data.get(key, [])
         if not isinstance(v, list):
             return None, f"`{key}` must be an array of tables ([[{key}]])"

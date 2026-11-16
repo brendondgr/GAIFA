@@ -27,6 +27,11 @@ good_for = "the decision model the mod runs: yes/no, choice and score questions 
 licence = "Apache-2.0"
 required = true
 
+[[find]]                        # capability-enablement 7.1: where such models are compared
+label = "Decision models compared (JEV decision index)"
+url = "https://huggingface.co/spaces/multimodalart/jev-decision-index"
+note = "local models only; pick by size and score for your machine"
+
 [[variants]]                    # plan 39.3: this machine's (gfx1151's exact lock)
 accel = "rocm"
 os = ["linux"]

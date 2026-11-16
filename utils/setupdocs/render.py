@@ -150,6 +150,9 @@ def mods_index(envs: list[Env], readme: Path) -> str:
             disks = [v.setup.disk_gb for v in vs if v.setup.disk_gb is not None]
             disk = gb(sum(disks) * 1e9) if disks else "—"
             docs = ", ".join(f"[{v.title}]({link(readme, v.path)})" for v in vs)
+            finds = [f for v in vs for f in v.setup.find]          # capability-enablement 7.1: where its models are compared
+            if finds:
+                docs += " · models compared: " + ", ".join(f"[{f.label}]({f.url})" for f in finds)
             out.append(f"| `{mod}` | {summary} | {gpu} | {runs} | {disk} | {docs} |")
     out.append(END)
     return "\n".join(out)

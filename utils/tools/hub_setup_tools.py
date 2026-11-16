@@ -46,7 +46,10 @@ def plan_text(plan: dict[str, Any]) -> str:
     for v in plan.get("variants") or []:
         out.append(f"For this machine: {v['setup']} as {v['label']}" + (" (not tested on this kind of machine)" if v.get("untested") else "") + ".")
     for q in plan.get("questions") or []:
-        out.append(f"Question {q['id']}: {q.get('text') or q['id']}" + (f" (choices: {', '.join(q['choices'])})" if q.get("choices") else "") + ".")
+        choices = q.get("choices") if isinstance(q.get("choices"), list) else None
+        out.append(f"Question {q['id']}: {q.get('text') or q['id']}" + (f" (choices: {', '.join(choices)})" if choices else "") + ".")
+        for f in q.get("find") or []:            # capability-enablement 7.1
+            out.append(f"Where such models are compared: {f['label']}, {f['url']}" + (f" ({f['note']})" if f.get("note") else "") + ".")
     for h in plan.get("host") or []:
         if not h.get("ok", True) and (not h.get("gpu") or plan.get("gpu")):
             out.append(f"Fix first: {h['detail']}" + (f": {h['fix']}" if h.get("fix") else "") + (" (needs sudo: the person runs it)" if h.get("needs_root") else "") + ".")

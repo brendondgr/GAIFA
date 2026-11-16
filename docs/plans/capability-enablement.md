@@ -298,9 +298,10 @@ One step at a time: each numbered step is one commit (`GAIFA (capability-enablem
 
 ## Phase 7 — `decide` and `embed` fit the machine they run on (L)
 
-- [ ] **7.1 Where to find models: `utils/setupdocs/block.py`, `services/decide/setup/decide.md`, `services/embed/setup/embed.md`.**
+- [x] **7.1 Where to find models: `utils/setupdocs/block.py`, `services/decide/setup/decide.md`, `services/embed/setup/embed.md`.**
   - A new block key, `[[find]]` (`label`, `url`, `note`), shown in the dialog's model question, the plan's text for the agent, `gaifa setup`'s model prompt and the generated guide. `embed`: "Embedding models compared (MTEB leaderboard)", <https://huggingface.co/spaces/mteb/leaderboard>. `decide`: "Decision models compared (JEV decision index)", <https://huggingface.co/spaces/multimodalart/jev-decision-index>. Each with the note "local models only; pick by size and score for your machine". Any mod may use the key (lcpp, tts, comfy later).
   *Done when:* `utils/tests/docs/test_setupdocs.py` parses `[[find]]` (an `https` URL, short label); the plan's JSON carries it; docs/mods.md §9 updated.
+  *As built:* the plan's JSON carries `find` on the model question (and on the question a non-interactive run stops with); the setup guide's table links it after the mod's docs. The parse test is in `utils/tests/docs/test_setup_recommended.py` beside `recommended`.
 - [ ] **7.2 Tested on your machine: the two setup blocks, `services/decide/decide/server.py`, `services/embed/embed/server.py`.**
   - Each mod's `smoke` reports numbers, not only pass: seconds for the first answer and for the next ten, the device and dtype it ran on, peak memory (from the mod's status). The dialog (3.4), `hub_setup_test` (4.1) and Settings → Services (3.5) show them as one sentence ("EmbeddingGemma 2 on your GPU: 40 texts a second, 3.0 GB").
   - When the test fails or runs on the CPU though a GPU was expected, the result says which, and offers: the CPU variant (`gaifa setup <id> --accel <id>=cpu`), a smaller model (7.3), or the coding-agent prompt with the log's path. It is advice, never a gate: setup finishes, the mod stays set up, and the model stays selectable (also as the judge) with its result shown beside it.

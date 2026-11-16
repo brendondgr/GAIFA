@@ -35,7 +35,7 @@ export function planSections(plan) {
 /** The plan's questions as form fields: [{id, kind, text, choices, required}]. */
 export function questions(plan) {
   return (plan?.questions || []).map(q => ({ id: q.id, kind: q.kind || (q.choices ? 'choice' : 'yes-no'), text: q.text || q.id,
-    choices: q.choices || null, required: q.required || [] }));
+    choices: Array.isArray(q.choices) ? q.choices : null, required: q.required || [], find: q.find || [] }));
 }
 
 /** Does a host fix read as a command to run (something to copy), rather than advice? */
@@ -143,6 +143,7 @@ export async function open(env, ids) {
     const fields = qs.map(q => {
       if (q.kind === 'models' && q.choices) return h('fieldset', { style: 'border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:4px' },
         h('legend', { style: 'font-weight:600;font-size:12.5px;margin-bottom:4px' }, q.text),
+        ...(q.find || []).map(f => h('div', { style: 'font-size:12px;' + MUT }, 'Compared: ', h('a', { href: f.url, target: '_blank', rel: 'noopener' }, f.label), f.note ? ` (${f.note})` : '')),   // capability-enablement 7.1
         ...q.choices.map(c => { const cb = h('input', { type: 'checkbox', checked: q.required.includes(c) || undefined, onchange: e => {
           const cur = new Set(values[q.id] || q.required); e.target.checked ? cur.add(c) : cur.delete(c); values[q.id] = [...cur]; } });
           if (q.required.includes(c)) cb.checked = true;

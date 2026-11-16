@@ -27,6 +27,11 @@ good_for = "the encoder the mod runs: 768-d vectors for text, code, images, audi
 licence = "Apache-2.0"
 required = true
 
+[[find]]                        # capability-enablement 7.1: where such models are compared
+label = "Embedding models compared (MTEB leaderboard)"
+url = "https://huggingface.co/spaces/mteb/leaderboard"
+note = "local models only; pick by size and score for your machine"
+
 [[variants]]                    # plan 39.3: this machine's (gfx1151's exact lock)
 accel = "rocm"
 os = ["linux"]

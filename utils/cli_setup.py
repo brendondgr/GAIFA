@@ -137,7 +137,8 @@ def plan(envs: list[setupdocs.Env], checks: list[host_mod.Check], hub: list[str]
                               "answer_with": f'--set "{e.id}/choose:{ch.id}=<{"|".join(o.value for o in ch.options)}>" (default {ch.default})'})
         if e.setup.suggest:
             names = [s.name for s in e.setup.suggest]
-            questions.append({"id": f"{e.id}/models", "kind": "models", "text": f"Which models for {e.title}?",
+            finds = [{"label": f.label, "url": f.url, "note": f.note} for f in e.setup.find]   # capability-enablement 7.1
+            questions.append({"id": f"{e.id}/models", "kind": "models", "text": f"Which models for {e.title}?", **({"find": finds} if finds else {}),
                               "choices": names, "required": [s.name for s in e.setup.suggest if s.required],
                               "answer_with": f'--models "{e.id}=<names, comma-separated, or none>"'})
             for s in e.setup.suggest:
@@ -177,6 +178,9 @@ def plan_text(p: dict[str, Any]) -> str:
         out += ["", "Models (you choose; required ones are preselected):"]
         for s in p["suggestions"]:
             out.append(f"  {s['setup']:24} {s['name']} ({s['size_gb']:.2f} GB){' required' if s['required'] else ''}{' gated' if s['gated'] else ''}: {s['good_for']}")
+        for q in p["questions"]:                  # capability-enablement 7.1: where such models are compared
+            for f in q.get("find") or []:
+                out.append(f"  {q['id'].split('/')[0]:24} compared: {f['label']}: {f['url']}" + (f" ({f['note']})" if f.get("note") else ""))
     values = [q for q in p["questions"] if q["kind"] == "value"]
     if values:
         out += ["", "After install, it asks (the choices exist only then):"] + [f"  {q['id']:24} {q['text']}{'' if q['required'] else ' (optional)'}" for q in values]

@@ -9,10 +9,12 @@ gpu = false
 disk_gb = 0.1
 needs = ["uv"]
 check = "gaifa start web && gaifa check web"
+after = ["searxng"]             # capability-enablement 5.3: setting up web sets up search with it (yours, or GAIFA's own)
+smoke = "curl -sf -X POST -H 'content-type: application/json' -d '{\"query\": \"gaifa\"}' \"${GAIFA_URL:-http://127.0.0.1:7000}/api/s/web/v1/search\" | grep -q '\"results\"'"
 
 [[steps]]
 run = "gaifa install web"
-what = "makes .venv/ from requirements-dev.txt (about 70 MB, under a minute); SearXNG, for search, runs outside GAIFA (this doc's Install)"
+what = "makes .venv/ from requirements-dev.txt (about 70 MB, under a minute); search goes through the SearXNG the searxng setup finds or starts"
 
 [[variants]]                    # plan 39.1: no GPU work, so one variant everywhere; tested on Linux
 accel = "cpu"
@@ -26,7 +28,7 @@ The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
 
-The `web` mod's own venv (FastAPI, httpx, trafilatura) and the **SearXNG** it searches through. SearXNG is a metasearch engine that runs **outside GAIFA**: GAIFA doesn't install, start or update it, it only calls `GET <SEARXNG_URL>/search?q=…&format=json` and reports in the mod's status whether it answers. `web_search` needs SearXNG; `web_fetch` (pages and PDFs into Outputs) works without it.
+The `web` mod's own venv (FastAPI, httpx, trafilatura) and the **SearXNG** it searches through. Setting up web sets up the `searxng` mod first (`after`), which uses a SearXNG of yours when one answers, or starts GAIFA's own in a container if you say yes (its setup doc). The web mod calls `GET <url>/search?q=…&format=json` and says in its status when search is off (`tools_off`: no SearXNG answers, or it refuses JSON). `web_search` needs SearXNG; `web_fetch` (pages and PDFs into Outputs) works without it. The rest of this doc is the by-hand way to run a SearXNG of your own.
 
 ## Tested with
 

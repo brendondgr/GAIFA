@@ -23,7 +23,7 @@ ACCELS = ("rocm", "cuda", "xpu", "mps", "vulkan", "cpu")        # utils/hardware
 OSES = ("linux", "wsl", "darwin")
 CONFIG = {"key", "text", "choices", "required", "restart"}
 CONFIG_KEY = re.compile(r"^(services\.[a-z][a-z0-9-]{1,31}\.env\.[A-Z][A-Z0-9_]*|agent\.judge\.model)$")
-STEP = {"run", "what", "ask", "interactive", "skip_if", "optional", "next"}
+STEP = {"run", "what", "ask", "interactive", "skip_if", "optional", "next", "ask_if"}
 SUGGEST = {"name", "repo", "revision", "files", "dest", "kind", "op", "body", "size_gb", "good_for", "licence", "required", "gated", "next", "start_op", "start_body", "skip_if"}
 
 
@@ -36,6 +36,8 @@ class Step:
     skip_if: str = ""               # a command: exit 0 means there's nothing to do (logged in already), so it's done
     optional: bool = False          # with an `ask`: a "no" skips only this step, not the whole setup
     next: str = ""                  # what the person still has to do once it has run (joins the report)
+    ask_if: str = ""                # capability-enablement 5.3: a command run while planning; exit 0: the step (and its
+    #                                 question) applies here, else it is left out with the command's output as the reason
 
 
 @dataclass
@@ -140,8 +142,11 @@ def _step(i: int, d: Any) -> tuple[Step | None, str | None]:
         return None, f"{where}: `next` must be a string"
     if d.get("optional") and not d.get("ask"):
         return None, f"{where}: an `optional` step needs an `ask` (its question)"
+    if not isinstance(d.get("ask_if", ""), str):
+        return None, f"{where}: `ask_if` must be a command"
     return Step(run=d["run"].strip(), what=d["what"].strip(), ask=d.get("ask", "").strip(), interactive=d.get("interactive", False),
-                skip_if=d.get("skip_if", "").strip(), optional=d.get("optional", False), next=d.get("next", "").strip()), None
+                skip_if=d.get("skip_if", "").strip(), optional=d.get("optional", False), next=d.get("next", "").strip(),
+                ask_if=d.get("ask_if", "").strip()), None
 
 
 def _suggest(i: int, d: Any) -> tuple[Suggest | None, str | None]:

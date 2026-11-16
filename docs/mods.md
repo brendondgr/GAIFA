@@ -274,6 +274,7 @@ smoke = "scripts/smoke.sh"                  # version 3: real work (one clip spo
 run = "scripts/install-runtime.sh"
 what = "builds the engine venvs from locks/ (about 14 GB, 10 min)"
 ask = ""                                    # a yes/no question first, such as a licence; "no" skips this setup
+# ask_if = "python3 scripts/probe.py is none"   # run while planning: exit 0, the step (and its question) applies here; else it's left out, its output the reason
 interactive = false                         # true: it prompts (a login), so under --json the person runs it
 skip_if = ""                                # a command: exit 0 means nothing to do (logged in already), so it's done
 optional = false                            # with an ask: a "no" skips only this step, not the setup

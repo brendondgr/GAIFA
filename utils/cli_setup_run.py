@@ -470,6 +470,10 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
             continue
         if s["id"] in optional_no:
             report["skipped"].append(f"{s['id']}: declined (optional)")
+            report["next"] += [f"{s['id']}: {step.next}"] if step.next else []
+            continue
+        if s.get("skip"):                 # capability-enablement 5.3: its ask_if said it doesn't apply here
+            report["skipped"].append(f"{s['id']}: {s['skip']}")
             continue
         if step.skip_if and runner.run(step.skip_if, root / "services" / e.mod, env=getattr(e, "run_env", None), stream=False)[0] == 0:
             state["steps"][s["id"]] = "done"

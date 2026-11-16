@@ -3,16 +3,39 @@ id = "searxng"
 title = "SearXNG watcher (the searxng mod)"
 models = []
 scan = []
-summary = "SearXNG watcher: see your SearXNG's health and engines, and change its settings from GAIFA or the agent"
+summary = "Search for GAIFA: your SearXNG if one answers here, else GAIFA's own in a container; its health, engines and settings"
 recommended = true   # offered first for chat (capability-enablement 1.4)
 gpu = false
 disk_gb = 0.03
 needs = ["uv"]
 check = "gaifa start searxng && gaifa check searxng"
 
+smoke = ".venv/bin/python scripts/setup_search.py is yours || curl -sf 'http://127.0.0.1:5200/search?q=gaifa&format=json' | grep -q results"
+
 [[steps]]
 run = "gaifa install searxng"
-what = "makes .venv/ from requirements-dev.txt (about 28 MB, under a minute); SearXNG itself is set up as in the web mod's setup doc"
+what = "makes .venv/ from requirements-dev.txt (about 28 MB, under a minute)"
+
+[[steps]]                       # capability-enablement 5.3: yours, when one answers with JSON
+run = ".venv/bin/python scripts/setup_search.py use-yours"
+what = "uses the SearXNG of yours that answers on this machine (nothing is created)"
+ask_if = "python3 scripts/setup_search.py is yours"
+
+[[steps]]
+run = ".venv/bin/python scripts/setup_search.py json-on"
+what = "turns the JSON format on in your SearXNG (settings.yml backed up first, restarted, checked; put back if the check fails)"
+ask = "Your SearXNG answers but refuses JSON results, which GAIFA's search needs. Turn the JSON format on in it (settings.yml is backed up first)?"
+ask_if = "python3 scripts/setup_search.py is yours_no_json"
+optional = true
+next = "to use GAIFA's own SearXNG instead, press Start GAIFA's own on the SearXNG page"
+
+[[steps]]
+run = ".venv/bin/python scripts/setup_search.py managed"
+what = "starts GAIFA's own SearXNG: a container from SearXNG's image (about 0.4 GB, pinned), on 127.0.0.1:5200, settings in data/state/searxng/managed/"
+ask = "No SearXNG answers on this machine. Start GAIFA's own? (A container from SearXNG's image, about 0.4 GB, on 127.0.0.1:5200, settings in data/state/searxng/managed/; without it web search stays off.)"
+ask_if = "python3 scripts/setup_search.py can-manage"
+optional = true
+next = "web search stays off until a SearXNG answers: start GAIFA's own from the SearXNG page, or give yours (POST /v1/source)"
 
 [[variants]]                    # plan 39.1: no GPU work, so one variant everywhere; tested on Linux
 accel = "cpu"
@@ -26,7 +49,9 @@ The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
 
-The `searxng` mod's own venv (FastAPI, httpx, ruamel.yaml). It finds the SearXNG this machine runs, watches it and its engines, and changes its settings when you or the agent ask (engines on or off, timeouts, safe search, the default language, the JSON format). It doesn't install SearXNG: that is in [the web mod's setup doc](../../web/setup/web.md). The `web` mod reads the URL this mod finds; without this mod it uses its own `SEARXNG_URL`.
+The `searxng` mod's own venv (FastAPI, httpx, ruamel.yaml), and the SearXNG search goes through. Setting it up looks for a SearXNG of yours first (`SEARXNG_URL`, 127.0.0.1:8080 and :8888): one that answers with JSON is used as it is and nothing is created; one that refuses JSON gets a question (turn JSON on in it, with a backup of its `settings.yml`); when none answers, a question offers **GAIFA's own**: a container `gaifa-searxng` from SearXNG's own image (pinned by digest, about 0.4 GB), on 127.0.0.1:5200 (the next free port up to 5209), its settings in `data/state/searxng/managed/` (capability-enablement 5.3). A "no" leaves web search off until one answers. The mod then watches the SearXNG it uses and changes its settings when you or the agent ask (engines on or off, timeouts, safe search, the default language, the JSON format). The `web` mod reads the URL from this mod; without it, it uses its own `SEARXNG_URL`.
+
+**Before deleting this mod's folder**, remove GAIFA's own SearXNG if you started it (`curl -X DELETE 'http://127.0.0.1:7000/api/s/searxng/v1/managed?image=true'`): the container and its image live in podman's or Docker's store. Its settings folder then belongs to SearXNG's own user; delete it with `podman unshare rm -rf data/state/searxng/managed` (rootless podman) or `sudo rm -rf data/state/searxng/managed` (Docker).
 
 ## Tested with
 

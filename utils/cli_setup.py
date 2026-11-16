@@ -272,6 +272,7 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
         p["unavailable"] = unavailable
         p["checkouts"] = subs
         p["smokes"] = [{"setup": e.id, "run": e.setup.smoke} for e in envs if e.setup.smoke] if getattr(args, "smoke", False) else []
+        applies(p, envs, root, runner)          # capability-enablement 5.3: steps whose ask_if says they don't apply here
         _last["plan"] = p
         if args.plan:
             emit(args, {"stage": "plan", **p}, plan_text(p))
@@ -301,6 +302,24 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
                  "unavailable": "stopped: nothing chosen runs on this machine:\n" + "\n".join(f"  {u['setup']}: {u['why']}" for u in s.data.get("unavailable", []))}
         emit(args, data, lines.get(s.reason, f"stopped: {s.reason} {json.dumps({k: v for k, v in s.data.items() if k != 'report'})[:600]}"))
         return 2 if s.reason in ("question", "interactive") else 1
+
+
+def applies(p: dict[str, Any], envs: list[Any], root: Path, runner: Any) -> None:
+    """Run each step's `ask_if` (capability-enablement 5.3): a step it says doesn't apply here loses its question and is
+    marked `skip` with the command's output as the reason (the run reports it as skipped)."""
+    by_id = {e.id: e for e in envs}
+    drop: set[str] = set()
+    for s in p["steps"]:
+        e = by_id.get(s["setup"])
+        step = e.setup.steps[int(s["id"].rsplit("/", 1)[1]) - 1] if e else None
+        if not step or not step.ask_if:
+            continue
+        rc, out = runner.run(step.ask_if, root / "services" / e.mod, stream=False)
+        if rc != 0:
+            s["skip"] = (out or "").strip().splitlines()[-1][:300] if (out or "").strip() else "not needed here"
+            s["ask"] = None
+            drop.add(s["id"])
+    p["questions"] = [q for q in p["questions"] if q["id"] not in drop]
 
 
 def add_parser(sub: Any) -> None:

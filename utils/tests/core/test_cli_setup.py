@@ -759,3 +759,74 @@ def test_a_decide_judge_isnt_checked_against_the_relay(agent_root: Path, capsys)
     runner.judge = "d3-lite"
     assert cli_setup.cmd_setup(args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=m"]), runner, FakeProbe()) == 0
     assert out(capsys)["failed"] == []
+
+
+SEARCH = """<!-- gaifa-setup
+id = "search"
+title = "Search"
+summary = "Search: yours or GAIFA's own"
+gpu = false
+
+[[steps]]
+run = "bin/gaifa install"
+what = "makes the venv"
+
+[[steps]]
+run = "use-yours"
+what = "uses yours"
+ask_if = "is-yours"
+
+[[steps]]
+run = "json-on"
+what = "turns JSON on in yours"
+ask = "Turn JSON on in yours?"
+ask_if = "is-no-json"
+optional = true
+
+[[steps]]
+run = "managed"
+what = "starts GAIFA's own"
+ask = "Start GAIFA's own?"
+ask_if = "can-manage"
+optional = true
+next = "search stays off until a SearXNG answers"
+-->
+# Search
+"""
+
+
+@pytest.mark.parametrize("here, steps, questions", [
+    ("yours", ["search/2"], []),                                  # yours answers with JSON: use it, ask nothing
+    ("no_json", ["search/3"], ["search/3"]),                      # yours refuses JSON: ask to turn it on
+    ("none", ["search/4"], ["search/4"]),                         # none: ask to start GAIFA's own
+])
+def test_ask_if_leaves_out_what_doesnt_apply(root: Path, capsys, here, steps, questions) -> None:
+    """capability-enablement 5.3: each step's ask_if is run while planning; a step that doesn't apply loses its question."""
+    d = root / "services" / "search" / "setup"
+    d.mkdir(parents=True)
+    (d.parent / "service.toml").write_text('id = "search"\n')
+    (d / "env.md").write_text(SEARCH)
+    applies = {"yours": "is-yours", "no_json": "is-no-json", "none": "can-manage"}[here]
+    fail = {"is-yours", "is-no-json", "can-manage"} - {applies}
+    assert cli_setup.cmd_setup(args("search", plan=True), FakeRunner(fail=fail), FakeProbe()) == 0
+    p = out(capsys)
+    kept = [s["id"] for s in p["steps"] if not s.get("skip") and s["id"] != "search/1"]
+    assert kept == steps and [q["id"] for q in p["questions"]] == questions
+    skipped = {s["id"]: s["skip"] for s in p["steps"] if s.get("skip")}
+    assert all(why.endswith("boom") for why in skipped.values())      # the command's own words are the reason
+    r = FakeRunner(fail=fail)
+    assert cli_setup.cmd_setup(args("search", yes=True, accept=questions or None), r, FakeProbe()) == 0
+    report = out(capsys)
+    ran = [c for c, _, _ in r.ran if c in ("use-yours", "json-on", "managed")]
+    assert ran == [{"yours": "use-yours", "no_json": "json-on", "none": "managed"}[here]]
+    assert any(x.startswith("search/") and "boom" in x for x in report["skipped"])
+
+
+def test_a_declined_optional_step_says_what_to_do_later(root: Path, capsys) -> None:
+    d = root / "services" / "search" / "setup"
+    d.mkdir(parents=True)
+    (d.parent / "service.toml").write_text('id = "search"\n')
+    (d / "env.md").write_text(SEARCH)
+    assert cli_setup.cmd_setup(args("search", yes=True, decline=["search/4"]), FakeRunner(fail={"is-yours", "is-no-json"}), FakeProbe()) == 0
+    report = out(capsys)
+    assert "search/4: declined (optional)" in report["skipped"] and "search/4: search stays off until a SearXNG answers" in report["next"]

@@ -62,3 +62,18 @@ async def test_search_needs_a_searxng(root, make_app):
         finally:
             svc.state, svc.tools_off = "stopped", {}
     assert checks["web search: off"]["level"] == "warn" and "no SearXNG answers" in checks["web search: off"]["detail"]
+
+
+def test_a_gaifa_searxng_left_without_its_mod():
+    from types import SimpleNamespace
+
+    from utils.doctor import _leftovers
+    hub = SimpleNamespace(services=SimpleNamespace(services={}))
+    seen = []
+
+    def run(argv):
+        seen.append(argv)
+        return SimpleNamespace(stdout="gaifa-searxng\n" if argv[0] == "podman" else "")
+    out = _leftovers(hub, run)
+    assert [c["fix"] for c in out] == ["podman rm -f gaifa-searxng"] and out[0]["level"] == "warn"
+    assert _leftovers(SimpleNamespace(services=SimpleNamespace(services={"searxng": object()})), run) == []

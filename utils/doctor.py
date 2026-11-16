@@ -261,6 +261,27 @@ def _what_works(hub: Any) -> list[dict[str, Any]]:
     return out
 
 
+def _leftovers(hub: Any, run: Any = None) -> list[dict[str, Any]]:
+    """capability-enablement 5.2: GAIFA's own SearXNG (`gaifa-searxng`) left behind by a searxng mod that was deleted."""
+    import subprocess
+
+    mgr = getattr(hub, "services", None)
+    if mgr is None or "searxng" in mgr.services:
+        return []
+    out = []
+    for rt in ("podman", "docker"):
+        if not shutil.which(rt) and run is None:
+            continue
+        try:
+            r = (run or (lambda a: subprocess.run(a, capture_output=True, text=True, timeout=10)))([rt, "ps", "-a", "--filter", "name=^gaifa-searxng$", "--format", "{{.Names}}"])
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if "gaifa-searxng" in (r.stdout or ""):
+            out.append(check("what works", "warn", f"GAIFA's own SearXNG is left in {rt} without its mod",
+                             "the searxng mod's folder is gone, but its container gaifa-searxng isn't", f"{rt} rm -f gaifa-searxng"))
+    return out
+
+
 def _offline(hub: Any, views: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     out = []
     for s in hub.services.list() if hub.services else []:
@@ -318,6 +339,6 @@ async def run(hub: Any) -> dict[str, Any]:
     models, views = await asyncio.to_thread(_models, hub)
     checks = (models + _manifests(hub) + _paths(hub) + _stage_d(hub) + await _ports_units(hub)
               + await asyncio.to_thread(_network, hub) + _disk(hub) + _judge(hub) + _offline(hub, views) + await asyncio.to_thread(_repos, hub)
-              + _what_works(hub))
+              + _what_works(hub) + await asyncio.to_thread(_leftovers, hub))
     counts = {k: sum(c["level"] == k for c in checks) for k in ("ok", "note", "warn", "fail")}
     return {"ts": time.time(), "ok": counts["fail"] == 0, "counts": counts, "checks": checks}

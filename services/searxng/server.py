@@ -1,8 +1,9 @@
 """SearXNG: find the SearXNG on this machine, watch it, adjust its settings (plan 26.3).
 
-GAIFA runs this as `.venv/bin/python server.py` (architecture §4.4). SearXNG itself runs outside
-GAIFA (setup/searxng.md); this mod never installs it or changes its network binding. Its only
-writes outside the project are SearXNG's `settings.yml` and its backups (containers.py).
+GAIFA runs this as `.venv/bin/python server.py` (architecture §4.4). SearXNG runs in a container: the user's own
+(setup/searxng.md: this mod never installs it or changes its network binding; its only writes outside the project are
+that SearXNG's `settings.yml` and its backups, containers.py), or GAIFA's own `gaifa-searxng` (managed.py,
+capability-enablement 5.2), chosen in source.py.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from pydantic import BaseModel, Field
 
 import settings as st
 import source as src
+from managed import Managed, ManagedError
 from containers import CliRuntime, Runtime
 from searx import ChangeFailed, Searx
 
@@ -55,14 +57,26 @@ class SettingsIn(BaseModel):
 
 
 def create_app(runtime: Runtime | None = None, env_url: str | None = None, watch_s: float | None = None,
-               query_s: float | None = None, ready_s: float = 60) -> FastAPI:
+               query_s: float | None = None, ready_s: float = 60, managed: Managed | None = None) -> FastAPI:
     sx = Searx(runtime or CliRuntime(), env_url if env_url is not None else os.environ.get("SEARXNG_URL"),
                watch_s=watch_s or float(os.environ.get("SEARXNG_WATCH_S", "60")),
                query_s=query_s or float(os.environ.get("SEARXNG_QUERY_S", "600")), ready_s=ready_s)
     started = time.time()
+    mg = managed or Managed()
+
+    def use_chosen() -> None:
+        """The chosen SearXNG is the one watched and adjusted (yours, or GAIFA's own at its port)."""
+        chosen = src.load()
+        if chosen and chosen.get("url"):
+            sx.env_url = chosen["url"]
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        chosen = src.load()
+        if chosen and chosen.get("source") == "managed":     # capability-enablement 5.2: it starts and stops with the mod
+            with contextlib.suppress(Exception):
+                await mg.start()
+        use_chosen()
         try:   # whatever the first look finds, the server starts and says so; the watch loop tries again
             await sx.detect()
             await sx.tick()
@@ -71,6 +85,9 @@ def create_app(runtime: Runtime | None = None, env_url: str | None = None, watch
         task = asyncio.create_task(sx.watch())
         yield
         task.cancel()   # shutdown never waits long: a watch round stuck in a call, or a pooled connection, can't hold it
+        if (src.load() or {}).get("source") == "managed":
+            with contextlib.suppress(Exception):
+                await asyncio.wait_for(mg.stop(), 15)
         with contextlib.suppress(asyncio.CancelledError, TimeoutError):
             await asyncio.wait_for(task, 5)
         with contextlib.suppress(Exception):
@@ -131,6 +148,32 @@ def create_app(runtime: Runtime | None = None, env_url: str | None = None, watch
     @app.get("/v1/found", summary="What was found: URL, container, compose folder, settings file")
     def found() -> dict:
         return sx.found()
+
+    @app.get("/v1/managed", summary="GAIFA's own SearXNG: whether it exists and runs, its URL, the runtime and image")
+    async def managed_state() -> dict:
+        return await mg.state()
+
+    @app.post("/v1/managed", summary="Create and start GAIFA's own SearXNG (a container on 127.0.0.1:5200)")
+    async def managed_create(body: DetectIn | None = None) -> Any:
+        try:
+            out = await mg.create(body.port if body else None)
+        except ManagedError as e:
+            return error(409 if e.code in ("yours_chosen", "no_port") else 503 if e.code == "no_runtime" else 500, e.code, e.detail, e.fix)
+        use_chosen()
+        for _ in range(30):                     # it takes a few seconds to answer the first time
+            await sx.detect()
+            if sx.answer != "none":
+                break
+            await asyncio.sleep(1)
+        await sx.tick()
+        return {**out, "answer": sx.answer}
+
+    @app.delete("/v1/managed", summary="Remove GAIFA's own SearXNG (and its image with image=true)")
+    async def managed_remove(image: bool = False) -> dict:
+        out = await mg.remove(image)
+        sx.env_url = None
+        await sx.detect()
+        return out
 
     @app.post("/v1/detect", summary="Look for SearXNG again: yours (JSON on), yours_no_json, or none")
     async def detect(body: DetectIn | None = None) -> dict:

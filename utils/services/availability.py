@@ -12,7 +12,7 @@ doctor and the UI. `status`:
     broken          its service.toml has errors
 
 `fix` is `{kind, id, command, tool}`: `kind` setup | enable | start | logs | none, `command` what a person runs, `tool`
-the hub tool that does it (`hub_start_service`, `hub_enable_service`; "" for setup until `hub_setup` exists, step 4.1).
+the hub tool that does it (`hub_start_service`, `hub_enable_service`, `hub_setup`).
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 Status = Literal["on", "starts_on_use", "off", "not_set_up", "cant_run", "failed", "broken"]
 USABLE = ("on", "starts_on_use")
 # the hub tool for each kind of fix, once it exists in the catalog
-FIX_TOOLS: dict[str, str] = {"start": "hub_start_service", "enable": "hub_enable_service"}
+FIX_TOOLS: dict[str, str] = {"start": "hub_start_service", "enable": "hub_enable_service", "setup": "hub_setup"}   # hub_setup: 4.1
 
 
 def _fix(kind: str, sid: str, command: str = "") -> dict[str, str]:

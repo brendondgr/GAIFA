@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from utils.outputs.entries import KINDS
 from utils.services import loading
-from utils.tools import doc_tools, hub_status_tools
+from utils.tools import doc_tools, hub_setup_tools, hub_status_tools
 from utils.tools.catalog import ToolDef
 
 if TYPE_CHECKING:
@@ -183,6 +183,11 @@ async def list_preferences(hub: Hub, args: dict[str, Any]) -> Any:
                             if r["scope"] != "thread"][:50]}
 
 
+def _no_mcp(t: ToolDef) -> ToolDef:
+    t.mcp = False
+    return t
+
+
 def tools() -> list[ToolDef]:
     def t(name: str, desc: str, params: dict[str, Any], fn: Any, risk: str = "read", cap: int | None = None, view: Any = None) -> ToolDef:
         return ToolDef(f"hub_{name}", None, name, desc, params, risk=risk, core=True, source="hub", handler=fn, cap_bytes=cap, view=view)
@@ -232,6 +237,9 @@ def tools() -> list[ToolDef]:
         t("list_preferences", "The user's saved preferences (active), optionally for one tool.",
           _obj({"tool": {"type": "string"}}), list_preferences),
         *(t(name, desc, params, fn, risk) for name, desc, params, fn, risk in hub_status_tools.specs(_obj, SERVICE)),   # plan 46.2
+        # capability-enablement 4.1: setting mods up from a chat; hub_setup runs commands here, so never at /mcp
+        *(_no_mcp(t(name, desc, params, fn, risk)) if name == "setup" else t(name, desc, params, fn, risk)
+          for name, desc, params, fn, risk in hub_setup_tools.specs(_obj)),
         t("job_status", "The state of an earlier tool call that is still running (by its call_id), with its result when done.",
           _obj({"call_id": {"type": "string"}, "wait": {"type": "number", "minimum": 0, "maximum": 600,
                                                          "description": "Seconds to wait for it to finish"}}, ["call_id"]),

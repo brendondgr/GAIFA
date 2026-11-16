@@ -42,7 +42,7 @@ async def test_each_status(rig, monkeypatch):
     assert a["status"] == "starts_on_use" and a["fix"] == {"kind": "start", "id": "idle", "command": "gaifa start idle", "tool": "hub_start_service"}
     a = st("fresh")
     assert a == {"status": "not_set_up", "why": "Fake OK isn't set up on this machine",
-                 "fix": {"kind": "setup", "id": "fresh", "command": "gaifa setup fresh", "tool": ""}}
+                 "fix": {"kind": "setup", "id": "fresh", "command": "gaifa setup fresh", "tool": "hub_setup"}}
     a = st("offmod")
     assert a["status"] == "off" and a["why"] == "Fake OK is turned off" and a["fix"]["kind"] == "enable"
     a = st("crashy")

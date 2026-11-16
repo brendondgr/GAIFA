@@ -59,7 +59,7 @@ async def test_every_tool_listed_with_its_state(hub):
     app, c = hub
     tools = {t["name"]: t for t in (await c.get("/api/tools")).json()}
     assert tools["fresh_get_item"]["state"] == "not_set_up" and tools["fresh_get_item"]["why"] == "Fresh isn't set up on this machine"
-    assert tools["fresh_get_item"]["turn_on"] == {"tool": "", "arguments": {}, "command": "gaifa setup fresh"}
+    assert tools["fresh_get_item"]["turn_on"] == {"tool": "hub_setup", "arguments": {"ids": ["fresh"]}, "command": "gaifa setup fresh"}
     assert tools["offmod_get_item"]["state"] == "off" and tools["offmod_get_item"]["why"] == "Offmod is turned off"
     idle = tools["idle_get_item"]
     assert idle["state"] == "starts_on_use" and idle["turn_on"]["tool"] == "hub_start_service" and idle["turn_on"]["arguments"] == {"id": "idle"}
@@ -76,7 +76,7 @@ async def test_not_set_up_answers_at_once_with_what_is_missing(hub):
     e = out["error"]
     assert out["status"] == "error" and e["code"] == "capability_unavailable" and e["state"] == "not_set_up"
     assert e["detail"] == "I can't make fake things: Fresh isn't set up on this machine"
-    assert "offer to set it up (`gaifa setup fresh`" in e["fix"] and "don't retry" in e["fix"]
+    assert 'offer to set it up (hub_setup with ids ["fresh"], after the user says yes)' in e["fix"] and "don't retry" in e["fix"]
     assert e["fixes"] == [{"label": "Set up Fresh", "setup": "fresh", "command": "gaifa setup fresh"}]
     assert app.state.hub.services.get("fresh").state == "stopped"          # nothing launched
 

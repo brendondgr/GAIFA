@@ -227,11 +227,12 @@ One step at a time: each numbered step is one commit (`GAIFA (capability-enablem
 
 ## Phase 4 — Turn it on by asking (M)
 
-- [ ] **4.1 The hub's tools: `utils/tools/hub_setup_tools.py`, registered beside `hub_status_tools.py`.**
+- [x] **4.1 The hub's tools: `utils/tools/hub_setup_tools.py`, registered beside `hub_status_tools.py`.**
   - `hub_setup_plan` (`read`): `{ids}` → the plan in words the model passes on in full: what it gives, what is installed and where, size, downloads with source and licence, minutes, containers and ports, questions, host problems.
   - `hub_setup` (`execute`, `mcp = false`): `{ids, answers?}` → starts 3.1's job and follows it as a job tool (`job_status`, cancel). Its card shows the same details as the dialog, with the questions as fields; it asks in every mode but Bypass, is refused when `origin.unattended`, and `needs_you` comes back as a result that tells the model what the user must run.
   - `hub_setup_test` (`read`): runs a mod's test on this machine and returns what it measured.
   *Done when:* `utils/tests/tools/test_hub_setup_tools.py`: the plan's text; the card's fields; a job followed to its report with the fake runner; refused unattended; absent from `/mcp`.
+  *As built:* `hub_setup` asks through the default ask list, so it asks in Bypass too (stricter than "every mode but Bypass": it installs on this machine); unattended runs are refused by the existing rule for asking calls. The handler waits for the job (the call stays running; `job_status` follows it; cancelling the call stops the setup). The card shows the call's `ids` and `answers`; the plan itself is `hub_setup_plan`'s result just before, in sentences (`plan_text`). `fix.tool` for *not set up* became `hub_setup`, so Off on this machine reads "Turn on: hub_setup {\"ids\": [\"web\"]}, after the user says yes."
 - [ ] **4.2 The agent's skill: `services/agent/harness/skills/turning-things-on/SKILL.md`.**
   - Stopped: call the tool, or `hub_start_service`. Turned off: `hub_enable_service`. Not set up: `hub_setup_plan`, tell the user everything it will do, ask the plan's questions, `hub_setup`, then `hub_setup_test` and say what works now and what still needs them. When a step needs the user's hands (a `sudo` install, a login), give the exact command, and offer the coding-agent prompt (`gaifa setup --prompt`) as the easier way. Named in the Off on this machine section's lines.
   *Done when:* the skill loads (`services/agent/tests/test_skills_files.py`), and `evals/missing.py` gains "turn on web search for me" (dry-run setup): plan, card, job, a reply that says what works.

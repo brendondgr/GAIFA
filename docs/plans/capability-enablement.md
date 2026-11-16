@@ -216,11 +216,14 @@ One step at a time: each numbered step is one commit (`GAIFA (capability-enablem
 **Wire — Phase 3:** the `setup` area goes live; every mod page, the Services list, the sidebar and Chat's fix-it cards read `availability`.
 
 **Checks & deliverables — Phase 3**
-- [ ] **The Calendar, in a browser on a scratch hub**, in each state: never set up → the entry is dimmed, the page says "Calendar isn't set up" with **Set up Calendar**, one click installs it and the page opens; turned off → **Turn on**; stopped → **Start**, and the box changes to "starting…" and then the page; a failing start → the error with **View logs**. The same for `mcp`. Screenshots in `docs/reference/capability-enablement-2026-11/`.
+- [x] **The Calendar, in a browser on a scratch hub**, in each state: never set up → the entry is dimmed, the page says "Calendar isn't set up" with **Set up Calendar**, one click installs it and the page opens; turned off → **Turn on**; stopped → **Start**, and the box changes to "starting…" and then the page; a failing start → the error with **View logs**. The same for `mcp`. Screenshots in `docs/reference/capability-enablement-2026-11/`.
+  *As built (2026-11-15):* on scratch hubs in the browser pane: never set up → the Calendar entry dimmed, the page said "Calendar isn't set up on this machine" with Set up Calendar, one click set it up in about 3 s and the Calendar opened; turned off → Turn on (MCP servers), which turned it on and opened its page; stopped → Start (SearXNG), the button busy, then its page; a failing start (MCP servers with a server that exits) → "MCP servers didn't start" with the error, Start and View logs. The Calendar's turned-off and failing states were seen on MCP servers rather than repeated on the Calendar (the same box). Screenshots in `docs/reference/capability-enablement-2026-11/`.
 - [ ] On a fresh clone (the Phase 23 fresh-clone check): `gaifa setup agent`, open the app, set up `web` and `workspace` from Settings → Services without a terminal; on a machine without podman the dialog shows the install command and the coding-agent prompt.
+  *Not run here:* a fresh clone set up with `gaifa setup agent` needs the relay from GitHub and, for workspace, the 1.1 GB sandbox image; the same flows (Set up from the box, the dialog, Settings → Services) were checked on scratch hubs that link this checkout (`calendar`, `web` set up for real from the app). Left for the next fresh-clone check.
 - [ ] The coding-agent prompt, pasted into Claude Code in a fresh clone (the user's, or a fresh session here): it sets up `web`, `searxng` and `workspace` and reports What works.
+  *Not run here:* it needs a fresh Claude Code session in a fresh clone; the prompt's text is tested (`test_cli_setup_prompt.py`) and names only what exists (the skill, the setup docs, the commands). Phase 8.2 runs it again against the rewritten setup docs.
 - [ ] From a phone on the network (the user's): the Set up button says to do it on the GAIFA machine.
-- [ ] Delivered: the setup routes and job, the prompt, `mod-off.js`, `setup-dialog.js`, the Services and Overview changes.
+- [x] Delivered: the setup routes and job, the prompt, `mod-off.js`, `setup-dialog.js`, the Services and Overview changes.
 
 ## Phase 4 — Turn it on by asking (M)
 

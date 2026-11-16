@@ -20,6 +20,8 @@ The whole page stays the output, for `hub_read_document` and `hub_search_documen
 
 from __future__ import annotations
 
+from utils.config import on_this_hub
+
 import asyncio
 import math
 import re
@@ -150,7 +152,7 @@ async def decide_scores(cfg: Any, query: str, texts: list[str], idx: list[int],
 
     async def one(i: int) -> tuple[int, float]:
         async with sem:
-            r = await client.post(f"{cfg.url.rstrip('/')}/v1/decide", json={
+            r = await client.post(f"{(on_this_hub(cfg.url) or cfg.url).rstrip('/')}/v1/decide", json={
                 "input": defuse(texts[i][:3000]), "model": cfg.model,
                 "questions": [{"id": "relevant", "type": "yesno", "question": question}]})
             r.raise_for_status()

@@ -130,7 +130,8 @@ class JudgeConfig:
 
 def config_from(cfg: Any) -> JudgeConfig:
     """`config.agent.judge` (utils/config.py JudgeCfg) → JudgeConfig."""
-    return JudgeConfig(backend=cfg.backend, model=cfg.model, url=cfg.url, threshold=cfg.threshold, timeout_s=cfg.timeout_s,
+    from utils.config import on_this_hub
+    return JudgeConfig(backend=cfg.backend, model=cfg.model, url=on_this_hub(cfg.url) or cfg.url, threshold=cfg.threshold, timeout_s=cfg.timeout_s,
                        allow_commands=list(cfg.allow_commands), ask_commands=list(cfg.ask_commands),
                        context=getattr(cfg, "context", "none"))
 

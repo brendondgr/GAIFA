@@ -250,6 +250,23 @@ class PermissionsCfg(_Strict):
 
 
 JUDGE_DECIDE = {"backend": "decide", "model": "d3-lite", "url": "http://127.0.0.1:7000/api/s/decide"}
+STOCK_HUB = "http://127.0.0.1:7000/"       # the hub URL the defaults above carry
+_running_port: int | None = None
+
+
+def set_running_port(port: int | None) -> None:
+    """The port this hub listens on (create_app): defaults that name the stock hub follow it."""
+    global _running_port
+    _running_port = port
+
+
+def on_this_hub(url: str | None) -> str | None:
+    """A URL through the stock hub (`http://127.0.0.1:7000/…`, the judge's and page relevance's defaults) as this hub's
+    own when it runs on another port (`gaifa serve --port`, `hub.port`): the capability-enablement fresh-clone check found
+    a hub on 7078 judging with the decide mod of the hub on 7000."""
+    if url and _running_port and _running_port != 7000 and url.startswith(STOCK_HUB):
+        return f"http://127.0.0.1:{_running_port}/" + url[len(STOCK_HUB):]
+    return url
 
 
 class JudgeCfg(_Strict):

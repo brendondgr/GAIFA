@@ -155,6 +155,8 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options, config, paths), options=options, version=hub_version())
     hub.listen_port = hub.port
+    from utils.config import set_running_port
+    set_running_port(hub.port)                                     # stock 127.0.0.1:7000 URLs follow this hub's port
     hub.allowed_hosts = LOOPBACK_HOSTS | {h.lower() for h in options.extra_hosts}
     hub.lan = Lan(config.hub.lan, paths.state, hub.port)          # other devices on the network (plan lan-access)
 

@@ -252,3 +252,20 @@ def test_judge_call_uses_the_models_facts_and_a_failed_test_stays_selectable():
     finally:
         httpx.AsyncClient = real
         J._facts.clear(), J._status.clear()
+
+
+def test_the_stock_hub_url_follows_this_hubs_port():
+    """The fresh-clone check (capability-enablement, 2026-11-16): a hub on 7078 judged with the decide mod of the hub on
+    7000, since the judge's default URL names the stock port. (conftest replaces `config_from` itself, so the rewrite it
+    uses is tested here.)"""
+    from utils import config
+    try:
+        config.set_running_port(7078)
+        assert config.on_this_hub(config.JUDGE_DECIDE["url"]) == "http://127.0.0.1:7078/api/s/decide"
+        assert config.on_this_hub(config.WebReadCfg().url) == "http://127.0.0.1:7078/api/s/decide"
+        assert config.on_this_hub("http://10.0.0.5:5107") == "http://10.0.0.5:5107"          # yours stays
+        assert config.on_this_hub(None) is None
+        config.set_running_port(7000)
+        assert config.on_this_hub(config.JUDGE_DECIDE["url"]) == "http://127.0.0.1:7000/api/s/decide"
+    finally:
+        config.set_running_port(None)

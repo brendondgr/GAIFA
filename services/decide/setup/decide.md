@@ -1,6 +1,6 @@
 <!-- gaifa-setup
 id = "decide"
-title = "Decisions: d3-lite"
+title = "Decisions"
 models = ["decide/**"]
 scan = []
 summary = "Decisions: fast yes/no, choice and score answers with probabilities (the Auto judge's d3-lite)"

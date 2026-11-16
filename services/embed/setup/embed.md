@@ -1,6 +1,6 @@
 <!-- gaifa-setup
 id = "embed"
-title = "Embeddings: EmbeddingGemma 2"
+title = "Embeddings"
 models = ["embed/**"]
 scan = []
 summary = "Embeddings: search outputs, documents and chats by meaning (text, images, audio, video in one space)"

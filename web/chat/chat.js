@@ -182,7 +182,9 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     document.addEventListener('gaifa:open-chat-beside', on);
     return () => document.removeEventListener('gaifa:open-chat-beside', on);
   }, []);
-  const mods = useMemo(() => [...new Set((tools || []).map(t => t.mod))], [tools]);
+  // capability-enablement 3.6: the mods a chat can use (the catalog lists the rest too: not set up, turned off, …), so
+  // Read aloud, the mic and the side panels show only for a mod that can run
+  const mods = useMemo(() => [...new Set((tools || []).filter(t => !t.state || t.state === 'on' || t.state === 'starts_on_use' || t.state === 'off_by_mod').map(t => t.mod))], [tools]);
 
   // ---- the list's actions ----
   const listPatch = (id, p) => setThreads(l => l.map(x => (x.id === id ? { ...x, ...p } : x)));

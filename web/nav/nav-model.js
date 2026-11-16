@@ -75,7 +75,8 @@ export function groups(route, services) {
   const memory = r.page === 'service' && r.parts[1] === 'agent' && MEMORY_TABS.includes(r.parts[2]);
   const item = (key, label, href, icon, on) => ({ key, label, href, icon, on: !!on, hint: HINTS[key] });
   const mains = after => (services || []).filter(s => s.main && s.main.after === after)
-    .map(s => ({ key: 'main:' + s.id, label: s.main.label, href: '#/' + s.id, icon: s.icon || 'puzzle', on: r.page === s.id, hint: s.description || '', badge: s.badge || 0 }));   // the manifest's icon, drawn like the hub's own items
+    .map(s => ({ key: 'main:' + s.id, label: s.main.label, href: '#/' + s.id, icon: s.icon || 'puzzle', on: r.page === s.id, badge: s.badge || 0,
+      ...mainState(s) }));   // the manifest's icon, drawn like the hub's own items; dimmed with its reason when it can't run (3.6)
   return {
     top: [item('overview', 'Overview', '#/overview', 'grid', r.page === 'overview'), ...mains('overview'), item('chat', 'Chat', '#/chat', 'chat', r.page === 'chat'),
       ...mains('chat'), item('outputs', 'Outputs', '#/outputs', 'folder', r.page === 'outputs'), ...mains('outputs')],
@@ -83,6 +84,13 @@ export function groups(route, services) {
       item('models', 'Models', '#/models', 'layers', r.page === 'models'), item('settings', 'Settings', '#/settings', 'gear', r.page === 'settings')],
   };
 }
+/** capability-enablement 3.6: a main view whose mod can't run (not set up, turned off, failed …) stays, dimmed, with its
+ *  reason as the tooltip; it still opens (to the page's Set up / Turn on box). */
+export function mainState(s) {
+  const st = s?.availability?.status;
+  return st && st !== 'on' && st !== 'starts_on_use' ? { dim: true, hint: s.availability.why || s.description || '' } : { dim: false, hint: s?.description || '' };
+}
+
 /** A badge's text (calendar 2.2): '' for none, the count up to 9, then '9+'. */
 export function badgeText(n) {
   const v = Number(n) || 0;

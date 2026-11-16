@@ -37,8 +37,10 @@ export function ModelSelect({ models, value, onChange }) {
 export function modeChoices(value, bypass = false, judge = null) {
   const cur = modeOf(value), down = judge && !judge.available;
   return MODES.filter(([k]) => k !== 'bypass' || bypass || cur === 'bypass').map(([k, l, d]) => ({
-    key: k, label: k === 'auto' && down ? l + ' (judge unavailable)' : l, desc: d, disabled: k === 'auto' && down && cur !== 'auto',
-    why: k === 'auto' && down ? `Not available: ${judge.detail || "the judge's model doesn't answer"}` : undefined }));
+    // capability-enablement 3.6: with the decide mod not set up (or off) the reason is that, in words, with its fix
+    key: k, label: k === 'auto' && down ? l + (judge.fix ? ` (${judge.detail.replace(/ on this machine$/, '')})` : ' (judge unavailable)') : l, desc: d, disabled: k === 'auto' && down && cur !== 'auto',
+    why: k === 'auto' && down ? `Not available: ${judge.detail || "the judge's model doesn't answer"}` : undefined,
+    fix: k === 'auto' && down && judge.fix ? judge.fix : undefined }));
 }
 export const modeTitle = (value, judge = null) => (modeOf(value) === 'auto' && judge && !judge.available
   ? `The judge's model doesn't answer (${judge.detail || judge.model}): calls ask until it's back` : MODES.find(m => m[0] === modeOf(value))?.[2]);

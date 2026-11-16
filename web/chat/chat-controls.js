@@ -33,7 +33,12 @@ export function ModeMenu({ value, onChange, bypass = false, judge = null }) {
       modeChoices(value, bypass, judge).map(m => h('button', { key: m.key, type: 'button', role: 'menuitemradio', 'aria-checked': m.key === cur ? 'true' : 'false', disabled: m.disabled, title: m.why,
         onClick: () => { setOpen(false); if (m.key !== cur) onChange(m.key); }, style: rowSt(m.key === cur, m.disabled) },
         h('span', { style: { fontSize: 12.5, fontWeight: 500 } }, m.label),
-        h('span', { style: { fontSize: 11.5, color: T.mut, lineHeight: 1.35 } }, m.desc)))));
+        h('span', { style: { fontSize: 11.5, color: T.mut, lineHeight: 1.35 } }, m.desc))),
+      ...modeChoices(value, bypass, judge).filter(m => m.fix).map(m => h('button', { key: 'fix:' + m.key, type: 'button', role: 'menuitem',   // capability-enablement 3.6
+        onClick: () => { setOpen(false); m.fix.kind === 'enable' ? globalThis.location && (location.hash = '#/s/decide')
+          : globalThis.dispatchEvent?.(new CustomEvent('gaifa:setup', { detail: { ids: [m.fix.id] } })); },
+        style: { ...rowSt(false, false), flexDirection: 'row', alignItems: 'center', color: T.cy, fontSize: 12.5 } },
+        m.fix.kind === 'enable' ? 'Turn on Decisions to use Auto…' : 'Set up Decisions to use Auto…'))));
 }
 
 /** The model: server → model (plan llm-servers 5.1), in chat-model-menu.js. */

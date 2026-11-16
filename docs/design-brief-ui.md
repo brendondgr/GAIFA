@@ -1280,7 +1280,8 @@ interface Judged { verdict: "allow" | "ask" | "refused"; reason: string;   // re
 interface JudgedCall extends Judged { id: number; ts: number; tool: string; thread?: string; call_id?: string; approval_id?: string;
                                       suggest?: string[] }   // allow rules that would cover a command the model asked about (plan 30.7)
 interface JudgeStatus { available: boolean; backend: string; model: string; detail: string;   // Auto is offered only when available
-                       choices: string[] }   // the decide mod's usable models (the picker in Settings → Permissions → Auto judge)
+                       choices: string[];    // the decide mod's usable models (the picker in Settings → Permissions → Auto judge)
+                       fix?: { kind: string; id: string; command: string } }   // capability-enablement 3.6: the decide mod isn't set up or is off
 interface CallLimits { action: "read" | "edit" | "delete" | "commit" | "command" | "network" | "host" | "remote" | "change";
                        folder?: string; level?: string; allow_bypass?: boolean; path?: string;
                        key?: string;                                // what "allow in this chat" covers: the folder and the exact command

@@ -120,9 +120,10 @@ export function Sidebar(p) {
   // calendar 2.2: a mod's unread count (its last /api/notify `unread`) as a small badge
   const badge = n => badgeText(n) ? h('span', { className: 'hubnav-badge', 'aria-label': `${n} unread` }, badgeText(n)) : null;
   const look = n => n.logo ? h(ServiceLogo, { sv: n.logo, size: rail ? 20 : 16 }) : h(Icon, { d: ic(n.icon) });
+  const dimSt = n => n.dim ? { style: { opacity: 0.5 } } : {};   // capability-enablement 3.6: a main view whose mod can't run
   const fixed = n => rail
-    ? h('a', { key: n.key, href: n.href, className: 'hubnav-a', 'aria-current': cur(n.on), 'aria-label': n.label + (n.badge ? `, ${n.badge} unread` : ''), ...tipOn(n.label, n.hint) }, look(n), badge(n.badge))
-    : h('a', { key: n.key, href: n.href, className: 'hubnav-a', 'aria-current': cur(n.on), ...tipOn(n.label, n.hint) }, look(n), h('span', { style: { flex: 1 } }, n.label), badge(n.badge));
+    ? h('a', { key: n.key, href: n.href, className: 'hubnav-a', 'aria-current': cur(n.on), 'aria-label': n.label + (n.badge ? `, ${n.badge} unread` : ''), ...dimSt(n), ...tipOn(n.label, n.hint) }, look(n), badge(n.badge))
+    : h('a', { key: n.key, href: n.href, className: 'hubnav-a', 'aria-current': cur(n.on), ...dimSt(n), ...tipOn(n.label, n.hint) }, look(n), h('span', { style: { flex: 1 } }, n.label), badge(n.badge));
   const svcTitle = sv => `${sv.name} · ${sv.manifest_errors?.length ? 'manifest error' : sv.state}`;
   const svcTip = sv => tipOn(sv.name, `${stateWords(sv)}${sv.description ? ' — ' + sv.description : ''}`, BUCKETS[bucket(sv)].color);
   const svcItem = sv => rail

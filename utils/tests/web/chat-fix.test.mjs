@@ -46,7 +46,7 @@ test('capability-enablement 2.3: a mod that is off reads plainly, and Turn on tu
   const steps = await import(pathToFileURL(path.join(root, 'web/chat/chat-steps.js')).href);
   const r = row('a', 'failed', {});
   assert.deepEqual(fix.fixAction({ label: 'Turn on Calendar', service: 'calendar', action: 'enable' }, r), { kind: 'tool', tool: 'hub_enable_service', arguments: { id: 'calendar' } });
-  assert.deepEqual(fix.fixAction({ label: 'Set up Web', setup: 'web', command: 'gaifa setup web' }, r), { kind: 'copy', text: 'gaifa setup web' });
+  assert.deepEqual(fix.fixAction({ label: 'Set up Web', setup: 'web', command: 'gaifa setup web' }, r), { kind: 'setup', ids: ['web'] });   // 3.6: the dialog
   const e = { code: 'capability_unavailable', detail: "I can't search the web and read pages: Web isn't set up on this machine", fix: "tell the user" };
   assert.equal(steps.errorText({ status: 'error', error: e }).text, "Web isn't set up on this machine");
   assert.equal(steps.errorText({ status: 'error', error: { ...e, detail: "web_search: I can't search the web and read pages: Web isn't set up on this machine" } }).text, "Web isn't set up on this machine");

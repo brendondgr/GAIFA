@@ -106,12 +106,21 @@ function ToolGroups({ index, settings, onChange }) {
     h('span', { style: label11 }, 'Tool groups in this chat'),
     h('span', { style: { fontSize: 11.5, color: T.mut } }, 'Auto: the agent loads a group when it needs it (an MCP server when a skill or @mcp:<server> asks for it). Pinned: always loaded. Off: never used.'),
     mods.length ? mods.map(mod => {
-      const cur = disabled.includes(mod) ? 'off' : pinned.includes(mod) ? 'pin' : 'auto', n = index.filter(t => groupOf(t) === mod).length;
+      const cur = disabled.includes(mod) ? 'off' : pinned.includes(mod) ? 'pin' : 'auto', tools = index.filter(t => groupOf(t) === mod), n = tools.length;
+      const state = groupState(tools);   // capability-enablement 3.6: not set up, turned off, failed … in words
       return h('div', { key: mod, style: { display: 'flex', alignItems: 'center', gap: 8 } },
-        h('span', { style: { flex: 1, fontSize: 12.5, color: cur === 'off' ? T.mut : T.tx } }, groupLabel(mod), h('span', { style: { color: T.dim, fontFamily: MONO, fontSize: 11, marginLeft: 6 } }, n)),
+        h('span', { style: { flex: 1, fontSize: 12.5, color: cur === 'off' || state ? T.mut : T.tx } }, groupLabel(mod), h('span', { style: { color: T.dim, fontFamily: MONO, fontSize: 11, marginLeft: 6 } }, n),
+          state ? h('span', { title: tools[0]?.why || '', style: { color: 'var(--acct,#FFB224)', fontSize: 11, marginLeft: 6 } }, state) : null),
         h('span', { role: 'group', 'aria-label': mod, style: { display: 'inline-flex', padding: 2, borderRadius: 6, border: '1px solid ' + T.bd, background: T.sb } },
           seg(mod, 'auto', 'Auto', cur), seg(mod, 'pin', 'Pinned', cur), seg(mod, 'off', 'Off', cur)));
-    }) : h('span', { style: { color: T.mut, fontSize: 12 } }, 'Loading the tool catalog…'));
+    }) : h('span', { style: { color: T.mut, fontSize: 12 } }, index == null ? 'Loading the tool catalog…' : 'No tool groups: no mod with tools is set up yet.'));
+}
+
+const GROUP_WORDS = { not_set_up: 'not set up', off: 'turned off', cant_run: "can't run here", failed: 'failed', broken: 'broken', off_by_mod: 'off for now' };
+/** A tool group's state in words when its tools can't run (capability-enablement 3.6), else ''. */
+export function groupState(tools) {
+  const st = (tools || []).map(t => t.state).find(s => s && GROUP_WORDS[s]);
+  return st && (tools || []).every(t => GROUP_WORDS[t.state]) ? GROUP_WORDS[st] : '';
 }
 
 // Whole / Card on a document chip (plan 24.9): Whole sends all of it if it fits the window after the

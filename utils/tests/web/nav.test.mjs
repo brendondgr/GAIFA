@@ -121,3 +121,13 @@ test('calendar 3.1: a mod with a main view is an item after its `after`, with it
   assert.equal(it.logo, undefined);                       // drawn as an icon in the items' colour, not the logo image
   assert.deepEqual(n.groups({ page: 'calendar', parts: [] }, SVCS).top.map(x => x.label), ['Overview', 'Chat', 'Outputs']);
 });
+
+test('capability-enablement 3.6: a main view whose mod cannot run stays, dimmed, with its reason', () => {
+  const cal = (status, o = {}) => sv('calendar', 'stopped', { main: { label: 'Calendar', after: 'chat' }, description: 'Your calendar', availability: { status, why: "Calendar isn't set up on this machine" }, ...o });
+  const item = s => n.groups({ page: 'overview', parts: [] }, [s]).top.find(i => i.key === 'main:calendar');
+  assert.deepEqual([item(cal('not_set_up')).dim, item(cal('not_set_up')).hint], [true, "Calendar isn't set up on this machine"]);
+  assert.equal(item(cal('off')).dim, true);
+  assert.deepEqual([item(cal('starts_on_use')).dim, item(cal('starts_on_use')).hint], [false, 'Your calendar']);
+  assert.equal(item(cal('on', { state: 'ready' })).dim, false);
+  assert.equal(item(cal('not_set_up')).href, '#/calendar', 'it still opens');
+});

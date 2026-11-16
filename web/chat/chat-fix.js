@@ -23,6 +23,7 @@ export function fixRows(turn) {
 export function fixAction(f, row) {
   if (f.retry) return { kind: 'tool', tool: row.name, arguments: { ...(row.item?.call?.arguments || {}), ...f.retry } };
   if (f.tool) return { kind: 'tool', tool: f.tool, arguments: f.arguments || {} };
+  if (f.setup) return { kind: 'setup', ids: [].concat(f.setup) };      // capability-enablement 3.6: the Set up dialog
   if (f.service && f.action === 'enable') return { kind: 'tool', tool: 'hub_enable_service', arguments: { id: f.service } };   // capability-enablement 2.3
   if (f.service) return { kind: 'service', service: f.service, action: f.action || 'restart' };
   if (f.command) return { kind: 'copy', text: f.command };
@@ -39,6 +40,7 @@ export function FixCard({ row, ctx }) {
       if (a.kind === 'tool') await ctx.act?.(a.tool, a.arguments);
       else if (a.kind === 'service') await ctx.api.restartService(a.service);
       else if (a.kind === 'copy') await globalThis.navigator?.clipboard?.writeText(a.text);
+      else if (a.kind === 'setup') globalThis.dispatchEvent?.(new CustomEvent('gaifa:setup', { detail: { ids: a.ids } }));
       setDone(d => ({ ...d, [i]: true }));
     } catch (e) { ctx.toast?.(e.detail || e.message || String(e), 'error'); }
     setBusy(null);

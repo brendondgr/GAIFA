@@ -240,4 +240,15 @@ async def judged_recent(request: Request, thread: str | None = None, limit: int 
 async def judge_status(request: Request) -> dict[str, Any]:
     from utils.tools.judge import status
 
-    return await status(_hub(request).config)
+    hub = _hub(request)
+    out = dict(await status(hub.config))
+    svc = hub.services.services.get("decide") if hub.services else None   # capability-enablement 3.6: why, in words
+    if not out.get("available") and svc is not None:
+        from utils.services.availability import availability
+        av = availability(hub.services, svc)
+        if av["status"] not in ("on", "starts_on_use"):
+            out["detail"] = av["why"]
+            out["fix"] = {"kind": av["fix"]["kind"], "id": "decide", "command": av["fix"]["command"]}
+    elif not out.get("available") and svc is None and hub.services is not None:
+        out["fix"] = {"kind": "setup", "id": "decide", "command": "gaifa setup decide"}   # the judge's own reason stays
+    return out

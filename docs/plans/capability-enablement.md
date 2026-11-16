@@ -206,11 +206,12 @@ One step at a time: each numbered step is one commit (`GAIFA (capability-enablem
   - The Overview's Needs you tile lists recommended mods that aren't set up, once, with Set up and **Not now** (remembered in `/api/ui/store`).
   *Done when:* `utils/tests/web/settings-blocks.test.mjs`, `overview-tiles.test.mjs`.
   *As built:* the state sits under each mod's name rather than in a column of its own (a column made the table wrap at the page's usual width). `ServiceSummary.testable` says whether a mod's setup doc has a test (`setup_flags` in `utils/setupdocs/envs.py`, beside `recommended`). Not now is remembered per mod in the hub's UI store (`hub.overview.setupNotNow`), so a newly recommended mod brings the row back. Checked on a scratch hub with Decisions and Web not set up and MCP turned off: the group ("2 of 4 aren't set up"), each row's Set up / Turn on, and Needs you's row and Not now. web/PATCHES.md 105.
-- [ ] **3.6 The sidebar and Chat: `web/nav/nav-model.js`, `web/chat/chat-forms.js`, `chat-header.js`, `chat-speak.js`, `chat-composer.js`.**
+- [x] **3.6 The sidebar and Chat: `web/nav/nav-model.js`, `web/chat/chat-forms.js`, `chat-header.js`, `chat-speak.js`, `chat-composer.js`.**
   - A main-view entry whose mod isn't `on` or `starts_on_use` is dimmed with its reason as the tooltip; it still opens (to 3.3's box).
   - A fix-it button with `setup` opens the dialog; with `action: "enable"` it turns the mod on.
   - Auto's disabled reason reads "Decisions isn't set up" (from `availability`), with Set up, in place of the raw URL error (`utils/tools/judge.py` `status()` adds the availability). Read aloud is hidden unless `tts` is `on` or `starts_on_use`; the tool groups menu shows each group's state and no longer says "Loading the tool catalog…" for an empty list.
   *Done when:* `utils/tests/web/nav.test.mjs`, `approvals.test.mjs` (the fix-it buttons), `modes.test.mjs`.
+  *As built:* the decide mod's availability is added to `/api/judge/status` by the route (`detail`, `fix`), not by `judge.status()`, which stays about the model. Read aloud follows `ctx.mods`, which now counts only mods whose tools can run (the catalog lists the rest since 1.5). Checked on a scratch hub with Calendar, Decisions and Web not set up: Calendar dimmed in the sidebar, the mode menu's "Auto (Decisions isn't set up)" and "Set up Decisions to use Auto…". A scratch hub's judge must be pointed at its own decide port (`[agent.judge] url`): the default, 5107, is this machine's installed decide. Tests: `utils/tests/tools/test_judge_setup.py` besides the three node tests. web/PATCHES.md 106.
 
 **Wire — Phase 3:** the `setup` area goes live; every mod page, the Services list, the sidebar and Chat's fix-it cards read `availability`.
 

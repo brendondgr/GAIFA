@@ -179,3 +179,15 @@ test('web-approvals 1.4: the judge picker offers decision models only, and a pic
   assert.match(judgeStatusText({ available: true, model: 'd3-lite' }), /d3-lite \(decision model\), answering/);
   assert.doesNotMatch(text(el), /relay|chat model/);
 });
+
+test('capability-enablement 3.6: Auto says why in words when the decide mod is not set up, with its fix', () => {
+  const judge = { available: false, model: 'd3-lite', detail: "Decisions isn't set up on this machine", fix: { kind: 'setup', id: 'decide', command: 'gaifa setup decide' } };
+  const auto = header.modeChoices('manual', false, judge).find(m => m.key === 'auto');
+  assert.equal(auto.label, "Auto (Decisions isn't set up)");
+  assert.equal(auto.disabled, true);
+  assert.equal(auto.why, "Not available: Decisions isn't set up on this machine");
+  assert.deepEqual(auto.fix, judge.fix);
+  const down = header.modeChoices('manual', false, { available: false, model: 'd3-lite', detail: 'http://127.0.0.1:5107 doesn\'t answer' }).find(m => m.key === 'auto');
+  assert.equal(down.label, 'Auto (judge unavailable)');
+  assert.equal(down.fix, undefined);
+});

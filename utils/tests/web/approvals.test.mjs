@@ -132,3 +132,13 @@ test('web-approvals 2.2: a web page card in a chat offers "Allow every site in t
   assert.equal(risk.rememberText('sites'), 'Every site allowed in this chat');
   assert.equal(risk.grantText('url:any', '*'), 'on every site');                 // Settings → Permissions → Grants
 });
+
+test('capability-enablement 3.6: a tool group whose mod cannot run says so; an empty catalog is not "Loading"', async () => {
+  const comp = await import(pathToFileURL(path.join(root, 'web/chat/chat-composer.js')).href);
+  assert.equal(comp.groupState([{ state: 'not_set_up' }, { state: 'not_set_up' }]), 'not set up');
+  assert.equal(comp.groupState([{ state: 'off' }]), 'turned off');
+  assert.equal(comp.groupState([{ state: 'off_by_mod' }, { state: 'on' }]), '', 'one tool off: the group still works');
+  assert.equal(comp.groupState([{ state: 'on' }]), '');
+  const fix = await import(pathToFileURL(path.join(root, 'web/chat/chat-fix.js')).href);
+  assert.deepEqual(fix.fixAction({ label: 'Set up Web', setup: 'web', command: 'gaifa setup web' }, {}), { kind: 'setup', ids: ['web'] });
+});

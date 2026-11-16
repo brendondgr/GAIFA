@@ -24,6 +24,8 @@ tested = ["linux"]
 
 # Web: setup
 
+**The easy way:** paste the text of `gaifa setup --prompt web` into your coding agent (Claude Code, Codex): it reads this doc, runs the same commands and checks, and can fix what goes wrong. Or run `gaifa setup web` yourself.
+
 The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
@@ -113,25 +115,39 @@ None: the mod runs no model. Pages are read with trafilatura, and search is what
 | `SEARXNG_URL` | `services/web/.env` (copy `.env.example`), or `config.toml [services.web] env` | optional | The SearXNG to search through; default `http://127.0.0.1:8080` |
 | `port` | `service.toml [run]` | fixed | 5102 (architecture §2) |
 
-## Check it works
+## Check
+
+Run both, in order: the mod's own check, then a page and a search through the hub.
 
 ```bash
-curl -s "http://127.0.0.1:8080/search?q=test&format=json" | head -c 200
+gaifa check web --start
 ```
 
-Expect JSON starting `{"query": "test", ...`. An HTML `403 Forbidden` means `json` is missing from `search.formats`.
+Expect `web: all checks passed`.
 
 ```bash
-gaifa start web && gaifa check web
+curl -s -X POST -H 'content-type: application/json' -d '{"url":"https://example.com"}' "$(gaifa url api/s/web/v1/fetch)" | head -c 200
 ```
 
-Expect `all checks passed`. The mod's tile shows **SearXNG: up**; its Overview tab shows the same with the reason when it's down.
+Expect JSON starting `{"path":".../outputs/web/<date>/…-example-com-example-domain.md","url":"https://example.com",…,"kind":"text"`: reading pages works (it needs no SearXNG).
 
 ```bash
-services/web/.venv/bin/python -m pytest services/web/tests -q
+curl -s -X POST -H 'content-type: application/json' -d '{"query":"GAIFA test"}' "$(gaifa url api/s/web/v1/search)" | head -c 200
 ```
 
-The mod's tests: a fake SearXNG and a local web server, no network.
+Expect `{"query":"GAIFA test","results":[{"title":…`: search works through SearXNG. `{"code":"searxng_down",…}` means no SearXNG answers (set up the `searxng` mod).
+
+## When it fails
+
+| What you see | What to check | The fix |
+|---|---|---|
+| a search answers `searxng_down`; the Web page says *Search isn't connected* | `curl -s "$(gaifa url api/s/searxng/v1/search-state)"` (`up`, `json`, `using`) | `gaifa setup searxng` (yours or GAIFA's own), or Connect search on the Web page |
+| a search answers HTML `403 Forbidden` | `curl -s "http://127.0.0.1:8080/search?q=test&format=json" \| head -c 100` | add `json` to `search.formats` in SearXNG's `settings.yml` (the searxng mod's Search settings tab does it with a backup) |
+| a fetch is refused with a reason (`blocked_address`, `robots_disallowed`, `too_large`) | the answer's `detail` | not a fault: the page is local, disallowed or too big (README's rules); fetch another source |
+| a page comes back nearly empty | the output's text (`chars` in the answer) | the page builds itself with JavaScript: try another source |
+| `gaifa status` shows web `not set up`; a chat says it isn't set up | `ls services/web/.venv` | `gaifa setup web` (or the Set up dialog: Settings → Services → Set up) |
+| `gaifa status` shows web `failed` | `gaifa logs web` (the last lines say why) | fix what the log names, then `gaifa start web`; still failing: `gaifa setup --prompt web` for your coding agent |
+| web is off (Settings → Services shows its switch off) | Settings → Services | turn its switch on, or ask GAIFA's agent to turn it on; `gaifa start web` starts it once |
 
 ## What to look for
 

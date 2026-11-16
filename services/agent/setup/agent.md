@@ -68,6 +68,8 @@ tested = ["linux"]
 
 # Chat agent: setup
 
+**The easy way:** paste the text of `gaifa setup --prompt agent` into your coding agent (Claude Code, Codex): it reads this doc, runs the same commands and checks, and can fix what goes wrong. Or run `gaifa setup agent` yourself.
+
 The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
@@ -144,27 +146,31 @@ AGENT_FALLBACK_MODEL = "<another-model>"   # optional; "" (the default) for none
 
 **Settings → Permissions → Auto judge** holds the Auto mode's judge: `config.toml [agent.judge]`. The judge is only ever a decision model in the `decide` mod (`d3-lite` by default, answering in a fraction of a second), never a chat model through the relay: an older `backend = "relay"` is ignored, and `gaifa doctor` names it. The same page has the document defaults and speech input.
 
-## Check it works
+## Check
 
 ```bash
 gaifa check agent --start
 ```
 
-Starts the agent if it's stopped (a stopped mod's live checks are skipped), then checks it. Expect `agent: all checks passed` (two widgets, the Learning page).
+Expect `agent: all checks passed`.
 
 ```bash
-curl -s http://127.0.0.1:7000/api/s/agent/v1/models
+curl -s "$(gaifa url api/s/agent/v1/status)" | python3 -c 'import json,sys; print(json.load(sys.stdin)["llm"])'
 ```
 
-The agent's view of the relay: `default`, `fallback`, and `models` with each one's facts (`context_length`, `tools`, `vision`, `reasoning`). Expect `{"default":"<your-model>","fallback":null,"models":[{"id":"auto",…},{"id":"<your-model>",…,"health":"healthy"}]}` (`fallback` is the name when you set one). Your `AGENT_MODEL` should be in that list; an lcpp nickname is there only while its instance runs.
+Expect `{'url': 'http://127.0.0.1:4000/v1', 'kind': 'relay', 'answers': True, 'models': [...], 'detail': ''}` with GAIFA's relay, or `'kind': 'direct'` with your own server: Chat has a model that answers. `'answers': False` comes with a `detail` that says why.
 
-The unit tests (a scripted model and a stand-in hub; no model, relay or GPU):
+## When it fails
 
-```bash
-cd services/agent && .venv/bin/python -m pytest -q
-```
-
-Expect `225 passed` (2026-10-21, about a minute).
+| What you see | What to check | The fix |
+|---|---|---|
+| `'answers': False`; the Chat page says no model answers | the `detail` (nothing at the URL, or a 401) | the relay: `gaifa start relay` (or `gaifa setup relay`); your own server: start it, or set `AGENT_LLM_KEY` (Settings → LLMs → Chat's server) |
+| a 401 from your own server | `grep AGENT_LLM services/agent/.env` | `gaifa setup agent` and answer with the key; it is written to the mod's `.env` |
+| the model you named isn't served | `curl -s "$(gaifa url api/s/agent/v1/models)"` | pick one of the listed models (Settings → LLMs → Default models) |
+| a chat says a mod isn't set up or is off | `gaifa doctor` (What works) | the fix it names (`gaifa setup <mod>`, or turn it on); the agent turns a set-up mod on by itself |
+| `gaifa status` shows agent `not set up`; a chat says it isn't set up | `ls services/agent/.venv` | `gaifa setup agent` (or the Set up dialog: Settings → Services → Set up) |
+| `gaifa status` shows agent `failed` | `gaifa logs agent` (the last lines say why) | fix what the log names, then `gaifa start agent`; still failing: `gaifa setup --prompt agent` for your coding agent |
+| agent is off (Settings → Services shows its switch off) | Settings → Services | turn its switch on, or ask GAIFA's agent to turn it on; `gaifa start agent` starts it once |
 
 ## What to look for
 

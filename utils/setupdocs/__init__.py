@@ -35,6 +35,7 @@ class Report:
     uncovered: list[str] = field(default_factory=list)   # inventory note: models no setup doc's `models` glob matches
     unsourced: list[str] = field(default_factory=list)   # inventory note: models with no recorded source
     uncovered_mods: list[str] = field(default_factory=list)  # mods without a setup doc
+    unguided: dict[str, str] = field(default_factory=dict)  # recommended mods' docs without Check / When it fails (8.2)
 
     def problems(self, strict: bool = False) -> list[str]:
         """What fails `gaifa docs --check`: only what's committed (the mods index, the setup docs).
@@ -43,7 +44,26 @@ class Report:
         out += [f"setup doc {p}: {m}" for p, m in self.env_problems.items()]
         if strict:
             out += [f"mod {m} has no setup doc (services/{m}/setup/)" for m in self.uncovered_mods]
+            out += [f"setup doc {p}: {m}" for p, m in self.unguided.items()]
         return out
+
+
+GUIDE_SECTIONS = ("Check", "When it fails")
+
+
+def guide_problems(text: str) -> str:
+    """What a recommended mod's setup doc lacks for an agent to follow it start to finish (capability-enablement 8.2):
+    a `## Check` section (the exact command and the output that means it worked) and a `## When it fails` table
+    (what you see | what to check | the fix, at least one row). '' when it has both."""
+    heads = re.findall(r"(?m)^##\s+(.+?)\s*$", text)
+    missing = [h for h in GUIDE_SECTIONS if h not in heads]
+    if missing:
+        return "a recommended mod's setup doc needs " + " and ".join(f"a `## {h}` section" for h in missing) + " (docs/mods.md §9)"
+    body = text.split("## When it fails", 1)[1].split("\n## ", 1)[0]
+    rows = [r for r in body.splitlines() if r.strip().startswith("|")]
+    if len(rows) < 3 or rows[0].count("|") < 4 or not re.match(r"^\|\s*:?-{3,}", rows[1].strip()):
+        return "`## When it fails` needs a table: | What you see | What to check | The fix |, with at least one row"
+    return ""
 
 
 def _models_dir(root: Path) -> Path:
@@ -132,6 +152,11 @@ def sync(root: Path, ids: list[str] | None = None, check: bool = False) -> Repor
     root = Path(root)
     report = Report()
     envs, report.env_problems = load_envs(root)
+    for e in envs:                              # capability-enablement 8.2: a recommended mod's doc an agent can follow
+        if e.setup.recommended and e.id == e.mod:
+            why = guide_problems(e.path.read_text())
+            if why:
+                report.unguided[e.path.relative_to(root).as_posix()] = why
     models_dir_data = _models_dir(root)
     reg = _registry(models_dir_data)
     mods = _mod_dirs(root)

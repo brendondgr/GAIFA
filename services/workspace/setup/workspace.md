@@ -26,6 +26,8 @@ tested = ["linux"]
 
 # Workspace: setup
 
+**The easy way:** paste the text of `gaifa setup --prompt workspace` into your coding agent (Claude Code, Codex): it reads this doc, runs the same commands and checks, and can fix what goes wrong. Or run `gaifa setup workspace` yourself.
+
 The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
@@ -73,14 +75,39 @@ None: the mod runs no model. The model that reads and edits your folders is the 
 |---|---|---|---|
 | `WORKSPACE_STATE` | `service.toml [run].env` | no | where folders, checkpoints and run records live (default `data/state/workspace`) |
 
-## Check it works
+## Check
 
 ```bash
-gaifa start workspace && gaifa check workspace
+gaifa check workspace --start
+```
+
+Expect `workspace: all checks passed`.
+
+```bash
+curl -s "$(gaifa url api/s/workspace/v1/sandbox)"
+```
+
+Expect `"podman":true,"exists":true`: the sandbox image is built and runs can start. `"exists":false` means it isn't built yet (Workspace page → Sandbox → Build, or the `podman build` above); `"podman":false` means podman isn't installed: folders, reading and edits still work, runs don't.
+
+```bash
 cd services/workspace && .venv/bin/python -m pytest -q
 ```
 
-Expect `all checks passed`, and the tests green; `tests/test_sandbox.py` (marked `podman`) runs the real sandbox and is skipped until the image is built.
+The tests green; `tests/test_sandbox.py` (marked `podman`) runs the real sandbox and is skipped until the image is built.
+
+## When it fails
+
+| What you see | What to check | The fix |
+|---|---|---|
+| `"podman":false`; Build answers `no_podman` | `podman --version` | `sudo dnf install podman` (or `sudo apt install podman`; yours to run), then `gaifa restart workspace` |
+| `"exists":false`; a run answers `sandbox_missing` | `podman images localhost/gaifa-workspace-sandbox` | Workspace page → Sandbox → Build, or `podman build -t localhost/gaifa-workspace-sandbox:2 -f services/workspace/sandbox/Containerfile services/workspace/sandbox` (needs the internet once) |
+| the build stops on a base image | `podman pull docker.io/library/python:3.12-slim-bookworm` (the Containerfile's base, pinned by digest) | check the network and `podman info`; then build again |
+| a run fails with *Read-only file system* | the folder's level on the Workspace page | raise the folder to Run (or Run + network) |
+| a run exits 127, *not found* | the run's note | install the program into the folder (Run + network), or run on this machine (`where = "host"`, which always asks) |
+| runs fail with a cgroup or memory error | `podman info --format '{{.Host.CgroupsVersion}} {{.Host.CgroupControllers}}'` (needs `v2` with `memory` and `pids`) | delegate the controllers to your user (systemd's `Delegate=`; Fedora does it by default), log in again |
+| `gaifa status` shows workspace `not set up`; a chat says it isn't set up | `ls services/workspace/.venv` | `gaifa setup workspace` (or the Set up dialog: Settings → Services → Set up) |
+| `gaifa status` shows workspace `failed` | `gaifa logs workspace` (the last lines say why) | fix what the log names, then `gaifa start workspace`; still failing: `gaifa setup --prompt workspace` for your coding agent |
+| workspace is off (Settings → Services shows its switch off) | Settings → Services | turn its switch on, or ask GAIFA's agent to turn it on; `gaifa start workspace` starts it once |
 
 ## What to look for
 

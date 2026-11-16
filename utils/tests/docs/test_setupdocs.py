@@ -212,3 +212,28 @@ def test_cli(root: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.Capture
     (root / "services" / "bare" / "service.toml").write_text('id = "bare"\n')
     assert cli.cmd_docs(Namespace(check=True, strict=True)) == 1      # a mod without a setup doc
     assert "mod bare has no setup doc" in capsys.readouterr().err
+
+
+def test_a_recommended_mods_doc_has_check_and_when_it_fails(root: Path) -> None:
+    """capability-enablement 8.2: `--strict` fails a recommended mod's own doc without `## Check` and a `## When it fails`
+    table (what you see | what to check | the fix); a mod that isn't recommended needn't have them."""
+    d = root / "services" / "rec" / "setup"
+    d.mkdir(parents=True)
+    (d.parent / "service.toml").write_text('id = "rec"\n')
+    head = '<!-- gaifa-setup\nid = "rec"\ntitle = "Rec"\nsummary = "x"\nrecommended = true\n-->\n\n# Rec\n\n'
+    (d / "rec.md").write_text(head + "## Check it works\n\nrun it\n")
+    problems = setupdocs.sync(root, check=True).problems(strict=True)
+    assert any("services/rec/setup/rec.md" in p and "`## Check` section" in p and "`## When it fails` section" in p for p in problems)
+    assert not any("rec.md" in p for p in setupdocs.sync(root, check=True).problems())          # only under --strict
+    (d / "rec.md").write_text(head + "## Check\n\n`gaifa check rec`\n\n## When it fails\n\nask someone\n")
+    assert any("needs a table" in p for p in setupdocs.sync(root, check=True).problems(strict=True))
+    (d / "rec.md").write_text(head + "## Check\n\n`gaifa check rec`\n\n## When it fails\n\n| What you see | What to check | The fix |\n"
+                              "|---|---|---|\n| failed | `gaifa logs rec` | `gaifa start rec` |\n")
+    assert not any("rec.md" in p for p in setupdocs.sync(root, check=True).problems(strict=True))
+    (d / "rec.md").write_text(head.replace("recommended = true\n", "") + "## Check it works\n\nrun it\n")
+    assert not any("rec.md" in p for p in setupdocs.sync(root, check=True).problems(strict=True))
+
+
+def test_every_recommended_mod_here_has_them() -> None:
+    root = Path(__file__).resolve().parents[3]
+    assert setupdocs.sync(root, check=True).unguided == {}

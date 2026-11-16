@@ -57,6 +57,8 @@ note = "slower; fp32"
 
 # Decisions: setup
 
+**The easy way:** paste the text of `gaifa setup --prompt decide` into your coding agent (Claude Code, Codex): it reads this doc, runs the same commands and checks, and can fix what goes wrong. Or run `gaifa setup decide` yourself.
+
 The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
@@ -155,30 +157,32 @@ curl -s localhost:7000/api/s/decide/v1/decide -H 'content-type: application/json
 
 Each answer is `{probs, top, p}` (a score adds `value`, the expected level with 0 = the first); a question the model couldn't answer gets `{error, message}`. `images` and `videos` take outputs (`output:<id>`); every question sees them. `GET /v1/models` lists the models with their revision and whether they're usable.
 
-## Check it works
+## Check
 
 ```bash
-gaifa start decide && gaifa check decide
+gaifa check decide --start
 ```
 
 Expect `decide: all checks passed`.
 
 ```bash
-services/decide/.venv/bin/python -m pytest -q -m gpu -s
+curl -s -X POST -H 'content-type: application/json' -d '{}' "$(gaifa url api/s/decide/v1/selftest)"
 ```
 
-Run in `services/decide/` with the env from `service.toml` (`HF_HOME`, `HF_MODULES_CACHE`, `TRITON_CACHE_DIR`, `TMPDIR`). Loads the real model in a worker: ten labelled questions (yes/no, choice, score, a language), all ten in one call, an image, and unloading ends the worker. Expect `4 passed`. The unit tests (`pytest -q`, a fake model, no torch) expect `20 passed`.
+Expect `"passed":true` and a sentence such as `"sentence":"d3-lite on your GPU: 0.06 s per answer, 7.7 GB"` (on the CPU: `on the CPU`, about 0.1 s with the `cpu` variant's torch). That is the test the Set up dialog and Settings → Services run. Then Settings → Permissions → Auto judge says *Judge: d3-lite (decision model), answering.*
 
-**Measured here** (2026-10-20, GPU, BF16, the hub's count: PSS plus GTT):
+## When it fails
 
-| | |
-|---|---|
-| Load (worker start, torch import, ROCm init, full file check, one warm-up question) | 7–11 s |
-| One question (the first after loading: 96 ms) | 60–70 ms (median 63 ms) |
-| Ten questions in one call | 261 ms |
-| One image question (384 × 384) | 0.5 s |
-| Memory, loaded and used | 5.1–5.2 GB (after unload: the worker is gone) |
-| The ten labelled questions | 10/10 (p 0.83–0.996) |
+| What you see | What to check | The fix |
+|---|---|---|
+| the test answers `no_weights` | `ls data/models/decide/d3-lite/` | `gaifa setup decide` (the model question), or `services/decide/install.sh` |
+| the test answers `unpinned_revision` | the answer's `detail` (which file differs) | `services/decide/install.sh --force` downloads the pinned revision again |
+| it ran `on the CPU` though you have a GPU | `gaifa hardware` (the accelerators torch reaches) | the GPU's host setup (docs/setup/), then `gaifa setup decide --accel decide=<rocm\|cuda\|xpu\|mps>`; or keep the CPU (it is quick enough for the judge) |
+| the CPU takes seconds a question | `.venv/bin/python -c 'import torch; print(torch.__version__)'` in `services/decide` names a GPU build | `gaifa setup decide --accel decide=cpu` installs a CPU-only torch (about 0.1 s a question) |
+| Auto isn't offered; Settings says the judge doesn't answer | `curl -s "$(gaifa url api/judge/status)"` (`detail`, `fix`) | do what `fix` says (`gaifa setup decide`, turn it on, or start it) |
+| `gaifa status` shows decide `not set up`; a chat says it isn't set up | `ls services/decide/.venv` | `gaifa setup decide` (or the Set up dialog: Settings → Services → Set up) |
+| `gaifa status` shows decide `failed` | `gaifa logs decide` (the last lines say why) | fix what the log names, then `gaifa start decide`; still failing: `gaifa setup --prompt decide` for your coding agent |
+| decide is off (Settings → Services shows its switch off) | Settings → Services | turn its switch on, or ask GAIFA's agent to turn it on; `gaifa start decide` starts it once |
 
 ## What to look for
 

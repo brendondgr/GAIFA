@@ -22,6 +22,8 @@ tested = ["linux"]
 
 # Calendar: setup
 
+**The easy way:** paste the text of `gaifa setup --prompt calendar` into your coding agent (Claude Code, Codex): it reads this doc, runs the same commands and checks, and can fix what goes wrong. Or run `gaifa setup calendar` yourself.
+
 The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
@@ -59,13 +61,30 @@ None: the calendar runs no model.
 
 Working hours, alert defaults, the week start, how `11/12` reads and whether today's agenda goes into chats are on the Calendar page's settings (`GET/PATCH /v1/settings`).
 
-## Check it works
+## Check
 
 ```bash
-gaifa start calendar && gaifa check calendar
+gaifa check calendar --start
 ```
 
-Expect `all checks passed`.
+Expect `calendar: all checks passed`.
+
+```bash
+curl -s "$(gaifa url api/s/calendar/v1/status)"
+```
+
+Expect `"stats":[{"label":"Items",…},{"label":"Calendars","value":1},…]`. The Calendar opens at `#/calendar`, and a chat's prompt holds *Your calendar* (today and tomorrow).
+
+## When it fails
+
+| What you see | What to check | The fix |
+|---|---|---|
+| the Calendar page says the mod isn't running | `gaifa status` | `gaifa start calendar` |
+| alerts don't show | `curl -s "$(gaifa url api/s/calendar/v1/status)"` (`next_alert`) | keep a GAIFA page open (alerts are in-app toasts), and check the item has a time |
+| an `.ics` import adds nothing | the import's proposal (it waits for you to tick and add) | tick the items and Add |
+| `gaifa status` shows calendar `not set up`; a chat says it isn't set up | `ls services/calendar/.venv` | `gaifa setup calendar` (or the Set up dialog: Settings → Services → Set up) |
+| `gaifa status` shows calendar `failed` | `gaifa logs calendar` (the last lines say why) | fix what the log names, then `gaifa start calendar`; still failing: `gaifa setup --prompt calendar` for your coding agent |
+| calendar is off (Settings → Services shows its switch off) | Settings → Services | turn its switch on, or ask GAIFA's agent to turn it on; `gaifa start calendar` starts it once |
 
 ## What to look for
 

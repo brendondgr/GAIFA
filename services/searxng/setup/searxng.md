@@ -45,6 +45,8 @@ tested = ["linux"]
 
 # SearXNG watcher: setup
 
+**The easy way:** paste the text of `gaifa setup --prompt searxng` into your coding agent (Claude Code, Codex): it reads this doc, runs the same commands and checks, and can fix what goes wrong. Or run `gaifa setup searxng` yourself.
+
 The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
@@ -82,19 +84,33 @@ None: the mod runs no model. Which search engines SearXNG asks is chosen on its 
 | `SEARXNG_WATCH_S` | same | optional | Seconds between health checks (default 60) |
 | `SEARXNG_QUERY_S` | same | optional | Seconds between test searches (default 600; each one asks the upstream engines) |
 
-## Check it works
+## Check
 
 ```bash
-gaifa start searxng && gaifa check searxng
+gaifa check searxng --start
 ```
 
-Expect `all checks passed`. The mod's Engines tab shows SearXNG up, the container, its compose folder and settings file, and every engine with its errors.
+Expect `searxng: all checks passed`.
 
 ```bash
-services/searxng/.venv/bin/python -m pytest services/searxng/tests -q
+curl -s "$(gaifa url api/s/searxng/v1/search-state)"
 ```
 
-The tests use a fake SearXNG, a fake runtime and a fake `docker` command; they never touch the real container.
+Expect `"up":true,"json":true` and `"using":"yours"` (with your SearXNG's `url`) or `"using":"managed"` (GAIFA's own, `http://127.0.0.1:52xx`). `"using":"none"` means no SearXNG answers yet.
+
+## When it fails
+
+| What you see | What to check | The fix |
+|---|---|---|
+| `"using":"none"`; the SearXNG page says *No SearXNG answers* | `curl -s http://127.0.0.1:8080/healthz` (yours), `podman ps -a --filter name=gaifa-searxng` (GAIFA's) | start yours, or *Start GAIFA's own* on the SearXNG page (`POST /api/s/searxng/v1/managed`), or `gaifa setup searxng` and answer GAIFA's own |
+| `"json":false` | `curl -s "<url>/search?q=test&format=json" \| head -c 100` gives `403` | add `json` to `search.formats` (the Search settings tab, with a backup); GAIFA's own has it already |
+| GAIFA's own won't start: `no_runtime` | `podman --version; docker --version` | install podman (`sudo dnf install podman`, or `sudo apt install podman`), then *Start GAIFA's own* again |
+| `docker`: permission denied | `id -nG` lacks `docker` | use podman (rootless), or `sudo usermod -aG docker $USER` and log in again (yours to run) |
+| `no_port`: ports 5200–5209 all taken | `ss -ltn \| grep ':52'` | free one, or use your own SearXNG (*Use mine on port …*) |
+| a change is refused with `settings_invalid` | the SearXNG page (it says where `settings.yml` doesn't parse) | fix the YAML, or copy the newest `settings.yml.gaifa-<date>` back |
+| `gaifa status` shows searxng `not set up`; a chat says it isn't set up | `ls services/searxng/.venv` | `gaifa setup searxng` (or the Set up dialog: Settings → Services → Set up) |
+| `gaifa status` shows searxng `failed` | `gaifa logs searxng` (the last lines say why) | fix what the log names, then `gaifa start searxng`; still failing: `gaifa setup --prompt searxng` for your coding agent |
+| searxng is off (Settings → Services shows its switch off) | Settings → Services | turn its switch on, or ask GAIFA's agent to turn it on; `gaifa start searxng` starts it once |
 
 ## What to look for
 

@@ -81,6 +81,8 @@ note = "slower; fp32"
 
 # Embeddings: setup
 
+**The easy way:** paste the text of `gaifa setup --prompt embed` into your coding agent (Claude Code, Codex): it reads this doc, runs the same commands and checks, and can fix what goes wrong. Or run `gaifa setup embed` yourself.
+
 The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
@@ -151,48 +153,39 @@ A text-only model answers a search for pictures, audio or video (`kind`) and an 
 | `EMBED_INDEX` | `service.toml` | no | `1` (default): the library follows the hub's outputs and indexes them into `data/databases/embed.db`; `0` turns it off |
 | `EMBED_INDEX_BATCH_TEXT`, `EMBED_INDEX_AUDIO_MAX_S` | `config.toml` env | no | 8 chunks a batch, each under its own `background` lease from GAIFA's GPU queue (plan 31.3: it replaced the `EMBED_IDLE_*` gate); audio indexed up to an hour |
 
-## Check it works
+## Check
 
 ```bash
-gaifa start embed && gaifa check embed
+gaifa check embed --start
 ```
 
 Expect `embed: all checks passed`.
 
 ```bash
-services/embed/.venv/bin/python -m pytest -q -m gpu
+curl -s -X POST -H 'content-type: application/json' -d '{}' "$(gaifa url api/s/embed/v1/selftest)"
 ```
 
-Run in `services/embed/`. Loads the real model in a worker: each of three drawn shapes is found by its text, each kind embeds, and unloading ends the worker. Expect `3 passed` (about 15 s). The unit tests (`pytest -q`, fake backend, no GPU) expect `20 passed`.
+Expect `"passed":true` and a sentence such as `"sentence":"EmbeddingGemma 2 on your GPU: 354 texts a second, 3.4 GB"` (a smaller model names itself; on the CPU: `on the CPU`). That is the test the Set up dialog and Settings → Services run.
 
-The live check (2026-10-20, through the hub, three real pictures from `services/gen3d/runtime/lab/input/` and the Hunyuan3D demo): "a samurai warrior with a sword", "a penguin holding a sign" and "a white ceramic vase" each rank their own picture first (cosine 0.73, 0.78 and 0.62 against 0.49–0.54 for the others), at 768, 512, 256 and 128 dimensions.
+```bash
+curl -s -X POST -H 'content-type: application/json' -d '{"query":"a picture of a dog"}' "$(gaifa url api/s/embed/v1/search)" | head -c 200
+```
 
-**Measured here** (bf16 on the GPU, the hub's count: PSS plus GTT):
+Expect `{"results":[…` (empty on a new install until outputs are indexed): search by meaning works.
 
-| Loaded | Memory | Load |
+## When it fails
+
+| What you see | What to check | The fix |
 |---|---|---|
-| nothing (server only) | 0.06 GB | |
-| text path (270M) | 3.0 GB | 9 s on the first call (worker start, torch import, ROCm init) |
-| + vision encoder (images, video) | 3.9 GB | 2.6 s (reloads inside the worker) |
-| + audio encoder | 5.4 GB | 3.0 s |
-| after unload | 0.10 GB | |
-
-| Input | Encode time |
-|---|---|
-| 64 short texts (~20 tokens each) | 107 ms in all |
-| 1 text of ~2.4k tokens | 125 ms |
-| 1 image | 0.18 s (3 images: 0.45 s) |
-| 20 s video (20 frames at 1 fps) | 1.5 s |
-| 30 s audio | 0.15 s |
-
-Decoding through ffmpeg adds 0.1 s for audio and 0.2 s for video. On the CPU (fp32, `EMBED_DEVICE=cpu`) the rankings are the same but it's slow: 64 texts in 30 s, about 22 s an image.
-
-**The library**, checked live on 2026-10-20 against a test hub:
-- 32 outputs (two documents, 24 pictures, audio and video clips) indexed into 90 chunks in about 140 s once the GPU had been quiet; with the real 300 s, 46 outputs waited 300 s and then took about 130 s; then the model unloaded. Much of that time is the 1 s look at the GPU after each batch. Indexing records the text path at 3.1 GB.
-- The gate, with a test mod: it reporting busy (no GPU work) held indexing back within 4 s; its real GPU work stopped indexing at the end of the batch in flight (14 s later, with the model still loading); indexing came back 20 s after the median fell. Another session's speech-to-text work on the GPU (outside the test hub) also held it back, as it should.
-- A new picture was queued at once and found by a search; a text file edited on disk was queued again and its new sentence found; deleting two outputs removed them from the library and from the results.
-
-**Search** (plan 28.3): `POST /v1/search` and the agent's tools `embed_library_search` and `embed_library_collections`. On the same hub, "the picture of the red car" ranks the drawn car first at 0.75, with the other pictures at or below 0.59. A search of everything first indexes pending outputs from the last day, for up to 10 s; a search within a chat or collection first indexes all of its outputs, for up to 120 s. Either can take seconds right after a large upload.
+| the test answers `no_weights` | `ls data/models/embed/` | `gaifa setup embed` (the model question), or `services/embed/install.sh` |
+| it ran `on the CPU` though you have a GPU | `gaifa hardware` | the GPU's host setup (docs/setup/), then `gaifa setup embed --accel embed=<rocm\|cuda\|xpu\|mps>`; or keep the CPU with a smaller model |
+| the CPU is slow (a few texts a second) | the torch in `services/embed/.venv` is a GPU build | `gaifa setup embed --accel embed=cpu` (a CPU-only torch), and pick BGE small (docs/embed-models.md) |
+| a picture search answers `needs_full_model` | `curl -s "$(gaifa url api/s/embed/v1/models)"` (`model`) | a text-only model is in use: Settings → Agent → Memory → Change… to EmbeddingGemma 2 |
+| search finds nothing new | `curl -s "$(gaifa url api/s/embed/v1/library)"` (`state`, `counts.pending`) | it indexes when the GPU is idle; `waiting_gpu` or `no_room` say why it waits |
+| a model switch stopped (`failed`) | the switch's `error` in `GET /api/s/embed/v1/models` | fix what it names (room, weights), then Change… again; the old model stays in use meanwhile |
+| `gaifa status` shows embed `not set up`; a chat says it isn't set up | `ls services/embed/.venv` | `gaifa setup embed` (or the Set up dialog: Settings → Services → Set up) |
+| `gaifa status` shows embed `failed` | `gaifa logs embed` (the last lines say why) | fix what the log names, then `gaifa start embed`; still failing: `gaifa setup --prompt embed` for your coding agent |
+| embed is off (Settings → Services shows its switch off) | Settings → Services | turn its switch on, or ask GAIFA's agent to turn it on; `gaifa start embed` starts it once |
 
 ## What to look for
 

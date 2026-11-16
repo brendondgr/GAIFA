@@ -328,9 +328,12 @@ Then these sections, in this order. Leave a section out only when it has nothing
 4. **Install**: commands in order, one per block, each followed by what it does, what it downloads and from where, how big and how long.
 5. **Choosing models**: what kind of model the mod runs, where the files go, and how to add your own (the mod's page, its downloader, or a command); the suggestions with their sizes and licences; weights an engine needs, if any.
 6. **Configuration**: `.env` and `service.toml` keys, marked required or optional.
-7. **Check it works**: commands and the output to expect.
-8. **What to look for**: what's specific to each variant (`gfx1151`, CUDA versions, …), known errors and their fixes, what breaks quietly.
-9. **Known gaps**: steps no script does yet.
+7. **Check** (`## Check`): the exact commands, each followed by the output that means it worked (`gaifa check <id> --start`, then a call that does the mod's real work through the hub, `$(gaifa url api/s/<id>/…)`).
+8. **When it fails** (`## When it fails`): a table, `| What you see | What to check | The fix |`, each check and fix a command (or the page and button), from what the mod answers (its error codes and status words) to not set up, failed and off.
+9. **What to look for**: what's specific to each variant (`gfx1151`, CUDA versions, …), known errors and their fixes, what breaks quietly.
+10. **Known gaps**: steps no script does yet.
+
+**A recommended mod's doc** (`recommended = true`, capability-enablement 8.2) must have **Check** and **When it fails** (`gaifa docs --check --strict` fails it otherwise), and opens, under its title, with the easy way: *paste the text of `gaifa setup --prompt <id>` into your coding agent*. Such a doc is what an agent given only that prompt follows from start to finish, so nothing in it is left to guess: every command is the real one, every expected output is one seen on a real run.
 
 ## 10. Mods with their own repository
 

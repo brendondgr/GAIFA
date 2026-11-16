@@ -49,7 +49,7 @@ async def test_status_meta_and_the_key():
         llm = LLM(url, key="sk-test", direct_window=8192)
         st = await llm.status(max_age=0)
         assert st["url"] == url and st["kind"] == "direct" and st["answers"] is True and st["models"] == ["llama-3.3"]
-        assert "8,192-token window" in st["detail"]
+        assert "a window of 8,192 tokens" in st["detail"]
         assert await llm.meta("llama-3.3") == {"context_length": 8192, "tools": True, "vision": False, "assumed": True}
         nokey = await LLM(url).status(max_age=0)
         assert nokey["answers"] is False and "AGENT_LLM_KEY" in nokey["detail"]

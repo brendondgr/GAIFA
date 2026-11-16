@@ -249,6 +249,16 @@ def _what_works(hub: Any) -> list[dict[str, Any]]:
             level = "fail"            # the one mod Chat can't do without
         out.append(check("what works", level, f"{gives}: {words}" + (" (recommended)" if rec and st == "not_set_up" else ""),
                          f"{s.id}: {av['why']}", fix.get("command") or None))
+    agent = by_id.get("agent")                # capability-enablement 6.3: Chat needs a model that answers
+    llm = ((agent.status or {}).get("llm") if agent is not None and agent.up else None) or None
+    if isinstance(llm, dict):
+        if llm.get("answers") and llm.get("models"):
+            out.append(check("what works", "ok", "Chat has a model", f"{llm.get('url')} ({'the relay' if llm.get('kind') == 'relay' else 'a server of yours'})"))
+        else:
+            fix = "gaifa start relay" if llm.get("kind") == "relay" and not llm.get("answers") else "Settings → LLMs: add a server, or change Chat's"
+            words = (f"nothing answers at {llm.get('url')}" if not llm.get("answers") else
+                     "the relay serves no chat model" if llm.get("kind") == "relay" else f"{llm.get('url')} lists no model")
+            out.append(check("what works", "fail", f"Chat has no model: {words}", llm.get("detail") or "", fix))
     web = by_id.get("web")
     if web is not None and web.up and "search" in (web.tools_off or {}):
         out.append(check("what works", "warn", "web search: off", f"web: {web.tools_off['search']['why']}", "gaifa setup searxng"))

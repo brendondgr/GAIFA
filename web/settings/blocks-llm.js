@@ -9,6 +9,7 @@ import { h, T, MONO, Btn, Badge, inputSt } from '../chat/chat-ui.js';
 import { useAgent } from '../chat/chat-settings.js';
 import { ModelMenu } from '../chat/chat-model-menu.js';
 import { PRESETS, addBody, grouped, groupOf, healthState, keyState, modelFacts } from './llm-view.js';
+import { noModel } from '../chat/chat-nomodel.js';
 
 const R = () => globalThis.React;
 export const llmEvents = new EventTarget();          // "changed": a server was added or removed
@@ -173,4 +174,34 @@ export function LlmLink() {
     h('a', { href: '#/settings/llms', style: { color: T.acc } }, 'Settings → LLMs'), '.');
 }
 
-export const LLM_BLOCKS = { LlmServers, AddLlmServer, LlmEngines, LlmDefaults, LlmLink };
+// capability-enablement 6.3: where Chat's model is (the relay, or a server of yours), whether it answers, and what to do
+export function ChatEndpoint({ ctx }) {
+  const React = R(), api = ctx.api, [s, setS] = React.useState(null), [busy, setBusy] = React.useState(false);
+  const look = () => api.callService?.('agent', 'GET', '/v1/status').then(r => setS(r?.json?.llm || { none: true }), () => setS({ none: true }));
+  React.useEffect(() => { look(); }, []);
+  if (!s) return h('div', { style: { padding: '8px 0', ...small } }, 'Loading…');
+  if (s.none) return h('div', { style: { padding: '8px 0', ...small } }, 'The agent isn’t running, so where its model is can’t be read.');
+  const nm = noModel(s);
+  const toRelay = async () => {
+    setBusy(true);
+    try {
+      const svc = await api.getService('agent');
+      const env = { ...(svc.config?.env || {}) };
+      delete env.AGENT_LLM_URL;
+      await api.saveServiceConfig('agent', { env });
+      await api.restartService('agent');
+      ctx.toast?.('Chat uses GAIFA’s relay now; the agent restarted');
+      setTimeout(look, 3000);
+    } catch (e) { ctx.toast?.(msg(e), 'error'); } finally { setBusy(false); }
+  };
+  return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 0 12px' } },
+    row(h('span', { style: { width: 110, fontSize: 12.5 } }, 'Chat’s server'), h('code', { style: { fontSize: 12 } }, s.url),
+      h('span', { style: { ...small, color: s.answers ? 'var(--gr,#3FB950)' : 'var(--rd,#F85149)' } }, s.answers ? (s.kind === 'relay' ? 'GAIFA’s relay, answers' : 'a server of yours, answers') : 'doesn’t answer')),
+    s.kind === 'direct' && s.detail ? h('span', { style: small }, s.detail) : null,
+    nm ? h('span', { role: 'alert', style: { fontSize: 12.5, color: 'var(--rd,#F85149)' } }, nm.text) : null,
+    row(h(Btn, { sm: true, label: 'Test', onClick: () => { setS(null); look(); } }),
+      s.kind === 'direct' ? h(Btn, { sm: true, kind: 'pri', label: busy ? 'Switching…' : 'Switch to the relay', disabled: busy, onClick: toRelay }) : null,
+      nm?.fix.kind === 'start_relay' ? h(Btn, { sm: true, kind: 'pri', label: nm.fix.label, onClick: () => api.startService('relay').then(() => setTimeout(look, 4000), e => ctx.toast?.(msg(e), 'error')) }) : null));
+}
+
+export const LLM_BLOCKS = { LlmServers, AddLlmServer, LlmEngines, LlmDefaults, LlmLink, ChatEndpoint };

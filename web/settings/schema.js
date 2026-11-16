@@ -117,6 +117,7 @@ export function sections(ctx = {}) {
   const mods = knownMods(ctx), d = ctx.draft || {};
   const svcName = id => (ctx.services || []).find(s => s.id === id)?.name || id;
   const agentOn = !ctx.services || hasMod(ctx, 'agent');
+  const relayOn = !ctx.services || hasMod(ctx, 'relay');
   const secs = [
     { id: 'general', label: 'General', icon: 'gear', areas: SETTINGS_AREAS.general, groups: [
       { id: 'hub', label: 'Hub', summary: () => `Port ${d.hub?.port ?? '—'}${ctx.system ? ` · v${ctx.system.hub.version}` : ''}`, rows: [
@@ -188,18 +189,20 @@ export function sections(ctx = {}) {
         field('reposStart', 'repos.check_on_start', { label: 'Check when GAIFA starts', hint: 'Reads their state from git on this machine (no network).', control: 'toggle' }),
       ] }] },
     // plan llm-servers 4.1: every language-model server in one place (the relay's endpoints, the [llm] engines)
-    { id: 'llms', label: 'LLMs', icon: 'cpu', areas: SETTINGS_AREAS.llms, when: () => !ctx.services || hasMod(ctx, 'relay'), groups: [
-      { id: 'servers', label: 'Servers', summary: () => serversSummary(ctx.llm?.endpoints), rows: [
+    // capability-enablement 6.3: shown with the relay or the agent (Chat on a server of yours has no relay); the relay's groups need it
+    { id: 'llms', label: 'LLMs', icon: 'cpu', areas: SETTINGS_AREAS.llms, when: () => !ctx.services || hasMod(ctx, 'relay') || hasMod(ctx, 'agent'), groups: [
+      { id: 'servers', label: 'Servers', summary: () => serversSummary(ctx.llm?.endpoints), when: () => relayOn, rows: [
         block('servers', 'LlmServers', { label: 'The relay’s servers', card: true,
           keywords: ['relay', 'endpoint', 'Claude', 'Anthropic', 'OpenAI', 'ChatGPT', 'Gemini', 'API key', 'key', 'cloud', 'models', 'hide', 'skynet', 'tunnel'] }),
       ] },
-      { id: 'add', label: 'Add a server', summary: () => 'Anthropic, OpenAI, Gemini or any OpenAI-compatible URL', rows: [
+      { id: 'add', label: 'Add a server', summary: () => 'Anthropic, OpenAI, Gemini or any OpenAI-compatible URL', when: () => relayOn, rows: [
         block('add', 'AddLlmServer', { label: 'Add a server', card: true, keywords: ['add', 'provider', 'API key', 'Claude', 'OpenAI', 'Gemini', 'vLLM', 'llama.cpp', 'Ollama', 'URL'] }),
       ] },
-      { id: 'engines', label: 'On this machine', summary: () => enginesSummary(ctx.llm?.engines), rows: [
+      { id: 'engines', label: 'On this machine', summary: () => enginesSummary(ctx.llm?.engines), when: () => relayOn, rows: [
         block('engines', 'LlmEngines', { label: 'Local engines', card: true, keywords: ['llama.cpp', 'lcpp', 'vLLM', 'load', 'unload', 'GGUF', 'engine', 'local models'] }),
       ] },
       { id: 'defaults', label: 'Defaults', summary: () => 'The chat model and its fallback', when: () => agentOn, rows: [
+        block('endpoint', 'ChatEndpoint', { label: 'Chat’s server', card: true, keywords: ['endpoint', 'AGENT_LLM_URL', 'server of yours', 'no model', 'relay', 'direct'] }),   // capability-enablement 6.3
         block('defaults', 'LlmDefaults', { label: 'Chat model and fallback', card: true, keywords: ['default model', 'chat model', 'fallback', 'AGENT_MODEL'] }),
       ] }] },
     { id: 'agent', label: 'Agent', icon: 'chat', areas: SETTINGS_AREAS.agent, when: () => agentOn, groups: [

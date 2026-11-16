@@ -345,10 +345,8 @@ class LLM:
         return {**_headers(), **({"Authorization": f"Bearer {self.key}"} if self.key else {})}
 
     def kind(self, models: list[dict[str, Any]] | None = None) -> str:
-        """relay: GAIFA's relay (its /v1/models rows carry `relay`); direct: any other OpenAI-compatible server."""
-        rows = self._models[1] if models is None else models
-        if rows:
-            return "relay" if any(isinstance(m.get("relay"), dict) for m in rows) else "direct"
+        """relay: GAIFA's relay (the default URL, 127.0.0.1:4000); direct: any other OpenAI-compatible server, whose
+        model facts (`meta`) are used when it gives them (another relay does)."""
         return "relay" if self.base.startswith(("http://127.0.0.1:4000", "http://localhost:4000")) else "direct"
 
     async def status(self, max_age: float = 30) -> dict[str, Any]:
@@ -368,8 +366,8 @@ class LLM:
         except (httpx.HTTPError, ValueError) as e:
             out = {"answers": False, "models": [], "detail": f"nothing answers at {self.base} ({type(e).__name__})"}
         kind = self.kind()
-        if kind == "direct" and out["answers"]:
-            out["detail"] = (f"a server of yours: no relay facts, so a {self.direct_window:,}-token window, tools on and "
+        if kind == "direct" and out["answers"] and not any(isinstance(m.get("meta"), dict) for m in self._models[1]):
+            out["detail"] = (f"a server of yours: no relay facts, so a window of {self.direct_window:,} tokens, tools on and "
                              "pictures off are assumed")
         out = {"url": self.base, "kind": kind, **out}
         self._status = (time.time(), out)
@@ -414,7 +412,7 @@ class LLM:
                 if m.get("meta"):
                     return m["meta"]
                 break
-        if rows and self.kind(rows) == "direct":          # capability-enablement 6.1: safe defaults without the relay's facts
+        if self.kind() == "direct" and rows and not any(isinstance(m.get("meta"), dict) for m in rows):   # 6.1: a plain server
             return {"context_length": self.direct_window, "tools": True, "vision": False, "assumed": True}
         return {}
 

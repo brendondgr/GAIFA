@@ -117,3 +117,16 @@ test('capability-enablement 3.5: each service row says its state and what turns 
   assert.match(text(out), /Set up the rest/);
   assert.match(text(out), /Have your coding agent do it/);
 });
+
+test('capability-enablement 6.3: no model, said plainly, with the fix that fits', async () => {
+  const nm = (await load('chat/chat-nomodel.js')).noModel;
+  assert.equal(nm({ url: 'http://127.0.0.1:4000/v1', kind: 'relay', answers: true, models: ['m'] }), null);
+  assert.deepEqual(nm({ url: 'http://127.0.0.1:4000/v1', kind: 'relay', answers: false, models: [] }),
+    { text: 'Chat has no model: nothing answers at http://127.0.0.1:4000/v1', fix: { kind: 'start_relay', label: 'Start LLM Relay' } });
+  assert.equal(nm({ url: 'http://127.0.0.1:4000/v1', kind: 'relay', answers: true, models: [] }).fix.kind, 'add_server');
+  const d = nm({ url: 'http://127.0.0.1:9090/v1', kind: 'direct', answers: false, models: [], detail: 'nothing answers at http://127.0.0.1:9090/v1 (ConnectError)' });
+  assert.equal(d.text, 'Chat has no model: nothing answers at http://127.0.0.1:9090/v1 (ConnectError)');
+  assert.equal(d.fix.kind, 'change_url');
+  const L = await load('settings/blocks-llm.js');
+  assert.ok(L.LLM_BLOCKS.ChatEndpoint);
+});

@@ -18,4 +18,8 @@ Taken in the app's browser pane on scratch hubs (port 7078, their own roots, the
 | `settings-recommended.jpg` | Settings → Services: Recommended for chat, with Set up the rest and the coding-agent prompt |
 | `settings-services.jpg` | Each mod's state under its name with the button that turns it on |
 | `overview-needs-you.jpg` | The Overview's Needs you: the recommended mods that aren't set up, Set up and Not now |
+| `searxng-search-source.jpg` | Phase 5: the SearXNG page says which SearXNG search uses (yours), with Start GAIFA's own and Use mine on port … |
+| `web-search-not-connected.jpg` | Phase 5: the Web page with no SearXNG: "Search isn't connected" and Connect search |
+| `settings-llms-own-server.jpg` | Phase 6: Settings → LLMs with Chat on a server of yours (no relay): its URL, that it answers, Test and Switch to the relay |
+| `chat-no-model.jpg` | Phase 6: Chat when nothing answers at Chat's server: "Chat has no model …" with the fix |
 | `chat-auto-decide-not-set-up.jpg` | Chat's mode menu: "Auto (Decisions isn't set up)" and "Set up Decisions to use Auto…"; the Calendar dimmed in the sidebar |

@@ -13,6 +13,7 @@
 //   registerStep(name, words)         a tool's step words in the activity fold
 // A mod gives its own with `[ui] chat = "ui/chat.js"` (plan 44.1, chat-mods.js): its setup(chat) gets these.
 
+import { noModel } from './chat-nomodel.js';
 import { h, T, Icon, Btn, useWidth } from './chat-ui.js';
 import { MD_CSS, installCopy } from './chat-md.js';
 import { CARD_CSS } from './chat-cards.js';
@@ -104,6 +105,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const [models, setModels] = useState(null), [settings, setSettings] = useState(null), [tools, setTools] = useState(null);
   const [drawer, setDrawer] = useState(false), [down, setDown] = useState(null);
   const [judge, setJudge] = useState(null);       // GET /api/judge/status: Auto is offered while its model answers (plan 30.5)
+  const [llm, setLlm] = useState(null);           // capability-enablement 6.3: the agent's model server, from its status
   const [envs, setEnvs] = useState(null), [listKey, setListKey] = useState(0);   // plan 41.2
   const [listUi] = useUiPref('chat.list', null), listView = readView(listUi ? viewOfUi(listUi) : undefined);   // settings-that-stick 3.3: config.toml [ui.chat.list]
   const archived = archivedParam(listView.show);   // Show: Chats, Archived or Both (chat-history 2.2)
@@ -140,6 +142,14 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   };
   loadRef.current = loadList;
   useEffect(() => { const t = setTimeout(loadList, q ? 220 : 0); return () => clearTimeout(t); }, [q, listView.show, listView.chatOrder, listKey]);
+  useEffect(() => {     // 6.3: does Chat's model answer? (the agent probes at most every 30 s)
+    if (!c.live || !api.callService) return undefined;
+    let on = true;
+    const look = () => api.callService('agent', 'GET', '/v1/status').then(r => { if (on) setLlm(r?.json?.llm || null); }, () => {});
+    look();
+    const t = setInterval(look, 60000);
+    return () => { on = false; clearInterval(t); };
+  }, []);
   const shown = useRef(listView.show);
   useEffect(() => { if (shown.current !== listView.show) { shown.current = listView.show; setListLoading(true); } }, [listView.show]);
   const loadEnvList = () => loadEnvs(api).then(setEnvs);
@@ -239,7 +249,11 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
       h('span', { style: { color: T.rd, display: 'flex' } }, h(Icon, { d: 'alert', size: 15 })),
       h('span', { style: { flex: 1, minWidth: 200 } }, h('strong', null, 'The agent isn’t running. '), down.detail || ''),
       h(Btn, { sm: true, kind: 'pri', label: 'Start Agent', onClick: () => api.startService('agent').then(() => { toast('Starting the agent…'); setTimeout(() => { setDown(null); loadList(); c.models().then(setModels).catch(fail); }, 2500); }, fail) }),
-      h('a', { href: '?mock#/chat', style: { fontSize: 12.5 } }, 'Try the scripted demo')) : null,
+      h('a', { href: '?mock#/chat', style: { fontSize: 12.5 } }, 'Try the scripted demo')) : (nm => nm ? h('div', { role: 'alert', style: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '8px 14px', background: T.trd, borderBottom: '1px solid ' + T.rd, fontSize: 12.5 } },
+      h('span', { style: { color: T.rd, display: 'flex' } }, h(Icon, { d: 'alert', size: 15 })),
+      h('span', { style: { flex: 1, minWidth: 200 } }, nm.text),
+      nm.fix.kind === 'start_relay' ? h(Btn, { sm: true, kind: 'pri', label: nm.fix.label, onClick: () => api.startService('relay').then(() => { toast('Starting the relay…'); setTimeout(() => api.callService('agent', 'GET', '/v1/status').then(r => setLlm(r?.json?.llm || null), () => {}), 4000); }, fail) })
+        : h('a', { href: nm.fix.href, style: { fontSize: 12.5 } }, nm.fix.label)) : null)(noModel(llm)),   // capability-enablement 6.3
   };
 
   // ---- render ----

@@ -77,3 +77,22 @@ def test_a_gaifa_searxng_left_without_its_mod():
     out = _leftovers(hub, run)
     assert [c["fix"] for c in out] == ["podman rm -f gaifa-searxng"] and out[0]["level"] == "warn"
     assert _leftovers(SimpleNamespace(services=SimpleNamespace(services={"searxng": object()})), run) == []
+
+
+async def test_chat_needs_a_model_that_answers(root, make_app):
+    _mod(root, "agent", {}, "chat with you and use GAIFA's tools")
+    app = make_app(port=7000, autostart=False)
+    async with app.router.lifespan_context(app):
+        from utils.doctor import _what_works
+        hub = app.state.hub
+        svc = hub.services.get("agent")
+        svc.state = "ready"
+        try:
+            svc.status = {"llm": {"url": "http://127.0.0.1:4000/v1", "kind": "relay", "answers": False, "models": [], "detail": "nothing answers"}}
+            bad = {x["title"]: x for x in _what_works(hub)}["Chat has no model: nothing answers at http://127.0.0.1:4000/v1"]
+            assert bad["level"] == "fail" and bad["fix"] == "gaifa start relay"
+            svc.status = {"llm": {"url": "http://127.0.0.1:9090/v1", "kind": "direct", "answers": True, "models": ["m"], "detail": ""}}
+            ok = {x["title"]: x for x in _what_works(hub)}["Chat has a model"]
+            assert ok["level"] == "ok" and "a server of yours" in ok["detail"]
+        finally:
+            svc.state, svc.status = "stopped", None

@@ -72,7 +72,10 @@ test('the section sits between Services and Agent', () => {
   const llms = secs.find(s => s.id === 'llms');
   assert.deepEqual(llms.groups.map(g => g.id), ['servers', 'add', 'engines', 'defaults']);
   assert.equal(llms.groups[0].summary({}), '5 servers · 2 cloud · 1 failing');
-  assert.ok(!S.sections({ services: [{ id: 'agent' }] }).some(s => s.id === 'llms'));        // no relay: no section
+  assert.ok(!S.sections({ services: [{ id: 'web' }] }).some(s => s.id === 'llms'));          // neither relay nor agent: no section
+  // capability-enablement 6.3: the agent on a server of yours (no relay): the section, with Chat's server only
+  const own = S.sections({ services: [{ id: 'agent' }] }).find(s => s.id === 'llms');
+  assert.ok(own && own.groups.filter(g => !g.when || g.when()).map(g => g.id).join() === 'defaults');
   for (const r of S.rowsOf(secs).filter(r => r.control === 'block' && r.section === 'llms')) assert.ok(B.LLM_BLOCKS[r.block], r.block);
 });
 

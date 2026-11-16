@@ -8,7 +8,7 @@ from utils.setupdocs.block import read
 from utils.setupdocs.envs import recommended
 from utils.tests.conftest import REPO
 
-RECOMMENDED = {"workspace", "web", "searxng", "decide", "embed", "mcp", "calendar"}   # and relay, with its pin
+RECOMMENDED = {"relay", "workspace", "web", "searxng", "decide", "embed", "mcp", "calendar"}   # relay since its pin of 2026-11-16
 
 
 def test_the_key_parses():

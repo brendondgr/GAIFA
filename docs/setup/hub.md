@@ -105,7 +105,7 @@ Paths (`paths.models`, `paths.databases`, `paths.outputs`) must stay inside the 
 | 16 | `calendar` | [calendar](../../services/calendar/setup/linux.md) | no |
 | 17 | `voice` (voice mode on a speech-to-speech model) | [llama.cpp](../../services/voice/setup/llama-cpp.md) | yes |
 
-Mods 9, 10 and 12–16 are the set recommended for chat (`gaifa setup --recommended`; [turning-things-on.md](../turning-things-on.md) says what each gives and what its state means).
+Mods 1 (the relay), 9, 10 and 12–16 are the set recommended for chat (`gaifa setup --recommended`; [turning-things-on.md](../turning-things-on.md) says what each gives and what its state means).
 
 The relay comes first because the LLM mods publish themselves to it and the agent talks to models through it. ComfyUI comes before 3D Generate because TRELLIS.2 and SAM 3D Body run as ComfyUI workflows, and its setup pulls the image both use. The setup docs say so in their blocks (`after`: `lcpp`, `vllm` and `agent` after `relay`, 3D Generate's base after `comfyui` and each of its engines after the base), so `gaifa setup <ids>` puts them in this order and sets up what a choice needs. Skip any mod you don't want: a mod that isn't installed yet (its command doesn't exist) isn't autostarted, and the hub shows it as "not installed: run gaifa setup <id>" (plan 23.12).
 

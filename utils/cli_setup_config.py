@@ -178,6 +178,9 @@ def _prompt(e: Any, c: Any, choices: list[str], runner: Runner) -> str | None:
     if c.choices == "folder":
         pick = input("An absolute folder outside GAIFA" + ("" if c.required else " (Enter to skip)") + ": ").strip()
         return pick or None
+    if c.choices == "text":                 # capability-enablement 6.2: a URL, or a key (hidden)
+        pick = (getpass.getpass("(hidden): ") if c.secret else input("> ")).strip()
+        return pick or None
     while True:
         pick = input("Number" + (", h" if c.choices == "relay-models" else "") + ("" if c.required else ", or Enter to skip") + ": ").strip()
         if not pick and not c.required:
@@ -193,6 +196,46 @@ def _prompt(e: Any, c: Any, choices: list[str], runner: Runner) -> str | None:
             return choices[int(pick) - 1]
 
 
+def endpoint_models(url: str, key: str | None = None) -> list[str]:
+    """capability-enablement 6.2: the models an OpenAI-compatible server lists at <url>/models (its key as a bearer token).
+    Raises OSError with why when nothing answers there."""
+    import json as _json
+    import urllib.error
+    import urllib.request
+
+    req = urllib.request.Request(url.rstrip("/") + "/models", headers={"Authorization": f"Bearer {key}"} if key else {})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:   # noqa: S310 - the person's own server
+            data = _json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        raise OSError(f"{url} answered HTTP {e.code}" + (" (it needs a key)" if e.code in (401, 403) else "")) from None
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        raise OSError(f"nothing answers at {url} ({type(e).__name__})") from None
+    return [m["id"] for m in (data.get("data") or []) if isinstance(m, dict) and m.get("id")]
+
+
+def set_env_file(path: Path, var: str, value: str) -> None:
+    """A secret goes to the mod's .env (0600), replacing its line; never config.toml."""
+    lines = path.read_text().splitlines() if path.exists() else []
+    lines = [ln for ln in lines if not ln.strip().startswith(f"{var}=")] + [f"{var}={value}"]
+    path.write_text("\n".join(lines) + "\n")
+    path.chmod(0o600)
+
+
+def _when_ok(e: Any, c: Any, answers: Answers) -> bool:
+    """A value meant for one answer of a choice (capability-enablement 6.2) is asked only when that answer was given."""
+    if not c.when:
+        return True
+    cid, want = c.when.split("=", 1)
+    ch = next((x for x in e.setup.choose if x.id == cid), None)
+    got = answers.values.get(f"{e.id}/choose:{cid}") or (ch.default if ch else None)
+    return got == want
+
+
+def _order(c: Any) -> int:
+    return {"text": 0, "folder": 1, "endpoint-models": 3, "relay-models": 4}.get(c.choices if isinstance(c.choices, str) else "", 2)
+
+
 def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Path, runner: Runner, report: dict[str, Any], state: dict[str, Any], started: bool = False) -> None:
     """Providers first, then every [[config]] value of the chosen setups."""
     state.setdefault("config", {})
@@ -206,14 +249,23 @@ def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Pat
             report["done"].append(f"relay: provider {p.get('name')}")
     # Folders and lists first: setting one can bring the relay new models (OpenCode's folder starts
     # it, then the relay finds Zen's), so the questions about the relay's models come last.
-    todo = [(e, c) for e in live for c in e.setup.config]
-    for e, c in sorted(todo, key=lambda ec: ec[1].choices == "relay-models"):
-        qid = f"{e.id}/config:{c.key}"
-        value = answers.values.get(qid, answers.values.get(c.key))
+    todo = [(e, c) for e in live for c in e.setup.config if _when_ok(e, c, answers)]
+    given: dict[str, str] = {}               # values set in this run, by config key (the URL before its models)
+    for e, c in sorted(todo, key=lambda ec: _order(ec[1])):
+        qid = f"{e.id}/config:{c.key}" + (f"@{c.when}" if c.when else "")
+        value = answers.values.get(qid, answers.values.get(f"{e.id}/config:{c.key}", answers.values.get(c.key)))
         while True:
             if c.choices == "relay-models":
                 choices = wait_models(runner, root, args, value, WAIT_STARTED_S if started else WAIT_S)
-            elif c.choices == "folder":
+            elif c.choices == "endpoint-models":     # capability-enablement 6.2: the server of yours, probed before going on
+                mod = c.key.split(".")[1]
+                url = given.get(f"services.{mod}.env.AGENT_LLM_URL") or get_value(root / "config.toml", f"services.{mod}.env.AGENT_LLM_URL")
+                key = given.get(f"services.{mod}.env.AGENT_LLM_KEY")
+                try:
+                    choices = endpoint_models(url or "", key)
+                except OSError as err:
+                    raise Stop("unknown-value", id=qid, value=url, choices=f"a server that answers at <url>/models: {err}", doc=doc_of(e, root)) from None
+            elif c.choices in ("folder", "text"):
                 choices = []
             else:
                 choices = list(c.choices)
@@ -243,6 +295,13 @@ def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Pat
             value = str(folder.resolve())
         elif choices and value not in choices:
             raise Stop("unknown-value", id=qid, value=value, choices=choices, doc=doc_of(e, root))
+        given[c.key] = value
+        if c.secret:                         # capability-enablement 6.2: the mod's .env, never config.toml or the report
+            _, mod, _, var = c.key.split(".", 3)
+            set_env_file(root / "services" / mod / ".env", var, value)
+            state["config"][qid] = "(set)"
+            report["done"].append(f"{qid} = (in services/{mod}/.env)")
+            continue
         if state["config"].get(qid) == value and applied(runner, c.key) == value:
             report["skipped"].append(f"{qid}: already {value}")
             continue
@@ -278,8 +337,8 @@ def verify(live: list[Any], root: Path, runner: Runner, report: dict[str, Any]) 
     for e in live:
         for c in e.setup.config:
             value = get_value(root / "config.toml", c.key)
-            if c.choices != "relay-models" or value is None:
-                continue
+            if c.choices != "relay-models" or value is None or (c.when and not any(x.mod == "relay" for x in live)):
+                continue                  # (6.2) a relay question while Chat uses a server of yours isn't checked
             if c.key == "agent.judge.model" and get_value(root / "config.toml", "agent.judge.backend") == "decide":
                 continue                  # a decide model id, not one of the relay's
             models = relay_models(runner, root) if models is None else models

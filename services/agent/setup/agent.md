@@ -3,12 +3,25 @@ id = "agent"
 title = "Chat agent"
 models = []
 scan = []
-summary = "Chat agent: the Chat page's tool loop (files, search, images, speech) on any chat model the relay serves"
+summary = "Chat agent: the Chat page's tool loop (files, search, images, speech) on a chat model the relay serves, or a server you already run"
 gpu = false
 disk_gb = 0.05
 needs = ["uv"]
-after = ["relay"]
 check = "gaifa check agent --start"
+
+[[choose]]                      # capability-enablement 6.2: asked first; the relay is set up only for its answer
+id = "llm"
+text = "How should Chat reach a model? GAIFA's relay runs local engines, holds your provider keys and draws usage charts. A server you already run (an OpenAI-compatible URL, such as http://127.0.0.1:9090/v1) needs no relay, but then Settings → LLMs' servers and keys, the usage charts, GAIFA's GPU slot per request and cloud models aren't there."
+default = "relay"
+
+[[choose.options]]
+value = "relay"
+label = "GAIFA's relay (local engines, your provider keys, usage charts)"
+adds = ["relay"]
+
+[[choose.options]]
+value = "direct"
+label = "A server I already run (its URL, and a key if it needs one)"
 
 [[steps]]
 run = "gaifa install agent"
@@ -23,6 +36,29 @@ key = "services.agent.env.AGENT_MODEL"
 text = "Which model should Chat use? (one your relay serves; with no local LLM, add a hosted provider)"
 required = true
 restart = "agent"
+when = "llm=relay"
+
+[[config]]
+key = "services.agent.env.AGENT_LLM_URL"
+text = "Your server's OpenAI-compatible URL (ending in /v1), e.g. http://127.0.0.1:9090/v1"
+choices = "text"
+required = true
+when = "llm=direct"
+
+[[config]]
+key = "services.agent.env.AGENT_LLM_KEY"
+text = "Its API key, if it needs one (kept in services/agent/.env)"
+choices = "text"
+secret = true
+when = "llm=direct"
+
+[[config]]
+key = "services.agent.env.AGENT_MODEL"
+text = "Which of its models should Chat use?"
+choices = "endpoint-models"
+required = true
+restart = "agent"
+when = "llm=direct"
 
 [[variants]]                    # plan 39.1: no GPU work, so one variant everywhere; tested on Linux
 accel = "cpu"
@@ -36,7 +72,7 @@ The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
 
-The `agent` mod (port 5100) is GAIFA's chat agent: our own tool loop (call the model, run its tool calls, repeat), behind the Chat page and the Learning page (`#/s/agent/learning`). Its one environment is `.venv/` in this folder: FastAPI, uvicorn, httpx and Pillow. It runs no model. Every model call goes to the [relay](../../relay/setup/relay.md) at `http://127.0.0.1:4000/v1`, and every tool call goes through the hub's catalog. So the agent works only when the relay has at least one chat model, and when the model names below exist on your relay.
+The `agent` mod (port 5100) is GAIFA's chat agent: our own tool loop (call the model, run its tool calls, repeat), behind the Chat page and the Learning page (`#/s/agent/learning`). Its one environment is `.venv/` in this folder: FastAPI, uvicorn, httpx and Pillow. It runs no model. Its model calls go to the [relay](../../relay/setup/relay.md) at `http://127.0.0.1:4000/v1`, or, if you choose it at setup, straight to an OpenAI-compatible server you already run (`AGENT_LLM_URL`, with `AGENT_LLM_KEY` in this folder's `.env` when it needs one; capability-enablement 6.1–6.2). The first question of its setup is which: the relay is set up only for that answer. A server of yours gets no relay facts, so a model there runs with an 8,192-token window (`AGENT_WINDOW`), tools on and pictures off, and Settings → LLMs' servers and keys, the usage charts, GAIFA's GPU slot per request and cloud models aren't there. Every tool call goes through the hub's catalog either way.
 
 ## Tested with
 

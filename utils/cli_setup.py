@@ -58,8 +58,15 @@ def _order(root: Path) -> list[str]:
         return []
 
 
-def resolve(targets: list[str], offered: dict[str, setupdocs.Env], root: Path) -> list[setupdocs.Env]:
-    """Mod ids (all their setup docs) or setup ids, plus what they need (`after`), dependencies first."""
+def needs_of(e: setupdocs.Env, values: dict[str, str] | None = None) -> list[str]:
+    """What a setup needs first: its `after`, and what its choices' answers add (capability-enablement 6.2: the relay
+    unless Chat uses a server of yours), the default answer when none is given."""
+    adds = [d for c in e.setup.choose for d in c.option((values or {}).get(f"{e.id}/choose:{c.id}")).adds]
+    return [*e.setup.after, *[d for d in adds if d not in e.setup.after]]
+
+
+def resolve(targets: list[str], offered: dict[str, setupdocs.Env], root: Path, values: dict[str, str] | None = None) -> list[setupdocs.Env]:
+    """Mod ids (all their setup docs) or setup ids, plus what they need (`after`, a choice's `adds`), dependencies first."""
     chosen: dict[str, setupdocs.Env] = {}
     by_mod: dict[str, list[setupdocs.Env]] = {}
     for e in offered.values():
@@ -71,7 +78,7 @@ def resolve(targets: list[str], offered: dict[str, setupdocs.Env], root: Path) -
         if eid not in offered:
             raise Stop("unknown", id=eid, why=why, choices=sorted(set(offered) | set(by_mod)))
         chosen[eid] = offered[eid]
-        for dep in offered[eid].setup.after:
+        for dep in needs_of(offered[eid], values):
             for d in [x.id for x in by_mod[dep]] if dep in by_mod and dep not in offered else [dep]:
                 add(d, f"{eid} needs it")
 
@@ -90,7 +97,8 @@ def resolve(targets: list[str], offered: dict[str, setupdocs.Env], root: Path) -
             return
         if e.id in path:
             raise Stop("cycle", ids=list(path) + [e.id])
-        deps = [x for x in chosen.values() if x.id != e.id and (x.id in e.setup.after or (x.mod in e.setup.after and x.mod != e.mod))]
+        need = needs_of(e, values)
+        deps = [x for x in chosen.values() if x.id != e.id and (x.id in need or (x.mod in need and x.mod != e.mod))]
         for dep in sorted(deps, key=key):
             visit(dep, path + (e.id,))
         seen.add(e.id)
@@ -122,6 +130,11 @@ def plan(envs: list[setupdocs.Env], checks: list[host_mod.Check], hub: list[str]
             steps.append({"id": sid, "setup": e.id, "mod": e.mod, "run": s.run, "what": s.what, "ask": s.ask or None, "interactive": s.interactive})
             if s.ask:
                 questions.append({"id": sid, "kind": "yes-no", "text": s.ask, "answer_with": f"--accept {sid} or --decline {sid}"})
+        for ch in e.setup.choose:                 # capability-enablement 6.2: asked before anything is installed
+            questions.append({"id": f"{e.id}/choose:{ch.id}", "kind": "choice", "text": ch.text, "default": ch.default,
+                              "choices": [o.value for o in ch.options], "labels": {o.value: o.label for o in ch.options},
+                              "adds": {o.value: o.adds for o in ch.options if o.adds},
+                              "answer_with": f'--set "{e.id}/choose:{ch.id}=<{"|".join(o.value for o in ch.options)}>" (default {ch.default})'})
         if e.setup.suggest:
             names = [s.name for s in e.setup.suggest]
             questions.append({"id": f"{e.id}/models", "kind": "models", "text": f"Which models for {e.title}?",
@@ -132,9 +145,12 @@ def plan(envs: list[setupdocs.Env], checks: list[host_mod.Check], hub: list[str]
                                     "licence": s.licence or None, "required": s.required, "gated": s.gated,
                                     "source": s.repo or f"{e.mod} {s.op}"})
         for c in e.setup.config:
-            qid = f"{e.id}/config:{c.key}"
+            qid = f"{e.id}/config:{c.key}" + (f"@{c.when}" if c.when else "")
             questions.append({"id": qid, "kind": "value", "text": c.text, "required": c.required, "after_install": True,
-                              "choices": "the relay's models, once it runs" if c.choices == "relay-models" else c.choices if c.choices == "folder" else list(c.choices),
+                              **({"when": c.when} if c.when else {}), **({"secret": True} if c.secret else {}),
+                              "choices": "the relay's models, once it runs" if c.choices == "relay-models" else
+                              "the server's models, once its URL is given" if c.choices == "endpoint-models" else
+                              c.choices if c.choices in ("folder", "text") else list(c.choices),
                               "answer_with": f'--set "{qid}=<value>"'})
     gpu = any(e.setup.gpu for e in envs)
     env_gb, req_gb, images = sizes(envs)
@@ -252,7 +268,20 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
             targets = [t for t in targets if t not in lost]
             if not targets:
                 raise Stop("unavailable", unavailable=subs["failed"])
-        envs = resolve(targets, offered, root)
+        early = run_mod.read_answers(args)
+        if run_mod.interactive(args):           # capability-enablement 6.2: a choice that changes what is set up comes first
+            for t in targets:
+                for e in [x for x in offered.values() if x.mod == t or x.id == t]:
+                    for ch in e.setup.choose:
+                        qid = f"{e.id}/choose:{ch.id}"
+                        if qid not in early.values:
+                            print(f"\n{ch.text}")
+                            for i, o in enumerate(ch.options, 1):
+                                print(f"  {i}. {o.label}" + (" (default)" if o.value == ch.default else ""))
+                            pick = input("Number, or Enter for the default: ").strip()
+                            early.values[qid] = ch.options[int(pick) - 1].value if pick.isdigit() and 0 < int(pick) <= len(ch.options) else ch.default
+            args.set = [*(getattr(args, "set", None) or []), *[f"{k}={v}" for k, v in early.values.items() if "/choose:" in k]]
+        envs = resolve(targets, offered, root, early.values)
         machine = probe.machine()
         _last.clear()
         _last.update(machine=machine.to_dict(), targets=targets)

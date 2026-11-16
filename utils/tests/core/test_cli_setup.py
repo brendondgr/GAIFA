@@ -830,3 +830,114 @@ def test_a_declined_optional_step_says_what_to_do_later(root: Path, capsys) -> N
     assert cli_setup.cmd_setup(args("search", yes=True, decline=["search/4"]), FakeRunner(fail={"is-yours", "is-no-json"}), FakeProbe()) == 0
     report = out(capsys)
     assert "search/4: declined (optional)" in report["skipped"] and "search/4: search stays off until a SearXNG answers" in report["next"]
+
+
+CHAT = """<!-- gaifa-setup
+id = "chat"
+title = "Chat"
+summary = "Chat"
+gpu = false
+
+[[steps]]
+run = "gaifa install chat"
+what = "the venv"
+
+[[choose]]
+id = "llm"
+text = "How should Chat reach a model?"
+default = "relay"
+
+[[choose.options]]
+value = "relay"
+label = "GAIFA's relay"
+adds = ["relay"]
+
+[[choose.options]]
+value = "direct"
+label = "A server I already run"
+
+[[config]]
+key = "services.chat.env.AGENT_MODEL"
+text = "Which relay model?"
+choices = ["main"]
+required = true
+when = "llm=relay"
+
+[[config]]
+key = "services.chat.env.AGENT_LLM_URL"
+text = "Your server's URL"
+choices = "text"
+required = true
+when = "llm=direct"
+
+[[config]]
+key = "services.chat.env.AGENT_LLM_KEY"
+text = "Its key"
+choices = "text"
+secret = true
+when = "llm=direct"
+
+[[config]]
+key = "services.chat.env.AGENT_MODEL"
+text = "Which of its models?"
+choices = "endpoint-models"
+required = true
+when = "llm=direct"
+-->
+# Chat
+"""
+
+
+def _chat(root: Path) -> None:
+    d = root / "services" / "chat" / "setup"
+    d.mkdir(parents=True)
+    (d.parent / "service.toml").write_text('id = "chat"\n')
+    (d / "env.md").write_text(CHAT)
+
+
+def test_the_choice_is_a_question_and_adds_the_relay_by_default(root: Path, capsys) -> None:
+    """capability-enablement 6.2: asked first, with what each answer means; the relay only for its answer."""
+    _chat(root)
+    assert cli_setup.cmd_setup(args("chat", plan=True), FakeRunner(), FakeProbe()) == 0
+    p = out(capsys)
+    assert p["setups"] == ["relay", "chat"]
+    q = next(x for x in p["questions"] if x["id"] == "chat/choose:llm")
+    assert q["kind"] == "choice" and q["default"] == "relay" and q["choices"] == ["relay", "direct"] and q["adds"] == {"relay": ["relay"]}
+    assert cli_setup.cmd_setup(args("chat", plan=True, set=["chat/choose:llm=direct"]), FakeRunner(), FakeProbe()) == 0
+    assert out(capsys)["setups"] == ["chat"]                       # a server of yours: no relay
+
+
+def test_a_server_of_yours(root: Path, capsys, monkeypatch) -> None:
+    """The URL, the key into .env (never config.toml or the report), its models probed and one chosen; no relay installed."""
+    _chat(root)
+    seen = []
+
+    def models(url, key=None):
+        seen.append((url, key))
+        return ["llama-3.3", "qwen3"]
+    monkeypatch.setattr(cli_setup_config, "endpoint_models", models)
+    r = FakeRunner()
+    answers = ["chat/choose:llm=direct", "chat/config:services.chat.env.AGENT_LLM_URL=http://127.0.0.1:9090/v1",
+               "chat/config:services.chat.env.AGENT_LLM_KEY=sk-secret", "chat/config:services.chat.env.AGENT_MODEL=qwen3"]
+    assert cli_setup.cmd_setup(args("chat", yes=True, set=answers), r, FakeProbe()) == 0
+    report = capsys.readouterr().out
+    assert seen == [("http://127.0.0.1:9090/v1", "sk-secret")]
+    assert "sk-secret" not in report and "sk-secret" not in (root / "config.toml").read_text()
+    env = (root / "services/chat/.env").read_text()
+    assert "AGENT_LLM_KEY=sk-secret" in env and oct((root / "services/chat/.env").stat().st_mode & 0o777) == "0o600"
+    assert not any("install relay" in c for c, _, _ in r.ran)
+    puts = [b for m, p, b in r.calls if m == "PUT" and p == "/api/services/chat/config"]
+    assert any((b or {}).get("env", {}).get("AGENT_MODEL") == "qwen3" for b in puts)
+    assert any((b or {}).get("env", {}).get("AGENT_LLM_URL") == "http://127.0.0.1:9090/v1" for b in puts)
+
+
+def test_a_server_that_doesnt_answer_stops_with_why(root: Path, capsys, monkeypatch) -> None:
+    _chat(root)
+
+    def down(url, key=None):
+        raise OSError(f"nothing answers at {url} (URLError)")
+    monkeypatch.setattr(cli_setup_config, "endpoint_models", down)
+    rc = cli_setup.cmd_setup(args("chat", yes=True, set=["chat/choose:llm=direct", "chat/config:services.chat.env.AGENT_LLM_URL=http://127.0.0.1:9/v1"]),
+                             FakeRunner(), FakeProbe())
+    p = out(capsys)
+    assert rc != 0 and "nothing answers at http://127.0.0.1:9/v1" in json.dumps(p)

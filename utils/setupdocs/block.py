@@ -17,11 +17,13 @@ from dataclasses import dataclass, field
 from typing import Any
 
 TOP = {"id", "title", "models", "scan", "summary", "gpu", "disk_gb", "images", "needs", "after", "check", "steps", "suggest", "config",
-       "variants", "smoke", "recommended"}
+       "variants", "smoke", "recommended", "choose"}
 VARIANT = {"accel", "os", "tested", "env", "steps", "check", "smoke", "note", "needs"}
 ACCELS = ("rocm", "cuda", "xpu", "mps", "vulkan", "cpu")        # utils/hardware ACCELS, in the order they're tried
 OSES = ("linux", "wsl", "darwin")
-CONFIG = {"key", "text", "choices", "required", "restart"}
+CONFIG = {"key", "text", "choices", "required", "restart", "when", "secret"}
+CHOOSE = {"id", "text", "default", "options"}
+OPTION = {"value", "label", "adds"}
 CONFIG_KEY = re.compile(r"^(services\.[a-z][a-z0-9-]{1,31}\.env\.[A-Z][A-Z0-9_]*|agent\.judge\.model)$")
 STEP = {"run", "what", "ask", "interactive", "skip_if", "optional", "next", "ask_if"}
 SUGGEST = {"name", "repo", "revision", "files", "dest", "kind", "op", "body", "size_gb", "good_for", "licence", "required", "gated", "next", "start_op", "start_body", "skip_if"}
@@ -68,6 +70,27 @@ class Config:
     choices: str | list[str] = "relay-models"   # the relay's models once it runs, "folder" (an absolute path outside GAIFA), or a list
     required: bool = False          # no answer stops the run; else it's left for later (the report says so)
     restart: str = ""               # a mod id (or "hub") restarted once it's set
+    when: str = ""                  # capability-enablement 6.2: "<choose id>=<value>": asked only for that answer
+    secret: bool = False            # written to the mod's .env (never config.toml, never a log or a report)
+
+
+@dataclass
+class Option:
+    value: str
+    label: str
+    adds: list[str] = field(default_factory=list)   # setups this answer brings in (the relay)
+
+
+@dataclass
+class Choose:
+    """capability-enablement 6.2: a choice asked before anything is installed; its answer can add setups."""
+    id: str
+    text: str
+    default: str
+    options: list[Option] = field(default_factory=list)
+
+    def option(self, value: str | None) -> Option:
+        return next((o for o in self.options if o.value == (value or self.default)), self.options[0])
 
 
 @dataclass
@@ -95,6 +118,7 @@ class Setup:
     steps: list[Step] = field(default_factory=list)
     suggest: list[Suggest] = field(default_factory=list)
     config: list[Config] = field(default_factory=list)   # values asked after install (choices come from it)
+    choose: list[Choose] = field(default_factory=list)   # capability-enablement 6.2: choices before install
     variants: list[Variant] = field(default_factory=list)   # version 3; empty: see `effective_variants`
     smoke: str = ""                                          # version 3: real work, run with --smoke
     recommended: bool = False                                # capability-enablement 1.4: offered first, pre-ticked; a chat without it says so
@@ -217,11 +241,42 @@ def _config(i: int, d: Any) -> tuple[Config | None, str | None]:
     if not isinstance(d.get("text"), str) or not d["text"].strip():
         return None, f"{where}: `text` must be a non-empty question"
     choices = d.get("choices", "relay-models")
-    if not (choices in ("relay-models", "folder") or _strs(choices)):
-        return None, f"{where}: `choices` must be \"relay-models\", \"folder\" or a list of strings"
+    if not (choices in ("relay-models", "folder", "text", "endpoint-models") or _strs(choices)):
+        return None, f"{where}: `choices` must be \"relay-models\", \"folder\", \"text\", \"endpoint-models\" or a list of strings"
     if not isinstance(d.get("required", False), bool) or not isinstance(d.get("restart", ""), str):
         return None, f"{where}: `required` is true or false, `restart` a mod id or \"hub\""
-    return Config(key=d["key"], text=d["text"].strip(), choices=choices, required=d.get("required", False), restart=d.get("restart", "").strip()), None
+    when = d.get("when", "")
+    if not isinstance(when, str) or (when and "=" not in when):
+        return None, f"{where}: `when` must be \"<choose id>=<value>\""
+    if not isinstance(d.get("secret", False), bool) or (d.get("secret") and not d["key"].startswith("services.")):
+        return None, f"{where}: `secret` is true or false, and only for a services.<id>.env key (it goes to the mod's .env)"
+    return Config(key=d["key"], text=d["text"].strip(), choices=choices, required=d.get("required", False), restart=d.get("restart", "").strip(),
+                  when=when.strip(), secret=d.get("secret", False)), None
+
+
+def _choose(i: int, d: Any) -> tuple[Choose | None, str | None]:
+    where = f"choose[{i}]"
+    if not isinstance(d, dict):
+        return None, f"{where} must be a table ([[choose]])"
+    unknown = sorted(set(d) - CHOOSE)
+    if unknown:
+        return None, f"{where}: unknown key(s) {', '.join(unknown)} (allowed: {', '.join(sorted(CHOOSE))})"
+    for key in ("id", "text", "default"):
+        if not isinstance(d.get(key), str) or not d[key].strip():
+            return None, f"{where}: `{key}` must be a non-empty string"
+    opts = d.get("options")
+    if not isinstance(opts, list) or len(opts) < 2:
+        return None, f"{where}: `options` must be at least two tables ([[choose.options]])"
+    out = []
+    for j, o in enumerate(opts):
+        if not isinstance(o, dict) or set(o) - OPTION or not isinstance(o.get("value"), str) or not isinstance(o.get("label"), str):
+            return None, f"{where}.options[{j}]: value and label strings, and optional adds (setup ids)"
+        if "adds" in o and not (_strs(o["adds"]) or o["adds"] == []):
+            return None, f"{where}.options[{j}]: `adds` must be a list of setup ids"
+        out.append(Option(o["value"].strip(), o["label"].strip(), [a.strip() for a in o.get("adds", [])]))
+    if d["default"] not in {o.value for o in out}:
+        return None, f"{where}: `default` must be one of its options' values"
+    return Choose(d["id"].strip(), d["text"].strip(), d["default"].strip(), out), None
 
 
 def _variant(i: int, d: Any) -> tuple[Variant | None, str | None]:
@@ -301,7 +356,7 @@ def read(data: dict[str, Any]) -> tuple[Setup | None, str | None]:
             return None, "`smoke` must be a non-empty command"
         out.smoke = data["smoke"].strip()
     for key, fn, into in (("steps", _step, out.steps), ("suggest", _suggest, out.suggest), ("config", _config, out.config),
-                          ("variants", _variant, out.variants)):
+                          ("variants", _variant, out.variants), ("choose", _choose, out.choose)):
         v = data.get(key, [])
         if not isinstance(v, list):
             return None, f"`{key}` must be an array of tables ([[{key}]])"

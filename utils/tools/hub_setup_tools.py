@@ -57,9 +57,13 @@ def plan_text(plan: dict[str, Any]) -> str:
 
 async def setup_plan(hub: Hub, args: dict[str, Any]) -> Any:
     plan = await hub.setup.plan(list(args["ids"]))
-    return {"text": plan_text(plan), "questions": plan.get("questions") or [],
-            "blocking": plan.get("blocking") or [], "next": "tell the user all of this, ask the questions, and call hub_setup "
-            "with their answers only once they say yes"}
+    qs = plan.get("questions") or []
+    nxt = ("tell the user all of this and ask its questions; with their answers, call hub_setup (its card is where they confirm)"
+           if qs else "tell the user all of this in your reply and call hub_setup in the same reply: its card shows them the "
+           "setup and asks before anything runs, so don't ask them again first")
+    if plan.get("blocking"):
+        nxt = "tell the user all of this, and the host problems they must fix first (their commands); hub_setup can't run until then"
+    return {"text": plan_text(plan), "questions": qs, "blocking": plan.get("blocking") or [], "next": nxt}
 
 
 async def setup(hub: Hub, args: dict[str, Any]) -> Any:

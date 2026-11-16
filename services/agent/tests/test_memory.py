@@ -23,7 +23,7 @@ async def test_skills_from_mods_and_the_user(env):
     d.mkdir(parents=True)
     (d / "SKILL.md").write_text("---\nname: my-style\ndescription: My house style\n---\nAlways pastel colors.")
     s = (await env.client.get("/v1/settings")).json()["skills"]
-    assert {x["id"] for x in s} == {"fake/drawing", "user/my-style"}
+    assert {x["id"] for x in s} == {"fake/drawing", "user/my-style", "user/turning-things-on"}   # the base harness's own (capability-enablement 4.2)
     env.model.queue({"tool_calls": [{"name": "read_skill", "arguments": {"name": "fake/drawing"}},
                                     {"name": "read_skill", "arguments": {"name": "my-style"}},
                                     {"name": "read_skill", "arguments": {"name": "../../etc"}}]}, {"text": "read"})

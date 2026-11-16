@@ -67,7 +67,9 @@ class Case:
     mods: dict[str, str] = field(default_factory=dict)   # other mods: id → on | not_set_up | off | start_fails | no_searxng
     mode: str = "manual"
     kind: str = "missing"            # missing: says what is missing · auto_answers: Auto without its judge still answers · turns_on: it turns the mod on
+    #                                  · sets_up: plan, card, the setup job, and a reply that says what works
     notes: list[str] = field(default_factory=list)
+    followup: tuple[str, ...] = ()   # later user turns (the yes to a plan)
 
 
 CASES = [Case("a", "not_set_up"), Case("b", "no_searxng", tools=("web_search",)), Case("c", "off", kind="turns_on"), Case("d", "start_fails"),
@@ -77,7 +79,10 @@ CASES = [Case("a", "not_set_up"), Case("b", "no_searxng", tools=("web_search",))
          Case("f", "decide", QUESTION, "decide", (), {"web": "on", "decide": "not_set_up"}, mode="auto", kind="auto_answers"),
          Case("g", "embed", "Find the chat where we talked about boots for Torres del Paine.", "embed",
               ("embed_library_search", "embed_library_collections", "chat_search"), {"embed": "not_set_up"}),
-         Case("h", "calendar", "What's on my calendar tomorrow?", "calendar", ("calendar_agenda",), {"calendar": "off"}, kind="turns_on")]
+         Case("h", "calendar", "What's on my calendar tomorrow?", "calendar", ("calendar_agenda",), {"calendar": "off"}, kind="turns_on"),
+         # plan 4.2: asked to turn it on, the agent shows the plan, asks (a card) and sets it up for real in the scratch root
+         Case("i", "setup", "Turn on web search for me.", "web", ("web_search", "web_fetch"), {"web": "not_set_up"}, kind="sets_up",
+              followup=("Yes, go ahead.",))]
 
 
 # --- the scratch root ---------------------------------------------------------------------------------------------
@@ -204,6 +209,13 @@ def score(events: list[dict[str, Any]], case: Case, seconds: float) -> dict[str,
     ok = (says and (steps_after <= 3) and after_refusal <= 1 and not shell)
     if case.kind == "auto_answers":        # decide not set up in Auto: the fixed rules or a card decide, and the turn answers
         ok = bool(reply.strip()) and not any(e["type"] == "error" for e in events) and steps <= 12
+    elif case.kind == "sets_up":           # plan 4.2: hub_setup_plan, a card for hub_setup, the job done, what works now
+        planned = any(c["name"] == "hub_setup_plan" for c in calls)
+        carded = any(a.get("tool") == "hub_setup" for a in pay("approval"))
+        done = any(c["name"] == "hub_setup" and not _code(results.get(c["id"]) or {}) and
+                   '"done"' in str((results.get(c["id"]) or {}).get("content") or (results.get(c["id"]) or {}).get("result") or "")
+                   for c in calls)
+        ok = planned and carded and done and bool(reply.strip())
     elif case.kind == "turns_on":          # a turned-off mod: the agent turns it on and answers from it
         on = [c for c in calls if c["name"] == "hub_enable_service" and (c.get("arguments") or {}).get("id") == case.mod] + \
              [n for n in pay("note") if f"turned on {case.mod} " in (n.get("text") or "")]     # 2.4: the agent turns it on itself
@@ -227,7 +239,7 @@ async def run_case(case: Case, root: Path, llm: str, model: str, timeout: float)
         await wait_ready(hub)
         h = Harness(f"{hub}/api/s/agent", model, dry_run=False, hub=hub, log=lambda s: None)
         try:
-            run = await h.run(Task(f"missing-{case.id}", "missing", [case.question], [], mode=case.mode,
+            run = await h.run(Task(f"missing-{case.id}", "missing", [case.question, *case.followup], [], mode=case.mode,
                                    settings={"dry_run": False}, timeout=timeout))
         finally:
             await h.close()

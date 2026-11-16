@@ -36,3 +36,15 @@ async def test_a_mods_skill_files(env):
     body, f, nope = (by[c["id"]] for c in env.payloads(tid, "tool_call"))
     assert body["content"].startswith("Use 16:9 for landscapes.") and "- sizes.md (1 KB)" in body["content"]
     assert f["content"] == "1344x768" and nope["error"]["code"] == "not_found"
+
+
+async def test_the_turning_things_on_skill_loads(env):
+    """capability-enablement 4.2: the base harness's skill is listed and read like any other."""
+    s = (await env.client.get("/v1/settings")).json()["skills"]
+    me = next(x for x in s if x["id"] == "user/turning-things-on")
+    assert me["description"].startswith("When something the user asks for is off on this machine")
+    env.model.queue({"tool_calls": [{"name": "read_skill", "arguments": {"name": "user/turning-things-on"}}]}, {"text": "ok"})
+    tid = await env.thread()
+    await env.send(tid, "turn on web search")
+    body = env.payloads(tid, "tool_result")[0]["content"]
+    assert "hub_setup_plan" in body and "hub_setup_test" in body and "gaifa setup --prompt" in body

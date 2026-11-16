@@ -105,3 +105,16 @@ def test_scratch_roots(tmp_path):
     dead = tomllib.loads((roots["no_searxng"] / "config.toml").read_text())
     assert dead["services"]["web"]["env"]["SEARXNG_URL"].endswith(":5299")
     assert (roots["off"] / "services/agent").is_symlink()
+
+
+def test_sets_up_needs_the_plan_a_card_and_a_done_setup():
+    from evals.missing import CASES
+    case = next(c for c in CASES if c.kind == "sets_up")
+    assert case.followup == ("Yes, go ahead.",)
+    evs = [ev(1, "user", text="Turn on web search for me."), ev(2, "usage"), call(3, "c1", "hub_setup_plan", {"ids": ["web"]}),
+           result(4, "c1", "hub_setup_plan"), ev(5, "assistant", text="It installs … Proceed?"), ev(6, "user", text="Yes, go ahead."),
+           ev(7, "usage"), call(8, "c2", "hub_setup", {"ids": ["web"]}), ev(9, "approval", approval_id="a1", tool="hub_setup"),
+           {"seq": 10, "type": "tool_result", "payload": {"id": "c2", "name": "hub_setup", "status": "done", "content": '{"state": "done"}'}},
+           ev(11, "usage"), ev(12, "assistant", text="Web search is set up.")]
+    assert score(evs, case, 8)["ok"]
+    assert not score([e for e in evs if e["type"] != "approval"], case, 8)["ok"]      # no card: not ok

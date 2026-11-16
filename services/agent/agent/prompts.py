@@ -81,9 +81,9 @@ def off_section(unusable: list[dict[str, Any]], services: list[dict[str, Any]] |
 
 
 # capability-enablement 2.2: the rule rides with the section, so a chat where everything is on reads the prompt it always did
-OFF_RULE = ("When a request needs one of these: say in one sentence what is missing and offer what its line says; never reach "
-            "it another way (a shell, another tool). Answer without it if you can, saying what you couldn't check. A "
-            "`capability_unavailable` result is final for this turn unless you turn the mod on.")
+OFF_RULE = ("When a request needs one of these: say in one sentence what is missing and offer what its line says (the skill "
+            "user/turning-things-on says how); never reach it another way (a shell, another tool). Answer without it if you can, "
+            "saying what you couldn't check. A `capability_unavailable` result is final for this turn unless you turn the mod on.")
 
 
 def outputs_table(outputs: list[dict[str, Any]]) -> str:

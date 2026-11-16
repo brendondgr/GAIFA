@@ -245,9 +245,10 @@ One step at a time: each numbered step is one commit (`GAIFA (capability-enablem
 
 ## Phase 5 — Search out of the box: yours, or GAIFA's own SearXNG (M)
 
-- [ ] **5.1 Find the user's SearXNG first: `services/searxng/searx.py`, `services/searxng/server.py`.**
+- [x] **5.1 Find the user's SearXNG first: `services/searxng/searx.py`, `services/searxng/server.py`.**
   - `POST /v1/detect` already looks at `SEARXNG_URL`, `127.0.0.1:8080` and `:8888`, and a container whose image is `searxng/*`. It gains a `port` argument (the dialog's "mine is on port …") and returns one of `yours` (answers, JSON on), `yours_no_json` (answers, JSON refused), `none`, with the URL and the container it found. The choice is saved in `data/state/searxng/source.json` (`{"source": "yours" | "managed", "url"}`), and `GET /v1/endpoint` (what the web mod reads) follows it.
   *Done when:* `services/searxng/tests/test_detect_watch.py` gains the three answers and the saved choice with fake probes.
+  *As built:* `services/searxng/source.py` keeps the choice; `GET`/`POST /v1/source` read and save it (`yours` defaults to what detect found). A detect with a `port` looks there first and ignores `SEARXNG_URL`. Telling *yours* from *yours_no_json* sends one test search with `format=json` per detect. With no choice saved the endpoint is what detect finds, as before.
 - [ ] **5.2 GAIFA's own SearXNG: new `services/searxng/managed.py`, `services/searxng/server.py`, `services/searxng/service.toml`.**
   - `POST /v1/managed` creates and starts a container `gaifa-searxng` with the runtime from `GAIFA_CONTAINER_RUNTIME` (podman, else Docker; rootless), from SearXNG's own image pinned by digest in the setup doc, published on `127.0.0.1:<SEARXNG_MANAGED_PORT>` (default 5200; never 8080, never host networking), with its settings folder `data/state/searxng/managed/` mounted: a `settings.yml` GAIFA writes (`use_default_settings: true`, `search.formats: [html, json]`, the limiter off, a random `secret_key`). It refuses while `source` is `yours`. `DELETE /v1/managed` stops and removes the container (and the image with `?image=true`).
   - The container starts with the mod and stops with it (lifespan), and the mod's status says which SearXNG it uses and whether it answers. The existing settings tools (engines, timeouts, safe search) work on either.

@@ -55,6 +55,7 @@ class Searx:
         self._last_query_ts: float | None = None   # None: no test query yet, so the first round runs one
         self._read_cache: str | None = None      # settings.yml as last read
         self.settings_problem: str | None = None  # why settings.yml can't be used as it is (doesn't parse, …)
+        self.answer: str = "none"                 # capability-enablement 5.1: yours | yours_no_json | none, from the last detect
 
     # ---- detect ------------------------------------------------------------------------------
 
@@ -68,20 +69,33 @@ class Searx:
         except (httpx.HTTPError, ValueError):
             return False
 
-    async def detect(self) -> dict[str, Any]:
+    async def detect(self, port: int | None = None) -> dict[str, Any]:
+        """Find a SearXNG: SEARXNG_URL, else `port` (the user's "mine is on port …") and the usual ports, else a
+        `searxng/*` container. The answer (capability-enablement 5.1): `yours` (it answers and gives JSON),
+        `yours_no_json` (it answers and refuses JSON), or `none`."""
         self.container = await self.runtime.find()
         url, by = None, None
-        if self.env_url:
+        probes = ((f"http://127.0.0.1:{port}",) if port else ()) + tuple(p for p in self.probes if not port or not p.endswith(f":{port}"))
+        if self.env_url and not port:
             url, by = self.env_url, "SEARXNG_URL"
         else:
-            for p in self.probes:
+            for p in probes:
                 if await self._answers(p):
                     url, by = p, "probe"
                     break
-            if url is None and self.container and self.container.url:
+            if url is None and self.container and self.container.url and not port:
                 url, by = self.container.url, "container"
         self.url, self.found_by = url, by
-        return self.found()
+        self.answer = "none" if not url or not await self._answers(url) else ("yours_no_json" if await self._json_refused(url) else "yours")
+        return {**self.found(), "answer": self.answer}
+
+    async def _json_refused(self, url: str) -> bool:
+        """Does this SearXNG refuse `format=json` (403, the default for a fresh SearXNG)?"""
+        try:
+            r = await self.http.get(url + "/search", params={"q": CHECK_QUERY, "format": "json"}, timeout=15)
+            return r.status_code == 403
+        except httpx.HTTPError:
+            return False
 
     def found(self) -> dict[str, Any]:
         c = self.container

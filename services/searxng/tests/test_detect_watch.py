@@ -72,7 +72,7 @@ async def test_test_search_waits_for_its_interval(fake, folder):
     await s.detect()
     await s.tick()
     await s.tick()
-    assert len(fake.queries) == 1                                 # the first round, then not for an hour
+    assert len(fake.queries) == 2      # detect's JSON check (capability-enablement 5.1), the first round, then not for an hour
     await s.http.aclose()
 
 
@@ -251,3 +251,38 @@ async def test_a_cancelled_or_slow_command_leaves_no_process(tmp_path):
     assert not os.path.exists(f"/proc/{pid}")              # killed and reaped (not even a zombie)
     with pytest.raises(Exception, match="took longer"):
         await rt._run("ps", timeout=0.3)
+
+
+# ---- capability-enablement 5.1: the answer and the saved choice ---------------------------------------------------
+
+async def test_detect_answers_yours_no_json_or_none(fake, folder, dead):
+    s = Searx(FakeRuntime(folder, fake), probes=(dead(),))
+    s.container = None
+    found = await Searx(FakeRuntime(folder, None), probes=(fake.url,)).detect()
+    assert found["answer"] == "yours" and found["url"] == fake.url
+    (folder / "settings.yml").write_text(SETTINGS.replace("    - json\n", ""))
+    fake.reload()
+    assert (await Searx(FakeRuntime(folder, None), probes=(fake.url,)).detect())["answer"] == "yours_no_json"
+    assert (await Searx(FakeRuntime(folder, None), probes=(dead(),)).detect())["answer"] == "none"
+    await s.http.aclose()
+
+
+async def test_detect_looks_on_the_port_given_first(fake, folder, dead):
+    port = int(fake.url.rsplit(":", 1)[1])
+    s = Searx(FakeRuntime(folder, None), env_url=dead(), probes=(dead(),))
+    found = await s.detect(port=port)
+    assert found["url"] == fake.url and found["found_by"] == "probe" and found["answer"] == "yours"
+    await s.http.aclose()
+
+
+def test_the_choice_is_saved_and_the_endpoint_follows_it(client, fake, tmp_path, monkeypatch):
+    monkeypatch.setenv("GAIFA_ROOT", str(tmp_path))
+    assert client.get("/v1/source").json()["chosen"] is None
+    r = client.post("/v1/source", json={"source": "yours"})
+    assert r.status_code == 200 and r.json()["chosen"] == {"source": "yours", "url": fake.url}
+    assert json.loads((tmp_path / "data/state/searxng/source.json").read_text())["source"] == "yours"
+    assert client.get("/v1/endpoint").json()["url"] == fake.url
+    client.post("/v1/source", json={"source": "managed", "url": "http://127.0.0.1:5200"})
+    assert client.get("/v1/endpoint").json() == {"url": "http://127.0.0.1:5200", "found_by": "managed", "up": None}
+    assert client.post("/v1/source", json={"source": "elsewhere"}).status_code == 422
+    assert client.post("/v1/detect", json={}).json()["answer"] in ("yours", "yours_no_json", "none")

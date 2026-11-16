@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 import settings as st
+import source as src
 from containers import CliRuntime, Runtime
 from searx import ChangeFailed, Searx
 
@@ -29,6 +30,15 @@ log = logging.getLogger("searxng")
 
 def error(status: int, code: str, detail: str, fix: str, **data: Any) -> JSONResponse:
     return JSONResponse({"detail": detail, "code": code, "fix": fix, **({"data": data} if data else {})}, status_code=status)
+
+
+class DetectIn(BaseModel):
+    port: int | None = Field(None, ge=1, le=65535, description="Look on this port first (\"mine is on port …\")")
+
+
+class SourceIn(BaseModel):
+    source: Literal["yours", "managed"] = Field(description="yours: a SearXNG of yours; managed: GAIFA's own container")
+    url: str | None = Field(None, max_length=200, pattern=r"^https?://", description="yours: its URL (default: what detect found)")
 
 
 class EngineIn(BaseModel):
@@ -95,16 +105,36 @@ def create_app(runtime: Runtime | None = None, env_url: str | None = None, watch
 
     @app.get("/v1/endpoint", summary="The SearXNG URL, for the web mod")
     def endpoint() -> dict:
-        """`url` is null when no SearXNG was found; the web mod then uses its own SEARXNG_URL."""
+        """The chosen SearXNG (capability-enablement 5.1: yours, or GAIFA's own), else what detect found; `url` is null
+        when there is none, and the web mod then uses its own SEARXNG_URL."""
+        chosen = src.load()
+        if chosen and chosen.get("url"):
+            return {"url": chosen["url"], "found_by": chosen["source"], "up": sx.health.get("up") if chosen["url"] == sx.url else None}
         return {"url": sx.url, "found_by": sx.found_by, "up": sx.health.get("up")}
+
+    @app.get("/v1/source", summary="Which SearXNG search uses: yours or GAIFA's own (null: not chosen yet)")
+    def get_source() -> dict:
+        return {"chosen": src.load(), "detected": {"url": sx.url, "answer": sx.answer}}
+
+    @app.post("/v1/source", summary="Choose which SearXNG search uses")
+    async def set_source(body: SourceIn) -> Any:
+        url = body.url or (sx.url if body.source == "yours" else None)
+        if body.source == "yours" and not url:
+            return error(409, "no_searxng", "no SearXNG of yours was found", "give its URL, or start GAIFA's own")
+        saved = src.save(body.source, url)
+        if body.source == "yours" and url != sx.url:
+            sx.env_url = url
+            await sx.detect()
+            await sx.tick()
+        return {"chosen": saved}
 
     @app.get("/v1/found", summary="What was found: URL, container, compose folder, settings file")
     def found() -> dict:
         return sx.found()
 
-    @app.post("/v1/detect", summary="Look for SearXNG again")
-    async def detect() -> dict:
-        out = await sx.detect()
+    @app.post("/v1/detect", summary="Look for SearXNG again: yours (JSON on), yours_no_json, or none")
+    async def detect(body: DetectIn | None = None) -> dict:
+        out = await sx.detect((body.port if body else None))
         await sx.tick()
         return out
 

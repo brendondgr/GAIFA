@@ -75,3 +75,18 @@ def test_interactive_enter_takes_the_recommended(root: Path, monkeypatch, capsys
     assert text.index("Recommended for chat (Enter takes them):") < text.index("The rest:")
     assert "[x] agent" in text and "[x] web" in text and "[ ] relay" in text
     assert "web" in text.split("Run it?")[0]
+
+
+def test_an_agent_without_a_model_is_taken_again(root: Path) -> None:
+    """The fresh-clone check: a run that stopped at the agent's model question left it installed; a resumed --recommended
+    must take it again, not skip it as set up."""
+    add(root, "web", WEB, "read web pages", set_up=False)
+    agent_not_set_up(root)
+    venv = root / "services" / "agent" / ".venv" / "bin"
+    venv.mkdir(parents=True)
+    (venv / "python").write_text("")
+    offered, _ = cli_setup.choices(root)
+    assert rec.is_set_up(root, "agent") and not rec.chat_ready(root) and rec.for_chat(root, offered)[0] == "agent"
+    cfg = root / "config.toml"
+    cfg.write_text(cfg.read_text() + '\n[services.agent.env]\nAGENT_MODEL = "auto"\n')
+    assert rec.chat_ready(root) and "agent" not in rec.for_chat(root, offered)

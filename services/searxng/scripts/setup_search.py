@@ -47,11 +47,25 @@ def runtime() -> str:
     return os.environ.get("GAIFA_CONTAINER_RUNTIME") or ("podman" if shutil.which("podman") else "docker" if shutil.which("docker") else "")
 
 
+def _chosen() -> str | None:
+    """The source saved before (source.json: yours | managed), read without the mod's venv."""
+    sys.path.insert(0, str(HERE))
+    try:
+        import source as src
+        return (src.load() or {}).get("source")
+    except Exception:  # noqa: BLE001: nothing chosen yet, or unreadable
+        return None
+
+
 def main(argv: list[str]) -> int:
     cmd = argv[1] if len(argv) > 1 else "probe"
     if cmd == "probe":
         print(json.dumps(probe()))
         return 0
+    chosen = _chosen()
+    if chosen == "managed" and cmd in ("is", "use-yours"):      # GAIFA's own is already the one search uses: keep it
+        print("GAIFA's own SearXNG is the one search uses (chosen before): kept")
+        return 1 if cmd == "is" else 0
     if cmd == "is":
         found = probe()
         if found["answer"] == argv[2]:
@@ -59,6 +73,8 @@ def main(argv: list[str]) -> int:
         print(f"the SearXNG here is {found['answer']}" + (f" ({found['url']})" if found["url"] else ""))
         return 1
     if cmd == "can-manage":
+        if runtime() and chosen == "managed":
+            return 0                                   # chosen before: the step makes sure it exists and runs
         if runtime():
             if probe()["answer"] == "none":
                 return 0

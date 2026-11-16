@@ -23,8 +23,28 @@ def recommended_mods(root: Path, offered: dict[str, Any]) -> list[str]:
 def for_chat(root: Path, offered: dict[str, Any]) -> list[str]:
     """What `--recommended` and Enter take: the recommended mods, and the agent (required for a chat) when it isn't set up."""
     rec = recommended_mods(root, offered)
-    agent = "agent" in {e.mod for e in offered.values()} and not is_set_up(root, "agent")
+    agent = "agent" in {e.mod for e in offered.values()} and not chat_ready(root)
     return (["agent"] if agent else []) + rec
+
+
+def chat_ready(root: Path) -> bool:
+    """The agent is set up and has a model (AGENT_MODEL in config.toml or its .env): a run that stopped at the model
+    question left it installed but unfinished, and a resumed --recommended takes it again (the fresh-clone check)."""
+    if not is_set_up(root, "agent"):
+        return False
+    if not (_manifest(root, "agent").get("run") or {}).get("command"):
+        return True                                  # an agent run elsewhere (no command here): nothing to tell
+    try:
+        env = (tomllib.loads((root / "config.toml").read_text()).get("services", {}).get("agent", {}).get("env") or {})
+    except (OSError, tomllib.TOMLDecodeError):
+        env = {}
+    if env.get("AGENT_MODEL"):
+        return True
+    try:
+        return any(ln.strip().startswith("AGENT_MODEL=") and ln.split("=", 1)[1].strip()
+                   for ln in (root / "services" / "agent" / ".env").read_text().splitlines())
+    except OSError:
+        return False
 
 
 def _manifest(root: Path, mod: str) -> dict[str, Any]:

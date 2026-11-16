@@ -196,6 +196,9 @@ def _prompt(e: Any, c: Any, choices: list[str], runner: Runner) -> str | None:
             return choices[int(pick) - 1]
 
 
+ENDPOINT_WAIT_S = 60       # a server's first /models may take a while (one took 18-60 s in the fresh-clone check)
+
+
 def endpoint_models(url: str, key: str | None = None) -> list[str]:
     """capability-enablement 6.2: the models an OpenAI-compatible server lists at <url>/models (its key as a bearer token).
     Raises OSError with why when nothing answers there."""
@@ -205,12 +208,12 @@ def endpoint_models(url: str, key: str | None = None) -> list[str]:
 
     req = urllib.request.Request(url.rstrip("/") + "/models", headers={"Authorization": f"Bearer {key}"} if key else {})
     try:
-        with urllib.request.urlopen(req, timeout=10) as r:   # noqa: S310 - the person's own server
+        with urllib.request.urlopen(req, timeout=ENDPOINT_WAIT_S) as r:   # noqa: S310 - the person's own server
             data = _json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
         raise OSError(f"{url} answered HTTP {e.code}" + (" (it needs a key)" if e.code in (401, 403) else "")) from None
     except (urllib.error.URLError, OSError, ValueError) as e:
-        raise OSError(f"nothing answers at {url} ({type(e).__name__})") from None
+        raise OSError(f"nothing answered at {url}/models within {ENDPOINT_WAIT_S} s ({type(e).__name__})") from None
     return [m["id"] for m in (data.get("data") or []) if isinstance(m, dict) and m.get("id")]
 
 
@@ -264,7 +267,8 @@ def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Pat
                 try:
                     choices = endpoint_models(url or "", key)
                 except OSError as err:
-                    raise Stop("unknown-value", id=qid, value=url, choices=f"a server that answers at <url>/models: {err}", doc=doc_of(e, root)) from None
+                    raise Stop("unknown-value", id=qid, value=url, choices=f"a server that answers at <url>/models: {err}", doc=doc_of(e, root),
+                               fix="start the server (or wait until it answers), then run gaifa setup again: it resumes here; or answer the URL question again with --set") from None
             elif c.choices in ("folder", "text"):
                 choices = []
             else:

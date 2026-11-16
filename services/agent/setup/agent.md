@@ -29,7 +29,7 @@ what = "makes .venv/ from requirements-dev.txt (about 45 MB, seconds from uv's c
 
 [[steps]]
 run = "gaifa start agent"
-what = "starts the agent on 127.0.0.1:5100; after install, the wizard asks which of your relay's models it uses"
+what = "starts the agent on its port (5100 unless config.toml moves it); after install, setup asks which model it uses: one your relay serves, or one your own server lists"
 
 [[config]]
 key = "services.agent.env.AGENT_MODEL"

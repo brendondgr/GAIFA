@@ -268,7 +268,7 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
         if not targets:
             if not run_mod.interactive(args):
                 emit(args, {"stage": "choose", "choices": [{"id": e.id, "mod": e.mod, "summary": e.setup.summary, "gpu": e.setup.gpu, "disk_gb": e.setup.disk_gb, "after": e.setup.after,
-                                                            "recommended": e.mod in rec} for e in offered.values()], "recommended": rec, "problems": problems,
+                                                            "recommended": e.mod in rec and e.id == e.mod} for e in offered.values()], "recommended": rec, "problems": problems,
                             "unavailable": subs["failed"], "answer_with": "gaifa setup --recommended, or gaifa setup <mod>…"},
                      "Recommended for chat (gaifa setup --recommended):\n" + "\n".join(f"  {m}" for m in rec) + "\n\nEvery setup:\n" +
                      "\n".join(f"  {e.id:24} {e.setup.summary}" for e in offered.values()))

@@ -89,6 +89,24 @@ def unit_installed() -> bool:
     return (UNIT_DIR / UNIT).exists()
 
 
+def unit_root() -> str | None:
+    """The folder the installed gaifa.service runs (its WorkingDirectory), or None."""
+    try:
+        for line in (UNIT_DIR / UNIT).read_text().splitlines():
+            if line.startswith("WorkingDirectory="):
+                return line.split("=", 1)[1].strip()
+    except OSError:
+        pass
+    return None
+
+
+def unit_is_ours() -> bool:
+    """The service is this folder's: a second clone (a fresh-clone check, a worktree) never drives another GAIFA's hub
+    (capability-enablement, 2026-11-16: `gaifa stop all` in a clone stopped the installed hub)."""
+    root = unit_root()
+    return unit_installed() and (root is None or Path(root).resolve() == Path(CODE).resolve())
+
+
 def render_unit(root: Path = CODE) -> str:
     return TEMPLATE.read_text().replace("@ROOT@", str(root))
 
@@ -412,13 +430,17 @@ def _lifecycle(action: str, target: str | None) -> int:
         if not unit_installed():
             print("gaifa: the hub isn't installed as a service; run `gaifa install` (or `gaifa serve`)", file=sys.stderr)
             return 1
+        if not unit_is_ours():
+            print(f"gaifa: the gaifa service is the GAIFA in {unit_root()}, not this one ({CODE}); this folder's hub isn't a "
+                  "service: stop or start it where it runs (`gaifa serve`, or `python app.py`)", file=sys.stderr)
+            return 1
         rc = systemctl(action, UNIT)
         if rc == 0 and action != "stop" and not wait_up():
             print(f"gaifa: the hub didn't answer at {hub_url()}; see `gaifa logs`", file=sys.stderr)
             return 1
         return rc
     if target == "all":
-        if action == "start" and unit_installed():
+        if action == "start" and unit_is_ours():
             systemctl("start", UNIT)
             wait_up()
         elif action == "start" and _no_unit():
@@ -438,8 +460,10 @@ def _lifecycle(action: str, target: str | None) -> int:
             except ApiError as e:
                 print(f"{s['id']}: {e.detail} ({e.code})", file=sys.stderr)
                 rc = 1
-        if action == "stop" and unit_installed():
+        if action == "stop" and unit_is_ours():
             systemctl("stop", UNIT)
+        elif action == "stop" and unit_installed():
+            print(f"the hub here isn't a service (the gaifa service is the GAIFA in {unit_root()}): left running", file=sys.stderr)
         elif action == "stop" and _no_unit():
             _plat().hub_stop(ROOT)
         return rc
